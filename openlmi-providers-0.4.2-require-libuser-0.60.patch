@@ -1,0 +1,28 @@
+From 352985f9a617b61fbe879e38f72663b6b7771450 Mon Sep 17 00:00:00 2001
+From: Tomas Bzatek <tbzatek@redhat.com>
+Date: Wed, 6 Nov 2013 17:37:01 +0100
+Subject: [PATCH] Require libuser >= 0.60
+
+The commit aac4d3a0d1dc brought new symbols in the code without bumping
+libuser version req.
+---
+ openlmi-providers.spec     | 9 +++++++--
+ src/account/CMakeLists.txt | 2 +-
+ 2 files changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/src/account/CMakeLists.txt b/src/account/CMakeLists.txt
+index 021b5f2..0fdba1f 100644
+--- a/src/account/CMakeLists.txt
++++ b/src/account/CMakeLists.txt
+@@ -42,7 +42,7 @@ set(TARGET_MOF "${CMAKE_BINARY_DIR}/mof/90_LMI_Account_Profile.mof")
+ profile_mof_generate("90_LMI_Account_Profile.mof.skel" "${TARGET_MOF}" "${CIM_PROVIDERS_CLASSES}")
+ 
+ # Require libuser
+-pkg_check_modules(LIBUSER REQUIRED libuser)
++pkg_check_modules(LIBUSER REQUIRED libuser>=0.60)
+ 
+ include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMPI_INCLUDE_DIR} ${GLIB_INCLUDE_DIRS} ${LIBUSER_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/src/indmanager)
+ 
+-- 
+1.8.4.2
+

@@ -1,0 +1,167 @@
+[LMI_SoftwareIdentity]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_SystemSoftwareCollection]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_HostedSoftwareCollection]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance association
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_MemberOfSoftwareCollection]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance association
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_InstalledSoftwareIdentity]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance association
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_SoftwareIdentityResource]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance method
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_ResourceForSoftwareIdentity]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance association
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_HostedSoftwareIdentityResource]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance association
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_SoftwareInstallationService]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance method
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_SoftwareInstallationServiceCapabilities]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance method
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_AssociatedSoftwareInstallationServiceCapabilities]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance association
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_HostedSoftwareInstallationService]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance association
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_SoftwareInstallationServiceAffectsElement]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance association
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_SoftwareJob]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance method
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_SoftwareInstallationJob]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance method
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_SoftwareVerificationJob]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance method
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_SoftwareMethodResult]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_AssociatedSoftwareJobMethodResult]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance association
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_OwningSoftwareJobElement]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance association
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_AffectedSoftwareJobElement]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance association
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_SoftwareInstCreation]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: indication
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_SoftwareInstModification]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: indication
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_SoftwareIdentityFileCheck]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance method
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
+[LMI_SoftwareIdentityChecks]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: instance association
+   namespace: root/cimv2
+   group: pycmpiLMI_Software

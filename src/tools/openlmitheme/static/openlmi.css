@@ -1,0 +1,78 @@
+@import url("default.css");
+
+/* Most of this file is taken from openlmi.org CSS */
+
+p.caption {
+    font-size: 90%;
+    font-style: italic;
+}
+
+h1 {
+    font-size: 2em;
+    line-height: 1;
+}
+
+div.sphinxsidebar li li {
+    padding: 0.4em 0.1em 0 0;
+}
+
+div.body {
+    font-size: 1.071em;
+}
+
+div.related {
+    background-color: #48a9e4;
+    background-image: -moz-linear-gradient(top, #0779bf 0%, #48a9e4 100%);
+    background-image: -ms-linear-gradient(top, #0779bf 0%, #48a9e4 100%);
+    background-image: -o-linear-gradient(top, #0779bf 0%, #48a9e4 100%);
+    background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #0779bf), color-stop(1, #48a9e4));
+    background-image: -webkit-linear-gradient(top, #0779bf 0%, #48a9e4 100%);
+    background-image: linear-gradient(top, #0779bf 0%, #48a9e4 100%);
+    line-height: 15px;
+    padding-bottom: 10px;
+}
+
+div.related ul {
+    font-weight:bold;
+}
+body {
+    font-size: 87%;
+}
+
+img.logo {
+    padding: 15px 15px 15px 10px;
+}
+
+div.logo {
+    float: left;
+}
+
+div.header {
+    padding-top: 15px;
+    margin: 0 0 10px 15px;
+}
+
+h1.header {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+div.sphinxsidebarwrapper {
+    padding: 15px 20px;
+    margin: 15px;
+    background-color: #f6f6f2;
+    word-wrap: break-word; /* don't overflow with large items like LMI_SoftwareInstallationServiceAffectsElement*/
+} 
+
+div.sphinxsidebar {
+    width: 280px; /* make the sidebar a bit wider */
+}
+div.bodywrapper {
+    margin: 0 0 0 280px; /* make the sidebar a bit wider */
+}
+div.sphinxsidebar #searchbox input[type="submit"] {
+    word-wrap: normal; /* don't wrap the search button */
+}
+
+div.sphinxsidebar ul {
+   margin: 10px 0px 10px 0px;
+}

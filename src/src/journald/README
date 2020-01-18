@@ -1,0 +1,26 @@
+= Description =
+
+The LMI_Journald provider exposes data stored in SystemD Journal service. See
+http://www.freedesktop.org/wiki/Software/systemd/ for more information.
+
+For the moment, global journal is used, all journal files are mixed together.
+This may change in the future.
+
+The CIM classes have been selected to be consistent with those used by
+sblim-cmpi-syslog, for easy integration with existing tools. I haven't been able
+to find a profile for CIM_LogRecord and CIM_MessageLog classes though.
+
+There's a related DMTF profile DSP1010 "Record Log Profile" which may be subject
+to extension of this provider.
+
+
+== Limiting number of instances enumerated ==
+
+Testing the provider showed up an issue with enumeration of LMI_JournalLogRecord
+instances. On the testing machine there was 199583 journal records, which is simply
+too much for the CIMOM, exceeding limits of memory and resulting reply.
+
+An artificial limit has been set, currently to 1000 last records. This limit is
+set by the JOURNAL_MAX_INSTANCES_NUM define in Journal.h source file. A solution
+is being searched on how to deal with this issue in a nice way. For now take it
+as a tail of the log.

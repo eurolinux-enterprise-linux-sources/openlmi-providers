@@ -1,0 +1,22 @@
+instance of PG_ProviderProfileCapabilities
+{
+    CapabilityID = "@CLASS@";
+
+    ProviderModuleName = "cmpiLMI_Realmd";
+
+    ProviderName = "@CLASS@";
+
+    RegisteredProfile = 0;
+
+    OtherRegisteredProfile = "OpenLMI-Realmd";
+    OtherProfileOrganization = "OpenLMI";
+
+    ProfileVersion = "@VERSION@";
+
+    RegisteredSubProfiles = {};
+
+    ConformingElements = {
+       "@CLASS@"
+    };
+};
+

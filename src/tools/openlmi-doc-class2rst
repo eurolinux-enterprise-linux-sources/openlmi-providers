@@ -1,0 +1,480 @@
+#!/usr/bin/python
+#
+# Copyright (C) 2012 Red Hat, Inc.  All rights reserved.
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+#
+# Authors: Jan Safranek <jsafrane@redhat.com>
+#          Radek Novacek <rnovacek@redhat.com>
+#
+
+import os
+import konkretmof
+import optparse
+import re
+import cgi
+import sys
+
+class HtmlExporter(object):
+
+    def __init__(self):
+        self.classcache = {}
+        # original list of classes
+        self.classes = []
+        # list of all classes to print, i.e. incl. all parents
+        self.queue = []
+        self.file = None
+
+    def link(self, classname, attributename = ""):
+        if attributename:
+            link = classname + "-" + attributename
+        else:
+            link = classname
+        link = str(link).replace("_","-")
+        return link
+
+    def print_escaped(self, string, prefix = ""):
+        # replace \n with prefixes
+        lines = string.split("\n")
+        for line in lines:
+            print >>self.file, prefix + line
+            print >>self.file, ""
+
+    def source_class(self, c, param):
+        """
+            Find a class where a CIMMethod or CIMProperty is first defined.
+            Start at class c and inspect all parents.
+        """
+
+        while True:
+            if isinstance(param, konkretmof.MOF_Method_Decl):
+                if not c.methods().has_key(param.name):
+                    break
+            else:
+                if not c.properties().has_key(param.name):
+                    break
+
+            if not c.super_class:
+                # we're at the top class
+                return c.name
+
+            parent = c
+            c = c.super_class
+        return parent.name
+
+    def display_type(self, param):
+        """
+            Return displayable type of given parameter.
+            It adds [] if it's array and class name of referenced classes.
+        """
+        url = False
+        if isinstance(param, konkretmof.MOF_Reference_Decl):
+            ptype = param.class_name
+            url = True
+        elif isinstance(param, konkretmof.MOF_Parameter) and (param.data_type == konkretmof.TOK_REF):
+            ptype = param.ref_name
+            self.add_class(param.ref_name)
+            url = True
+        else:
+            ptype = param.type_name()
+
+        if isinstance(param, (konkretmof.MOF_Property_Decl, konkretmof.MOF_Parameter)) and param.array_index != 0:
+            ptype = ptype + "[]"
+        if url:
+            if ptype.endswith("[]"):
+                ptype = ":ref:`%s <%s>`" % (ptype, self.link(ptype[:-2]))
+            else:
+                ptype = ":ref:`%s <%s>`" % (ptype, self.link(ptype))
+        else:
+            ptype = "``" + ptype + "``"
+        return ptype
+
+    def print_parameters(self, params):
+        """
+            Print table of method parametes.
+        """
+        function_indent = " "*4
+        if not params:
+            print >>self.file, "*None*"
+            return
+
+        for p in params:
+            param_indent = " "*8
+            direction = set()
+            if p.qualifiers and p.qualifiers.has_key("out"):
+                direction.add("*OUT*")
+            if p.qualifiers and p.qualifiers.has_key("in"):
+                if p.qualifiers.get("in").params.value():
+                    direction.add("*IN*")
+            if not direction:
+                direction.add("*IN*")
+            direction = ", ".join(sorted(direction))
+
+            print >>self.file, param_indent + "%s %s **%s**" % (direction, self.display_type(p), p.name)
+            if p.qualifiers:
+                self.print_qualifiers(p.qualifiers, param_indent+ " "*4)
+            print >>self.file, param_indent
+        print >>self.file, function_indent
+
+    def print_prototype(self, method):
+        """ Print function prototype """
+        self.file.write("``" + method.type_name() + "`` ")
+        self.file.write("**" + method.name + "** (")
+        params = []
+        if method.parameters:
+            for p in method.parameters:
+                params.append((self.display_type(p) + " " + p.name))
+        self.file.write(", ".join(params))
+        self.file.write(")\n")
+
+    def print_table(self, col1, col2, indent):
+        """
+            Print table with two columns.
+        """
+        len1 = max(max(map(len, col1)), len("ValueMap"))
+        len2 = max(max(map(len, col2)), len("Values"))
+        separator = "="*len1 + " " + "="*len2
+        print >>self.file, indent + separator
+        print >>self.file, indent + format("ValueMap", str(len1)) + " " + format("Values", str(len2))
+        print >>self.file, indent + separator
+        for i in range(len(col1)):
+            print >>self.file, indent + format(col1[i], str(len1)) + " " + format(col2[i], str(len2))
+        print >>self.file, indent + separator
+
+    def print_qualifiers(self, qualifiers, indent):
+        """
+            Print content of table of qualifiers.
+            Only Deprecated, Description, Values and ValueMap are recognized.
+        """
+        deprecated = ""
+        values = None
+        maps = None
+        if not qualifiers:
+            return
+        for q in sorted(qualifiers):
+            if not q:
+                continue
+            qname = q.name.lower()
+            if qname == "deprecated":
+                deprecated = "**Deprecated!** "
+            if qname == "description":
+                if deprecated:
+                    print >>self.file, indent + deprecated
+                self.print_escaped(q.params.value(), indent)
+            if qname == "values":
+                values = []
+                for p in q.params:
+                    values.append(p.value())
+            if qname == "valuemap":
+                maps = []
+                for p in q.params:
+                    maps.append(p.value())
+        print >>self.file, indent
+        if maps and values:
+            self.print_table(maps, values, indent)
+            print >>self.file, indent
+
+    def print_keys(self, class_hiearchy):
+        print >>self.file, "Key properties"
+        print >>self.file, "^^^^^^^^^^^^^^"
+        print >>self.file, ""
+        for cls in class_hiearchy:
+            for prop in cls.properties().values():
+                if prop.qualifiers and prop.qualifiers.has_key('key'):
+                    src = self.source_class(cls, prop)
+                    link = self.link(src, prop.name)
+                    print >>self.file, "| :ref:`%s <%s>`" % (prop.name, link)
+        print >>self.file, ""
+
+    def print_class(self, c):
+        """
+            Print one class, inc. header.
+        """
+        # We want to print following qualifiers for properties/methods
+        known_qualifiers = ("deprecated", "description", "values", "valuemap")
+        parent = None
+        class_hiearchy = [c]
+        cc = c
+        while cc.super_class:
+            cc = cc.super_class
+            class_hiearchy.append(cc)
+
+        if c.super_class:
+            parent = c.super_class
+            print >>self.file, "Subclass of :ref:`%s <%s>`" % (c.super_class_name, self.link(c.super_class_name))
+            print >>self.file, ""
+
+        for cls in class_hiearchy:
+            if cls.qualifiers:
+                description = cls.qualifiers.get("description")
+                if description:
+                    self.print_escaped(description.params.value(), "")
+                    break
+        print >>self.file, ""
+
+        self.print_keys(class_hiearchy)
+
+        # Create dictionaries with properties and methods of given class and fill them
+        properties = {}
+        methods = {}
+        for cls in class_hiearchy:
+            for prop in cls.properties().values():
+                if prop.name not in properties.keys():
+                    properties[prop.name] = prop
+                    prop.cls = cls
+                    prop.is_local = cls == c
+                    prop.known_qualifiers = {}
+                    if prop.qualifiers:
+                        for q in known_qualifiers:
+                            prop.known_qualifiers[q] = prop.qualifiers.get(q)
+                else:
+                    inherited_prop = properties[prop.name]
+                    for q in known_qualifiers:
+                        if not inherited_prop.known_qualifiers[q]:
+                            inherited_prop.known_qualifiers[q] = prop.qualifiers.get(q)
+            for meth in cls.methods().values():
+                if meth.name not in methods.keys():
+                    methods[meth.name] = meth
+                    meth.cls = cls
+                    meth.is_local = cls.name == c.name
+                    meth.known_qualifiers = {}
+                    if meth.qualifiers:
+                        for q in known_qualifiers:
+                            meth.known_qualifiers[q] = meth.qualifiers.get(q)
+                else:
+                    inherited_meth = methods[meth.name]
+                    for q in known_qualifiers:
+                        if not inherited_meth.known_qualifiers[q]:
+                            inherited_meth.known_qualifiers[q] = meth.qualifiers.get(q)
+
+        print >>self.file, "Local properties"
+        print >>self.file, "^^^^^^^^^^^^^^^^"
+        print >>self.file, ""
+        present = False
+        for prop in properties.values():
+            if prop.is_local:
+                present = True
+                prop_link = self.link(c.name, prop.name)
+                print >>self.file, ".. _%s:" % (prop_link)
+                print >>self.file, ""
+                print >>self.file, "%s **%s**" % (self.display_type(prop), prop.name)
+                print >>self.file, ""
+                self.print_qualifiers(prop.known_qualifiers.values(), " "*4)
+        if not present:
+            print >>self.file, "*None*"
+        print >>self.file, ""
+
+        print >>self.file, "Local methods"
+        print >>self.file, "^^^^^^^^^^^^^"
+        print >>self.file, ""
+        present = False
+        for m in methods.values():
+            if m.is_local:
+                present = True
+                link = self.link(c.name, m.name)
+                print >>self.file, "    .. _%s:" % (link)
+                print >>self.file, ""
+                self.print_prototype(m)
+                print >>self.file, ""
+                self.print_qualifiers(m.known_qualifiers.values(), " "*4)
+                print >>self.file, "    **Parameters**"
+                print >>self.file, "    "
+                self.print_parameters(m.parameters)
+        if not present:
+            print >>self.file, "*None*"
+        print >>self.file, ""
+
+        print >>self.file, "Inherited properties"
+        print >>self.file, "^^^^^^^^^^^^^^^^^^^^"
+        print >>self.file, ""
+        present = False
+        for prop in properties.values():
+            if not prop.is_local:
+                present = True
+                link = self.link(prop.cls.name, prop.name)
+                print >>self.file, "| %s :ref:`%s <%s>`" % (self.display_type(prop), prop.name, link)
+        if not present:
+            print >>self.file, "*None*"
+        print >>self.file, ""
+
+        print >>self.file, "Inherited methods"
+        print >>self.file, "^^^^^^^^^^^^^^^^^"
+        print >>self.file, ""
+        present = False
+        for m in methods.values():
+            if not m.is_local:
+                present = True
+                link = self.link(m.cls.name, m.name)
+                print >>self.file, "| :ref:`%s <%s>`" % (m.name, link)
+        if not present:
+            print >>self.file, "*None*"
+        print >>self.file, ""
+
+
+    def print_file(self, filename):
+        f = open(filename, "r")
+        data = f.read()
+        self.file.write(data)
+        f.close()
+
+    def print_page(self, c, header, footer):
+        print "exporting ", c.name
+        self.file = open(c.name + ".rst", "w")
+        print >>self.file, ".. _%s:" % self.link(c.name)
+        print >>self.file, ""
+        print >>self.file, c.name
+        print >>self.file, "-"*len(c.name)
+        print >>self.file, ""
+        if header:
+            self.print_file(header)
+        self.print_class(c)
+        if footer:
+            self.print_file(footer)
+        self.file.close()
+
+    def add_class(self, classname):
+        if classname in self.classes:
+            return
+        c = konkretmof.MOF_Class_Decl.list.fget().find(classname)
+        if not c:
+            print 'No such class "%s"' % classname
+            return
+        self.classes.append(classname)
+        print "adding", c.name
+        self.queue.append(c)
+        if c.super_class:
+            self.add_class(c.super_class_name)
+
+    def export(self, header=None, footer=None):
+        """
+            Print everything, i.e. index.rst + all classes + all their parents.
+        """
+        # remove duplicate classes from the queue (and sort them)
+        self.queue.sort(key=lambda c:c.name)
+        self.print_tree_rst(header, footer)
+        self.print_index_rst(header, footer)
+        while self.queue:
+            c = self.queue.pop()
+            self.print_page(c, header, footer)
+
+    def _do_print_tree(self, name, subtree, level):
+        nbsp=" |nbsp| "
+        if level:
+            print >>self.file, "|    "  + ("\\|"+nbsp*7)*(level-1) + "\\|---",
+        else:
+            print >>self.file, "|",
+        if name in self.classes:
+            print >>self.file, "\*",
+        link = self.link(name)
+        print >>self.file, ":ref:`%s <%s>`" % (name, link)
+        for n in subtree.keys():
+            self._do_print_tree(n, subtree[n], level+1)
+
+    def print_tree(self):
+        """
+            Create inheritance tree of classes.
+        """
+        # hash classname -> list of hash of (direct) sublasses 
+        subclasses = {}
+        # hash classname -> nr. of its parents
+        parents = {}
+        # initialize the hash
+        for c in self.queue:
+            subclasses[c.name] = {}
+            parents[c.name] = 0
+
+        # fill the hash
+        for c in self.queue:
+            if c.super_class:
+                subclasses[c.super_class_name][c.name] = subclasses[c.name]
+                parents[c.name] += 1
+
+        print >>self.file, ".. |nbsp| unicode:: 0xA0"
+        print >>self.file, "    :trim:"
+        print >>self.file, ""
+        # print all top classes
+        for c in self.queue:
+            if parents[c.name] == 0:
+                self._do_print_tree(c.name, subclasses[c.name], 0)
+
+    def print_index(self):
+        """
+            Create table of content.
+        """
+        # hash classname -> list of hash of (direct) sublasses 
+        print >>self.file, ".. toctree::"
+        print >>self.file, "    :maxdepth: 1"
+        print >>self.file, ""
+        # print all top classes
+        for c in self.queue:
+            print >>self.file, "    " + c.name
+
+
+    def print_tree_rst(self, header, footer):
+        print "exporting tree"
+        self.file = open("tree.rst", "w")
+        print >>self.file, "Inheritance tree"
+        print >>self.file, "================"
+        print >>self.file, ""
+
+        self.print_tree()
+        self.file.close()
+
+    def print_index_rst(self, header, footer):
+        print "exporting index"
+        self.file = open("index.rst", "w")
+        if header:
+            self.print_file(header)
+        self.print_index()
+        if footer:
+            self.print_file(footer)
+        self.file.close()
+
+description = """
+Generate RST documentation from given MOF files. It generates separate RST file for each class
+specified on command line and for all it's parents.
+
+The tool also generates tree.rst with inheritance tree and index.rst with table of content.
+
+The index.rst will optionally contain header and/or footer. Both must be valid
+RST code snippets and will be inserted just at the beginning or at the end of the file.
+
+Use Sphinx to generate html documentation from the RST files.
+"""
+
+parser = optparse.OptionParser(usage="usage: %prog [options] classname [classname ...]", description=description)
+parser.add_option('-M', '--mof', action='append', dest='mof', default=[], help='MOF files to generate documentation from, can be used multiple times')
+parser.add_option('-S', '--schema', action='append', dest='schema', default=[], help='MOF files to scan for dependencies, can be used multiple times')
+parser.add_option('-H', '--header', action='store', dest='header', default=None, help='File with HTML page header')
+parser.add_option('-F', '--footer', action='store', dest='footer', default=None, help='File with HTML page footer')
+
+(options, args) = parser.parse_args()
+
+exporter = HtmlExporter()
+
+for mof in options.schema:
+    konkretmof.MOF_add_include_path(os.path.dirname(mof))
+    konkretmof.MOF_parse_file(mof)
+
+for mof in options.mof:
+    konkretmof.MOF_parse_file(mof)
+
+for cls in konkretmof.MOF_Class_Decl.list.fget():
+    if cls.file_name in options.mof:
+        exporter.add_class(cls.name)
+for cls in args:
+    exporter.add_class(cls)
+
+exporter.export(options.header, options.footer)

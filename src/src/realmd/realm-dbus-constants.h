@@ -1,0 +1,66 @@
+/* realmd -- Realm configuration service
+ *
+ * Copyright 2012 Red Hat Inc
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation; either version 2 of the licence or (at
+ * your option) any later version.
+ *
+ * See the included COPYING file for more information.
+ *
+ * Author: Stef Walter <stefw@gnome.org>
+ */
+
+#ifndef __REALM_DBUS_CONSTANTS_H__
+#define __REALM_DBUS_CONSTANTS_H__
+
+#define   REALM_DBUS_BUS_NAME                      "org.freedesktop.realmd"
+#define   REALM_DBUS_SERVICE_PATH                  "/org/freedesktop/realmd"
+
+#define   DBUS_PEER_INTERFACE                      "org.freedesktop.DBus.Peer"
+#define   DBUS_PROPERTIES_INTERFACE                "org.freedesktop.DBus.Properties"
+#define   DBUS_INTROSPECTABLE_INTERFACE            "org.freedesktop.DBus.Introspectable"
+
+#define   REALM_DBUS_PROVIDER_INTERFACE            "org.freedesktop.realmd.Provider"
+#define   REALM_DBUS_REALM_INTERFACE               "org.freedesktop.realmd.Realm"
+#define   REALM_DBUS_KERBEROS_INTERFACE            "org.freedesktop.realmd.Kerberos"
+#define   REALM_DBUS_KERBEROS_MEMBERSHIP_INTERFACE "org.freedesktop.realmd.KerberosMembership"
+#define   REALM_DBUS_SERVICE_INTERFACE             "org.freedesktop.realmd.Service"
+
+#define   REALM_DBUS_DIAGNOSTICS_SIGNAL            "Diagnostics"
+
+#define   REALM_DBUS_ERROR_INTERNAL                "org.freedesktop.realmd.Error.Internal"
+#define   REALM_DBUS_ERROR_FAILED                  "org.freedesktop.realmd.Error.Failed"
+#define   REALM_DBUS_ERROR_BUSY                    "org.freedesktop.realmd.Error.Busy"
+#define   REALM_DBUS_ERROR_NOT_AUTHORIZED          "org.freedesktop.realmd.Error.NotAuthorized"
+#define   REALM_DBUS_ERROR_CANCELLED               "org.freedesktop.realmd.Error.Cancelled"
+#define   REALM_DBUS_ERROR_ALREADY_CONFIGURED      "org.freedesktop.realmd.Error.AlreadyConfigured"
+#define   REALM_DBUS_ERROR_NOT_CONFIGURED          "org.freedesktop.realmd.Error.NotConfigured"
+#define   REALM_DBUS_ERROR_AUTH_FAILED             "org.freedesktop.realmd.Error.AuthenticationFailed"
+
+#define   REALM_DBUS_DISCOVERY_DOMAIN              "domain"
+#define   REALM_DBUS_DISCOVERY_KDCS                "kerberos-kdcs"
+#define   REALM_DBUS_DISCOVERY_REALM               "kerberos-realm"
+
+#define   REALM_DBUS_NAME_CHARS                    "abcdefghijklnmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+
+#define   REALM_DBUS_LOGIN_POLICY_ANY              "allow-any-login"
+#define   REALM_DBUS_LOGIN_POLICY_PERMITTED        "allow-permitted-logins"
+#define   REALM_DBUS_LOGIN_POLICY_DENY             "deny-any-login"
+
+#define   REALM_DBUS_OPTION_OPERATION              "operation"
+#define   REALM_DBUS_OPTION_COMPUTER_OU            "computer-ou"
+#define   REALM_DBUS_OPTION_SERVER_SOFTWARE        "server-software"
+#define   REALM_DBUS_OPTION_CLIENT_SOFTWARE        "client-software"
+#define   REALM_DBUS_OPTION_MEMBERSHIP_SOFTWARE    "membership-software"
+#define   REALM_DBUS_OPTION_ASSUME_PACKAGES        "assume-packages"
+
+#define   REALM_DBUS_IDENTIFIER_ACTIVE_DIRECTORY   "active-directory"
+#define   REALM_DBUS_IDENTIFIER_WINBIND            "winbind"
+#define   REALM_DBUS_IDENTIFIER_FREEIPA            "freeipa"
+#define   REALM_DBUS_IDENTIFIER_SSSD               "sssd"
+#define   REALM_DBUS_IDENTIFIER_SAMBA              "samba"
+#define   REALM_DBUS_IDENTIFIER_ADCLI              "adcli"
+
+#endif /* __REALM_DBUS_CONSTANTS_H__ */

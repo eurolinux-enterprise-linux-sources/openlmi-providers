@@ -1,0 +1,17 @@
+#!/bin/bash -x
+
+if [ $# -ne 4 ]; then
+    echo "Usage: $0 <mock-config> <openlmi-providers tag> <openlmi-networking tag> <openlmi-storage tag>"
+    exit 1
+fi
+
+MOCK=$1
+shift
+
+mock -r $MOCK --install plantuml konkretcmpi-devel openlmi-providers-devel git dia python-sphinx cim-schema cmake sblim-cmpi-devel glib2-devel check-devel NetworkManager-devel libuuid-devel dbus-glib-devel python-sphinx-theme-openlmi graphviz systemd-devel pciutils-devel libuser-devel
+mock -r $MOCK --shell "rm -rf /builddir/doc/ /builddir/gendoc-mock-inside"
+mock -r $MOCK --copyin gendoc-mock-inside /builddir || exit 1
+mock -r $MOCK --copyin doc /builddir/doc || exit 1
+mock -r $MOCK --shell /builddir/gendoc-mock-inside $* || exit 1
+mock -r $MOCK --copyout /builddir/doc/doc.tgz . || exit 1
+mock -r $MOCK --shell "rm -rf /builddir/doc/* /builddir/gendoc-mock-inside"

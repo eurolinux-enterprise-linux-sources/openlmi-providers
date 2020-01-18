@@ -1,0 +1,394 @@
+/*
+ * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Authors: Roman Rakus <rrakus@redhat.com>
+ */
+
+[ Version("0.3.0"),
+  Description("Class representing Linux Account"),
+  Provider("cmpi:cmpiLMI_Account")
+]
+class LMI_Account: CIM_Account
+{
+  [ Description("User's home directory") ]
+  string HomeDirectory;
+
+  [ Description("User's login shell") ]
+  string LoginShell;
+
+  [ Description("The date when was password last changed") ]
+  datetime PasswordLastChange;
+
+  [ Description("Minimum number of days between password change") ]
+  datetime PasswordPossibleChange;
+
+  [ Description("Number of days of warning before password expires") ]
+  datetime PasswordExpirationWarning;
+
+  [ Description("Maximum number of days between password change") ]
+  datetime PasswordInactivation;
+
+  [ Description("The date of expiration of the account.") ]
+  datetime AccountExpiration;
+
+  [ Description (
+      "Delete the user. Along with the user, the home directory and user's "
+      "primary group are deleted. If the user is not owner of the home "
+      "directory it is not deleted. However this directory can be deleted "
+      "if force parameter is set to True." ),
+       ValueMap { "0", "1", "..", "4096", "4097", "4098", "4099" },
+       Values { "Operation completed successfully",
+          "Failed",
+          "DMTF Reserved",
+          "Non existing user",
+          "Unable to delete Home Direcotry",
+          "Unable to remove user, home directory removed",
+          "Unable to remove group, user and home directory removed" }]
+  uint32 DeleteUser(
+      [IN, Description (
+          "By default the user's home directory is deleted. Set to true "
+          "to not delete the home directory.")]
+      boolean DontDeleteHomeDirectory,
+      [IN, Description (
+          "By default the user's private group, if the user has one, "
+          "is deleted. Set to true to not delete the group.")]
+      boolean DontDeleteGroup,
+      [IN, Description (
+          "Force the deletion of user's home directory, even if the user "
+          "is not an owner.")]
+      boolean Force);
+
+  [ Description (
+      "Change the user's password."),
+       ValueMap { "0", "1"},
+       Values { "Operation completed successfully",
+          "Failed"}]
+  uint32 ChangePassword(
+      [Required, IN, Description (
+          "Plaintext string to which set the password; provider will encrypt "
+          "the string using the default crypto algorithm")]
+      String Password);
+
+};
+
+[ Version("0.2.0"),
+  Description("LMI_AccountManagementService creates, manages, and if necessary "
+        "destroys Linux Accounts on behalf of other SecurityServices."),
+  Provider("cmpi:cmpiLMI_Account")
+]
+class LMI_AccountManagementService: CIM_SecurityService
+// It would be good to inherit from CIM_AccountManagementService
+// however I don't if to create instance from embeddedinstance is a good way
+{
+   [ Description ( "Create a new account on the system"),
+       ValueMap { "0", "1", "2", "..", "4096", "4097"},
+       Values { "Operation completed successfully",
+          "Operation unsupported",
+          "Failed",
+          "DMTF Reserved",
+          "Unable to set password, user created",
+          "Unable to create home directory, user created and password set" }]
+   uint32 CreateAccount(
+         [Required, IN, Description (
+             "The scoping ComputerSystem in which to create the Account."
+              )]
+      CIM_ComputerSystem REF System,
+         [Required, IN, Description (
+             "Desired user login name for the account to be created." ) ]
+      string Name,
+         [IN, Description (
+             "GECOS information for new user" ) ]
+      string GECOS,
+         [IN, Description (
+             "Set home directory for the user." ) ]
+      string HomeDirectory,
+         [IN, Description (
+             "Wheter to create home directory." ) ]
+      boolean DontCreateHome,
+         [IN, Description (
+             "Default shell for new user" ) ]
+      string Shell,
+         [IN, Description (
+             "Pick a specific user id for new user" ) ]
+      uint32 UID,
+         [IN, Description (
+             "Pick a specific group id for new user" ) ]
+      uint32 GID,
+         [IN, Description (
+             "True for creating system account" ) ]
+      boolean SystemAccount,
+         [IN, Description (
+             "Password for a new user. By default has to be encrypted, but "
+             "can be plaintext if PasswordIsPlain is set to true" ) ]
+      string Password,
+         [IN, Description (
+             "Whether to create group" ) ]
+      boolean DontCreateGroup,
+         [IN, Description (
+             "If set to true, the Password is treated as plain text, "
+             "otherwise has to be ecnrypted") ]
+      boolean PasswordIsPlain,
+         [IN ( false ), OUT, Description (
+             "Reference to the instance of CIM_Account created "
+             "when the method returns a value of 0." )]
+      CIM_Account REF Account,
+         [IN ( false ), OUT, Description (
+             "Reference to the instances of CIM_Identity created "
+             "when the method returns a value of 0. NULL if no "
+             "such instances are created." )]
+      CIM_Identity REF Identities[]);
+
+   [ Description ( "Create a new group on the system"),
+       ValueMap { "0", "1", "2", ".."},
+       Values { "Operation completed successfully",
+          "Operation unsupported",
+          "Failed",
+          "DMTF Reserved" }]
+
+   uint32 CreateGroup(
+         [Required, IN, Description (
+             "The scoping ComputerSystem in which to create the Account."
+              )]
+      CIM_ComputerSystem REF System,
+         [Required, IN, Description (
+             "Desired group name for the account to be created." ) ]
+      string Name,
+         [IN, Description (
+             "Pick a specific group id for new user" ) ]
+      uint32 GID,
+         [IN, Description (
+             "True for creating system account" ) ]
+      boolean SystemAccount,
+         [IN ( false ), OUT, Description (
+             "Reference to the instance of CIM_Group created "
+             "when the method returns a value of 0." )]
+      CIM_Group REF Group,
+         [IN ( false ), OUT, Description (
+             "Reference to the instances of CIM_Identity created "
+             "when the method returns a value of 0. NULL if no "
+             "such instances are created." )]
+      CIM_Identity REF Identities[]);
+
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_Account") ]
+class LMI_AccountManagementCapabilities: CIM_AccountManagementCapabilities
+{
+};
+
+[ Version("0.2.0"), Association,
+  Provider("cmpi:cmpiLMI_Account") ]
+class LMI_AccountOnSystem: CIM_AccountOnSystem
+{
+  [ Override("GroupComponent"), Min(1), Max(1),
+    Description("The hosting System.") ]
+  CIM_ComputerSystem REF GroupComponent;
+
+  [ Override("PartComponent"),
+    Description("The managed Account on the System") ]
+  LMI_Account REF PartComponent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_Account") ]
+class LMI_AccountSettingData: CIM_AccountSettingData
+{
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_Account") ]
+class LMI_Identity: CIM_Identity
+{
+};
+
+[ Version("0.3.0"), Provider("cmpi:cmpiLMI_Account") ]
+class LMI_Group: CIM_Group
+{
+  [ Description (
+      "Delete the group. The group is not deleted if it is a primary group "
+      "of a user." ),
+       ValueMap { "0", "1", "..", "4096", "4097" },
+       Values { "Operation completed successfully",
+          "Failed",
+          "DMTF Reserved",
+          "Non existing group",
+          "Group is primary group of a user"}]
+  uint32 DeleteGroup();
+};
+
+[ Version("0.2.0"), Association,
+  Provider("cmpi:cmpiLMI_Account") ]
+class LMI_AssignedAccountIdentity: CIM_AssignedIdentity
+{
+  [ Override("IdentityInfo"),
+    Description("The managed Identity") ]
+  LMI_Identity REF IdentityInfo;
+
+  [ Override("ManagedElement"),
+    Description("The managed Account on the System") ]
+  LMI_Account REF ManagedElement;
+};
+
+[ Version("0.2.0"), Association,
+  Provider("cmpi:cmpiLMI_Account") ]
+class LMI_AssignedGroupIdentity: CIM_AssignedIdentity
+{
+  [ Override("IdentityInfo"),
+    Description("The managed Identity") ]
+  LMI_Identity REF IdentityInfo;
+
+  [ Override("ManagedElement"),
+    Description("The managed Group on the System") ]
+  LMI_Group REF ManagedElement;
+};
+
+[ Version("0.2.0"), Association,
+  Provider("cmpi:cmpiLMI_Account") ]
+class LMI_AccountManagementServiceCapabilities: CIM_ElementCapabilities
+{
+  [ Override("ManagedElement"),
+    Description("The Central Instance of Account Management") ]
+  LMI_AccountManagementService REF ManagedElement;
+
+  [ Override("Capabilities"),
+    Description("The supported Capabilities for managing Linux Accounts") ]
+  LMI_AccountManagementCapabilities REF Capabilities;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_Account") ]
+class LMI_EnabledAccountCapabilities: CIM_EnabledLogicalElementCapabilities
+{
+};
+
+
+[ Version("0.2.0"), Association,
+  Provider("cmpi:cmpiLMI_Account") ]
+class LMI_AccountCapabilities: CIM_ElementCapabilities
+{
+  [ Override("ManagedElement"),
+    Description("The managed Account") ]
+  LMI_Account REF ManagedElement;
+
+  [ Override("Capabilities"),
+    Description("The supported Capabilities for changing the state of the "
+            "Linux Account") ]
+  LMI_EnabledAccountCapabilities REF Capabilities;
+};
+
+[ Version("0.2.0"), Association,
+  Provider("cmpi:cmpiLMI_Account") ]
+class LMI_AccountManagementServiceSettingData: CIM_ElementSettingData
+{
+  [ Override("ManagedElement"),
+    Description("The Central Instance of Account management") ]
+  LMI_AccountManagementService REF ManagedElement;
+
+  [ Override("SettingData"),
+    Description("The default enforced setting for new Accounts") ]
+  LMI_AccountSettingData REF SettingData;
+};
+
+[ Version("0.2.0"), Association,
+  Provider("cmpi:cmpiLMI_Account") ]
+class LMI_HostedAccountManagementService: CIM_HostedService
+{
+  [ Override("Antecedent"),
+    Description("The hosting System") ]
+  CIM_ComputerSystem REF Antecedent;
+
+  [ Override("Dependent"),
+    Description("The Central Instance of Account management") ]
+  LMI_AccountManagementService REF Dependent;
+};
+
+[ Version("0.2.0"), Association,
+  Provider("cmpi:cmpiLMI_Account") ]
+class LMI_MemberOfGroup: CIM_MemberOfCollection
+{
+  [ Override("Collection"),
+    Description("The managed Group on the System") ]
+  LMI_Group REF Collection;
+
+  [ Override("Member"),
+    Description("The managed Identity") ]
+  LMI_Identity REF Member;
+};
+
+[ Version("0.2.0"), Association,
+  Provider("cmpi:cmpiLMI_Account") ]
+class LMI_OwningGroup: CIM_OwningCollectionElement
+{
+  [ Override("OwningElement"),
+    Description("The hosting System") ]
+  CIM_ComputerSystem REF OwningElement;
+
+  [ Override("OwnedElement"),
+    Description("The managed Group on the System") ]
+  LMI_Group REF OwnedElement;
+};
+
+[ Version("0.2.0"), Association,
+  Provider("cmpi:cmpiLMI_Account") ]
+class LMI_ServiceAffectsIdentity: CIM_ServiceAffectsElement
+{
+  [ Override("AffectingElement"),
+    Description("The Central Instance of Account management") ]
+  LMI_AccountManagementService REF AffectingElement;
+
+  [ Override("AffectedElement"),
+    Description("The managed Identity") ]
+  LMI_Identity REF AffectedElement;
+};
+
+[ Version("0.2.0"), Association,
+  Provider("cmpi:cmpiLMI_Account") ]
+class LMI_SettingsDefineManagementCapabilities: CIM_SettingsDefineCapabilities
+{
+  [ Override("GroupComponent"),
+    Description("The Account Management Capabilities") ]
+  LMI_AccountManagementCapabilities REF GroupComponent;
+
+  [ Override("PartComponent"),
+    Description("The default enforced setting for new Accounts") ]
+  LMI_AccountSettingData REF PartComponent;
+};
+
+[ Version("0.2.0"), Association,
+  Provider("cmpi:cmpiLMI_Account") ]
+class LMI_SettingsDefineAccountCapabilities: CIM_SettingsDefineCapabilities
+{
+  [ Override("GroupComponent"),
+    Description("The Account Capabilities") ]
+  LMI_EnabledAccountCapabilities REF GroupComponent;
+
+  [ Override("PartComponent"),
+    Description("The default enforced setting for new Accounts") ]
+  LMI_AccountSettingData REF PartComponent;
+};
+
+[ Version("0.2.0"), Indication,
+  Provider("cmpi:cmpiLMI_Account"),
+  Description("Account Instance Creation Indication") ]
+class LMI_AccountInstanceCreationIndication: CIM_InstCreation
+{
+};
+
+[ Version("0.2.0"), Indication,
+  Provider("cmpi:cmpiLMI_Account"),
+  Description("Account Instance Deletion Indication") ]
+class LMI_AccountInstanceDeletionIndication: CIM_InstDeletion
+{
+};
+

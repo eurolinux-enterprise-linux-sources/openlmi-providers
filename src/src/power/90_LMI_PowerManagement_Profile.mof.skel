@@ -1,0 +1,27 @@
+instance of PG_ProviderProfileCapabilities
+{
+    CapabilityID = "@CLASS@";
+
+    ProviderModuleName = "cmpiLMI_PowerManagement";
+
+    ProviderName = "@CLASS@";
+
+    RegisteredProfile = 0;
+
+    OtherRegisteredProfile = "OpenLMI-PowerManagement";
+    OtherProfileOrganization = "OpenLMI";
+
+    ProfileVersion = "@VERSION@";
+
+    RegisteredSubProfiles = {
+        3021
+    };
+
+    SubprofileVersions = {
+        "1.0.1"
+    };
+
+    ConformingElements = {
+       "@CLASS@"
+     };
+};

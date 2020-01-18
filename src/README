@@ -1,0 +1,245 @@
+*******************************************************************************
+* OpenLMI                                                                     *
+*******************************************************************************
+
+The OpenLMI project provides a common infrastructure for the management of Linux
+systems. Capabilities include configuration, management and monitoring of
+hardware, operating systems, and system services. OpenLMI includes a set of
+services that can be accessed both locally and remotely, multiple language
+bindings, standard APIs, and standard scripting interfaces. 
+
+
+*******************************************************************************
+* openlmi-providers                                                           *
+*******************************************************************************
+
+openlmi-providers is set of (usually) small providers (agents) that will provide
+given functionality on host system.
+
+Following providers are part of this sub-project:
+
+* Account
+    Account provider manages POSIX accounts. It allows to list, create, delete
+    and modify users and groups.
+
+* Fan
+    Fan provider implements interface for hardware monitoring of fans
+    in the system. It uses lm_sensors library so it's linux specific.
+
+    There are three interfaces provided according to CIM model:
+        * Linux_Fan
+            - Provides instance for every fan founded by lm_sensors with basic
+              information.
+        * Linux_FanSensor
+            - Associated sensor for each instance of Linux_Fan.
+            - Value of fan speed can be obtained from property CurrentReading.
+        * Linux_FanAssociatedSensor
+            - Provides association of instances of above 2 providers.
+
+* Hardware
+    Hardware provider allows to list various HW components on the managed system
+    such as PCI devices, CPUs and memory.
+
+* Journald
+    Journald provider exposes data stored in SystemD Journal service. See
+    http://www.freedesktop.org/wiki/Software/systemd/ for more information.
+
+    For the moment, global journal is used, all journal files are mixed together.
+    This may change in the future.
+
+* LogicalFile
+    Logical file management. Supports ordinary files, directories, links,
+    device files and fifo files.
+
+    The provider allows to:
+        - read files on the filesystem,
+        - traverse the file hierarchy,
+        - create new directories, remove directories.
+
+* Power
+    Power management provider allows to monitor and change power state of the
+    computer system.
+
+    Support commands:
+        - halt, reboot, suspend, hibernate
+
+* Service
+    Provider that allows manipulation with system services.
+
+    Supported commands:
+        - status
+        - start, stop, restart
+        - enable, disable
+
+* Software
+    Allows to install, remove, list and update packages.
+    Requires python 2.6+ and yum.
+
+* RealmD
+    This is a CIM interface for the RealmD daemon which allows for the Kerberos
+    and Active Directory realms enrollment
+
+* PCP
+    This is a CIM interface for the PCP (Performance Co-Pilot) daemon.  Allows
+    reading of PCP metrics on the local host.
+
+
+*******************************************************************************
+* Build Dependencies                                                          *
+*******************************************************************************
+For all providers:
+    - cmake
+    - konkretcmpi-devel
+    - sblim-cmpi-devel
+    - cim-schema
+
+For documentation:
+    - python-sphinx
+    - (optionally) plantuml
+
+Provider specific dependencies:
+* Account
+    - libuser-devel
+* Fan
+    - lm_sensors - installed and configured
+    - lm_sensors-libs
+    - lm_sensors-devel
+* Hardware
+    - pciutils-devel
+    - dmidecode
+* Journald
+    - systemd-devel
+* LogicalFile
+    - libudev-devel (systemd-devel)
+    - libselinux-devel
+* Power
+    - glib2-devel
+    - logind (part of systemd) or pm-utils
+    - shutdown and reboot commands in $PATH (usually provided by
+      systemd or upstart or SysVinit)
+* Service
+    - glib2-devel 2.26+
+    - systemd
+* RealmD
+    - glib2-devel
+    - dbus-devel
+* PCP
+    - python-pcp
+
+*******************************************************************************
+* Compilation and installation                                                *
+*******************************************************************************
+
+$ mkdir build && cd build
+$ cmake .. -DCMAKE_INSTALL_PREFIX=/usr
+$ make
+$ make doc
+# make install
+# make register-Fan
+# make register-PowerManagement
+# make register-Service
+
+You can disable specific provider by adding -DWITH-<PROVIDER>=0 to cmake line.
+
+
+*******************************************************************************
+* Development Tips                                                            *
+*******************************************************************************
+
+Understanding konkret code generation issues:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+konkret is a tool that reads in a mof file and generates C code. For
+every XXX class it will generate a XXX.h and XXXProvider.c file. The
+code generation occurs due to CMake macros provided by the
+openlmi-providers-devel package. konkret needs to run any time you
+modify the mof file. It *always* generates a new XXX.h file because
+that's where definitions based on the contents of the mof file are
+located. If there is no XXXProvider.c file it will also generate
+it. This is a "stub" file in which you will fill in with your
+implementation. If XXXProvider.c exits it will not overwrite it,
+however it always overwrites the XXX.h file.
+
+Do not put anything into the XXX.h file you'll need to retain.
+
+After editing the mof file the make targets will cause konkret to run
+again. You'll get brand new XXX.h files. But your old XXXProvider.c
+files may no longer have the correct definitions (e.g. prototypes)
+found in the XXX.h file so you may need to hand edit by copying the
+function prototype from the XXX.h file into your XXXProvider.c file.
+
+If you've written definitions that logically belong in XXX.h but don't
+want them nuked the next time konkret runs my solution was to put them
+in someother .h file that's included by the XXXProvider.c file.
+
+Initializing class instances:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The way konkret works is to emit specialized inline functions to
+initialize each member of a class. If the class is subclassed you get
+different initializers depending on whether the property is in the
+parent class or the subclass. You cannot call a parent class property
+initializer in a subclass (yuck), you have to use the subclass
+initializer for the property inherited from the parent class. This
+creates a maintenance problem if the parent class changes, you have
+find every place parent class properties are inialized and make
+changes. To solve this problem I defined macros that initialize class
+properties. The macro takes a "klass" parameter and token pastes it to
+generate the class specific property manipulation function call. Using
+these macros means anytime a class changes due to a change in the mof
+file there is only one place where you need to change the code. These
+macros are a good example of what logically belongs in the XXX.h file
+but are separated out into a different .h file because konkret will
+nuke anything you've added to a XXX.h file.
+
+Modifications to the provider:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+During development if the mof file changes you have to make Pegasus
+reload the mof. It's not sufficient to retart cimserver, you have to
+unregister the provider and register it again for Pegasus to see the
+mof changes. Thus you would use the openlmi-mof-register command above
+except pass the unregister option, followed by the above command, e.g.
+
+% openlmi-mof-register unregister /usr/share/openlmi-providers/LMI_Realmd.mof /usr/share/openlmi-providers/LMI_Realmd.reg
+% openlmi-mof-register register /usr/share/openlmi-providers/LMI_Realmd.mof /usr/share/openlmi-providers/LMI_Realmd.reg
+
+If all you've done during devopment is modify the provider (not it's
+mof definition) then all you need to do is:
+
+% sudo cimserver -s
+% sudo make install
+% sudo cimserver
+
+How do I run the Pegasus CIMOM so I can see debug statements?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+% sudo cimserver daemon=false forceProviderProcesses=false
+
+How do I use GDB to debug my provider?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create the following .gdbinit file where XXX is where you want to break.
+
+<<<<<<<<<<
+set breakpoint pending on
+b XXX
+r daemon=false forceProviderProcesses=false
+>>>>>>>>>>
+
+then run gdb like this:
+
+% sudo gdb cimserver
+
+How do I trace what Pegasus is doing?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+% cimserver daemon=false forceProviderProcesses=false logLevel=TRACE traceLevel=5 traceFacility=File traceComponents=All
+
+The trace file is written to:
+
+/var/lib/Pegasus/cache/trace/cimserver.trc
+
+More information about cimserver tracing can be found in the
+"OpenPegasus Tracing User Guide" PDF. Google the title to get a
+current URL.

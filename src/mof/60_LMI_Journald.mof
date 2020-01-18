@@ -1,0 +1,226 @@
+/*
+ * Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Authors: Tomas Bzatek <tbzatek@redhat.com>
+ */
+
+[ Version("0.4.1"), Provider("cmpi:cmpiLMI_Journald") ]
+class LMI_JournalMessageLog: CIM_MessageLog
+{
+    [ Implemented(true), Override("CreationClassName"), Key ]
+    String CreationClassName;
+
+    [ Implemented(true), Override("Name"), Key ]
+    String Name;
+
+    [ Implemented(true), Override("Capabilities") ]
+    uint16 Capabilities[];
+
+    [ Implemented(true), Override("TimeOfLastChange") ]
+    datetime TimeOfLastChange;
+
+
+    [ Implemented(true), Description (
+          "Requests that an iteration of the MessageLog be "
+          "established and that the iterator be set to the first "
+          "entry in the Log. An identifier for the iterator is "
+          "returned as an output parameter of the method. \n"
+          "\n"
+          "Regarding iteration, you have 2 choices: 1) Embed "
+          "iteration data in the method call, and allow "
+          "implementations to track/ store this data manually; or, "
+          "2) Iterate using a separate object (for example, class "
+          "ActiveIterator) as an iteration agent. The first "
+          "approach is used here for interoperability. The second "
+          "requires an instance of the Iterator object for EACH "
+          "iteration in progress. 2\'s functionality could be "
+          "implemented underneath 1.\n"
+          "\n"
+          "The return value from PositionToFirstRecord is 0 "
+          "if the request was successfully executed, 1 if the "
+          "request is not supported and some other value if an "
+          "error occurred." ),
+      ValueMap { "0", "1", "2" },
+      Values { "Success", "Not supported", "Failed" } ]
+    uint32 PositionToFirstRecord(
+          [IN ( false ), OUT, Description (
+             "An identifier for the iterator." )]
+       string IterationIdentifier);
+
+
+    [ Implemented(true), Description (
+          "Requests that the Log\'s iteration identifier be "
+          "advanced or retreated a specific number of records, or "
+          "set to the entry at a specified numeric location. These "
+          "two different behaviors are accomplished using the input "
+          "parameters of the method. Advancing or retreating is "
+          "achieved by setting the MoveAbsolute boolean to FALSE, "
+          "and then specifying the number of entries to advance or "
+          "retreat as positive or negative values in the "
+          "RecordNumber parameter. Moving to a specific record "
+          "number is accomplished by setting the MoveAbsolute input "
+          "parameter to TRUE, and then placing the record number "
+          "into the RecordNumber parameter. This can only be done "
+          "if the Capabilities array includes a value of 7, "
+          "\"Supports Addressing by Ordinal Record Number\". \n"
+          "\n"
+          "After the method completes and if ordinal record numbers "
+          "are supported (the Capabilities array includes a 7), the "
+          "current record number is returned in the RecordNumber "
+          "output parameter. Otherwise, the value of the parameter "
+          "is undefined. \n"
+          "Note that only relative movement is supported in "
+          "LMI_JournalMessageLog for the moment.\n"
+          "\n"
+          "IterationIdentifier is defined as an Input/Output method "
+          "parameter to allow the Log to embed state information in "
+          "the Identifier and potentially let the identifier be "
+          "maintained by the using application. \n"
+          "\n"
+          "The return value from PositionAtRecord is 0 if "
+          "the request was successfully executed, 1 if the request "
+          "is not supported and some other value if an error "
+          "occurred. If the request is not supported, check the "
+          "Capabilities array regarding support for ordinal record "
+          "number addressing and backward movement in the Log "
+          "(values 7 and 4, respectively)." ),
+      ValueMap { "0", "1", "2" },
+      Values { "Success", "Not supported", "Failed" } ]
+    uint32 PositionAtRecord(
+         [IN, OUT, Description (
+             "An identifier for the iterator." )]
+      string IterationIdentifier,
+         [IN, Description (
+             "Advancing or retreating the IterationIdentifier is "
+             "achieved by setting the MoveAbsolute boolean to "
+             "FALSE, and specifying the number of entries to "
+             "advance or retreat as positive or negative values "
+             "in the RecordNumber parameter. Moving to a "
+             "specific record number is accomplished by setting "
+             "the MoveAbsolute parameter to TRUE, and placing "
+             "the record number into the RecordNumber parameter."
+             "For LMI_JournalMessageLog, the only supported value "
+             "is FALSE." )]
+      boolean MoveAbsolute,
+         [IN, OUT, Description (
+             "The relative or absolute record number." )]
+      sint64 RecordNumber);
+
+
+    [ Implemented(true), Description (
+          "Requests that the record indicated by the "
+          "IterationIdentifier be retrieved from the MessageLog. "
+          "After retrieval, the IterationIdentifier may be advanced "
+          "to the next record by setting the PositionToNext input "
+          "parameter to TRUE. Two output parameters are defined for "
+          "the method - RecordData which holds the contents of the "
+          "Log entry (as an array of bytes that can be recast to an "
+          "appropriate format), and RecordNumber which returns the "
+          "current record number addressed via the Iteration "
+          "Identifier. The RecordNumber parameter is only "
+          "defined/valid when the Capabilities array indicates that "
+          "ordinal record number addressing is supported (a value "
+          "of 7). For LMI_JournalMessageLog, this stays unset.\n"
+          "\n"
+          "IterationIdentifier is defined as an Input/Output method "
+          "parameter to allow the Log to embed state information in "
+          "the Identifier and potentially let the identifier be "
+          "maintained by the using application. \n"
+          "\n"
+          "The return value from GetRecord is 0 if the "
+          "request was successfully executed, 1 if the request is "
+          "not supported, and some other value if an error "
+          "occurred." ),
+      ValueMap { "0", "1", "2" },
+      Values { "Success", "Not supported", "Failed" } ]
+    uint32 GetRecord(
+         [IN, OUT, Description (
+             "An identifier for the iterator." )]
+      string IterationIdentifier,
+         [IN, Description (
+             "Boolean indicating that the Iteration Identifier "
+             "should be advanced to the next record, after "
+             "retrieving the current Log entry." )]
+      boolean PositionToNext,
+         [IN ( false ), OUT, Description (
+             "The record number, unused in LMI_JournalMessageLog." )]
+      uint64 RecordNumber,
+         [IN ( false ), OUT, Description (
+             "The record data. This array carries a UTF-8 encoded "
+             "string in array of uint8 as defined by the model. "
+             "Users are supposed to recast this free-form data "
+             "to get a readable representation." )]
+      uint8 RecordData[]);
+
+     [ Implemented(true), Description (
+          "Requests that an iteration of the Log, identified by the "
+          "IterationIdentifier input parameter, be stopped. The "
+          "return value from CancelIteration is 0 if the "
+          "request was successfully executed, 1 if the request is "
+          "not supported and some other value if an error occurred." ),
+      ValueMap { "0", "1", "2" },
+      Values { "Success", "Not supported", "Failed" } ]
+    uint32 CancelIteration(
+         [IN, Description ( "An identifier for the iterator." )]
+      string IterationIdentifier);
+};
+
+[ Version("0.4.1"), Provider("cmpi:cmpiLMI_Journald") ]
+class LMI_JournalLogRecord: CIM_LogRecord
+{
+    [ Implemented(true), Override("LogCreationClassName"), Key ]
+    String LogCreationClassName;
+
+    [ Implemented(true), Override("LogName"), Key ]
+    String LogName;
+
+    [ Implemented(true), Override("CreationClassName"), Key ]
+    String CreationClassName;
+
+    [ Implemented(true), Override("RecordID"), Key ]
+    String RecordID;
+
+    [ Implemented(true), Override("MessageTimestamp"), Key ]
+    datetime MessageTimestamp;
+
+    [ Implemented(true),
+      Description("Hostname of the system where the log record has been sent from.") ]
+    String HostName;
+
+    [ Implemented(true), Override("DataFormat") ]
+    String DataFormat;
+
+    [ Implemented(true), Override("PerceivedSeverity") ]
+    uint16 PerceivedSeverity;
+};
+
+[ Version("0.4.1"), Provider("cmpi:cmpiLMI_Journald"),
+  Association ]
+class LMI_JournalRecordInLog: CIM_RecordInLog
+{
+    [ Override("MessageLog"), Key ]
+    LMI_JournalMessageLog REF MessageLog;
+
+    [ Override("LogRecord"), Key ]
+    LMI_JournalLogRecord REF LogRecord;
+};
+
+[ Version("0.4.1"), Provider("cmpi:cmpiLMI_Journald"),
+  Indication ]
+class LMI_JournalLogRecordInstanceCreationIndication: CIM_InstCreation
+{
+};

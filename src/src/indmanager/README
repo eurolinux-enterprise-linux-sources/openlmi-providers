@@ -1,0 +1,142 @@
+######################
+# Indication manager #
+######################
+    in short IM
+
+Purpose
+~~~~~~~
+Indication manager (in short IM) should help in writing indication provider
+using CMPI. Main concept is to lessen work you need to do to only define
+few callback functions.
+
+Usage
+~~~~~
+Mainly the user of IM have to write callback functions: IMFilterChecker,
+IMEventWatcher.
+IM can be used to poll instance. This has to be set upon initialization
+and cannot be changed. When not using polling the user have to write also
+IMInstGather callback function.
+For user are provided the following functions:
+im_create_manager, im_destroy_manager, im_verify_filter, im_add_filter,
+im_remove_filter, im_start_ind and im_stop_ind.
+Following are documentation for functions and callback definitions,
+in the following form:
+* name of function or callback
+C definition
+Documentation.
+
+* im_create_manager
+IMManager* im_create_manager(IMInstGather gather, IMFilterChecker f_checker,
+                             bool polling, IMEventWatcher watcher,
+                             IMIndType type, CMPIBroker *broker, IMError *err);
+Return newly created reference to IMManager. User should use this reference
+only as parameter for functions. User should provide callback functions (see
+below), should choose if want to use polling, choose type indications and
+provide broker reference. On any error occurance the NULL is returned and
+err is set.
+
+* im_destroy_manager
+bool im_destroy_manager(IMManager *manager, const CMPIContext *ctx,
+                        IMError *err);
+Destroy the given manager. User should provide context. Returns true when
+everything was correctly done, or false and err is set.
+
+* im_verify_filter
+bool im_verify_filter(IMManager *manager, const CMPISelectExp *filter,
+                      const CMPIContext *ctx, IMError *err);
+Ask manager to verify the given filter. User should provide context. In turn,
+the manager calls IMFilterChecker (see below). If filter is accepted true
+is returned, otherwise false is returned and err is set.
+
+* im_add_filter
+bool im_add_filter(IMManager *manager, CMPISelectExp *filter,
+                   const CMPIContext *ctx, IMError *err);
+Adds the given filter to the manager. It is logical error to add filter, which
+is not verified before. User should provide context. Return true when everything
+is correctly done, false otherwise and err is set.
+
+* im_remove_filter
+bool im_remove_filter(IMManager *manager, const CMPISelectExp *filter,
+                      const CMPIContext *ctx, IMError *err);
+Removes the given filter from the manager. Returns true when correctly done,
+or false and err is set.
+
+* im_start_ind
+bool im_start_ind(IMManager *manager, const CMPIContext *ctx, IMError *err);
+Informs the manager to start sending indications. It is recursively calling
+IMEventWatcher and IMInstGather (if using polling, the default gather is used).
+Returns true if everything started correctly, false otherwise and err is set.
+NOTE: Callbacks are called within a thread that can be forcefully interrupted
+by the im_stop_ind() call without any chance for cleanup. For that reason, any
+dynamically allocated memory will get leaked. Please keep that in mind and use
+as much stack memory as possible. If needed, please perform cleanup at the same
+place the im_stop_ind() is called. Only one thread is executed within each
+indication manager instance, no need for extra thread safety.
+
+* im_stop_ind
+bool im_stop_ind(IMManager *manager, const CMPIContext *ctx, IMError *err);
+Informs the manager to stop sending indications. Internally this call cancels
+the thread function, see the note above. Returns true when everything is done
+correctly, false otherwise and err is set.
+
+* IMFilterChecker
+typedef bool (*IMFilterChecker) (const CMPISelectExp *filter);
+User should define this callback, which is called whenever manager is asked
+to verify filter. Function should return true when given filter is allowed,
+false otherwise. Filter is passed from im_verify_filter function
+
+* IMEventWatcher
+typedef bool (*IMEventWatcher) (void **data);
+User should define this callback, which should be blocking. The purpose of this
+called is to inform manager that event occured. When the callback returns with
+true value the manager is informed that event has occured and will send
+indication right after. When the callback returns with false value the manager
+is informed that event hasn't occured and will not send indication and will
+retart the loop - the callback will be executed again soon.
+User can use data to transfer any information from this callback
+to IMInstGather.
+This is called within a thread and is advised that any blocking call should be
+a pthread cancellation point (see pthreads(7)) for easy interruption (see the
+note at im_start_ind()).
+
+* IMInstGather
+typedef bool (*IMInstGather) (const IMManager *manager, CMPIInstance **old,
+                              CMPIInstance **new, void *data);
+This callback has to be defined only when not using default polling mechanism.
+data are passed from IMEventWatcher and are supposed to help creating instances.
+User should create and set instance and/or instances. When type of indications
+is IM_IND_CREATION the new instance has to be set. When IM_IND_DELETION the old
+instance has to be set. Both when IM_IND_MODIFICATION is used. When the callback
+returns true the manager will send the indication and call the callback again.
+In other words, the return value means "There is another indication
+with instances to be send". When false is returned the manager will send
+the last indication and starts another round in the loop.
+
+Cancellation, indications enabling and disabling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Indications should be enabled or disabled in relation with EnableIndications()
+and DisableIndications() CIM class method calls. These are called typically when
+subscription is added or removed. Note that enabling or disabling indications
+multiple times has no effect.
+
+Polling
+~~~~~~~
+IM supports basic polling mechanism. When enabled the IM remembers instances
+after every IMEventWatcher call and default IMInstGather callback is used.
+Which instances are to be polled are determined by the filters, where
+the IM looks for the first occurence of ISA predicate in WHERE clause of select
+expression. For example we have filter with expression:
+SELECT * FROM LMI_SomeIndication WHERE SourceInstance ISA LMI_Account
+the manager will be polling instances from LMI_Account class (from the same
+namespace as LMI_SomeIndication). Polling is possible on multiple classes.
+
+Known limitations
+~~~~~~~~~~~~~~~~~
+IM supports only instance indications of the following types:
+Creation, Deletion, Modification
+and supports only one type per provider.
+Settings cannot be changed.
+
+Example
+~~~~~~~
+Is not provided yet.

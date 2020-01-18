@@ -1,0 +1,55 @@
+Documentation compilation
+=========================
+
+Using standard cmake in openlmi-providers top level directory:
+
+$ mkdir build && cd build
+$ cmake ..
+$ make doc
+
+See top-level README for list of dependencies.
+
+
+Adding documentation of new provider
+====================================
+
+We use cmake magic to generate:
+- .rst files from .mof files
+- .svg files from .uml files
+- .html files from all .rst+.svg files
+
+1) Place *all* images into <provider>/pic directory.
+   Use following code to include them in your .rst files:
+
+      .. figure:: pic/powermanagement.svg
+
+   If there is /usr/bin/plantuml available at the time of running cmake
+   and <provider>/pic/make-svg.sh exists, it will be executed to refresh
+   the .svg files.
+
+2) .rst files generated out of .mof file(s) will be available in mof/
+   subdirectory. Reference them using following code:
+
+       .. ifconfig:: includeClasses
+
+           OpenLMI Service CIM Classes:
+
+           .. toctree::
+              :maxdepth: 1
+
+              mof/tree
+              mof/index
+
+
+3) Update CMakeLists.txt in this directory:
+
+   PROVIDERS array - Add name of the provider directory. It will be used as
+                     the <providername> in the examples above.
+
+   PROVIDER_CAPTIONS array - Add human-friendly name of the provider.
+                             It will be used as HTML title of the generated
+                             documentation.
+
+   PROVIDER_MOFS array - Add name of the MOF file, from which class
+                         reference and inheritance tree will be generated.
+

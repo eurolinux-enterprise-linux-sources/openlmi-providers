@@ -1,0 +1,36 @@
+This tool uses pylint to check for errors in python code.
+Before using it, please ensure, that you have installed openlmi-python
+and all of the other cim provider packages, that you want to chek, into
+your PYTHONPATH.
+
+INSTALLATION TO PYTHON PATH
+ * If checking already installed providers under /usr/lib/pythonX.Y/*
+   you may skip this step.
+ 1. Choose some directory for your PYTHONPATH, if you don't have one yet. eg:
+      $ mkdir ~/.python_sandbox
+      $ export PYTHONPATH=~/.python_sandbox
+    note: you may put the export line into you .profile
+ 2. Go to the directory of python egg, you want to install and install it:
+      $ cd openlmi-providers/src/python
+      $ python setup.py develop --install-dir=$PYTHONPATH
+ 3. Repeat step 2 for providers you want to check.
+ 4. Check sources.
+
+FIX FOR PYLINT
+ * Due to a bug in pylint's module handling, it fails to work with namespace
+   packages. A bug is described here: http://www.logilab.org/ticket/8796
+ * To fix this you may apply attached patch "logilab-modutils-0.57.1.patch"
+   to logilab module (this one is for version 0.57.1):
+     $ patch -d /usr/lib/python2.7/site-packages/logilab -p1 \
+        <logilab-modutils-0.57.1.patch 
+
+RUNNING PYLINT CHECKER
+ 1. Add pylint directory to your PATH:
+     $ cd openlmi-providers
+     $ export PATH=`pwd`/tools/pylint:"$PATH"
+ 2. Use it
+   * Run it on single module:
+       $ cd src/software
+       $ pylintlmi openlmi/software/LMI_SoftwarePackage.py
+   * Run it on whole package:
+       $ pylintlmi openlmi

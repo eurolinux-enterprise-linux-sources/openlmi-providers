@@ -1,0 +1,89 @@
+#! /bin/sh
+# PCP bridge Providers
+#
+# Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+#
+# Authors: Frank Ch. Eigler <fche@redhat.com>
+#
+
+#
+# This script refreshes WBEM/CIM MOF & REG files from the current PCP PMNS,
+# if necessary, and reloads the new MOF/REGs into the CIMMON.
+#
+# The PCP PMNS changes infrequently (when the sysadmin manuall installs or
+# removes pcp PMDA (agent) modules in /var/lib/pcp/pmdas/*).
+#
+# This script encodes the PCP->CIM metric name-mapping convention of replacing
+# dots with double-underscores, which lmi/pcp/metric.py will dutifully undo.
+
+_LOCALSTATEDIR=/var
+_DATADIR=/usr/share
+NAME=openlmi-providers
+PYTHON2_SITELIB=/usr/lib/python2.7/site-packages
+
+PCP_PMNS=$_LOCALSTATEDIR/lib/pcp/pmns/root
+PCP_HOST=${1-localhost} # or local:// for pcp 3.9+
+BASEMOFFILE=$_DATADIR/$NAME/60_LMI_PCP.mof
+MOFREGDIR=$_LOCALSTATEDIR/lib/$NAME
+STAMPFILE=$MOFREGDIR/stamp
+MOFFILE=$MOFREGDIR/60_LMI_PCP_PMNS.mof
+REGFILE=$MOFREGDIR/60_LMI_PCP_PMNS.reg
+PROVIDER=$PYTHON2_SITELIB/lmi/pcp/metric.py
+
+if [ ! -f $PROVIDER ]; then
+    echo "Cannot find $PROVIDER" 1>&2
+    exit 1
+fi
+
+set -e
+
+echo Refreshing PCP_Metric CIMMON classes from current PCP PMNS
+
+# quick liveness test
+pcp -h $PCP_HOST
+
+if [ -s $PCP_PMNS -a $PCP_PMNS -nt $STAMPFILE ]; then
+    if [ -f $MOFFILE -a -f $REGFILE ]; then
+        echo Unregistering $BASEMOFFILE
+        echo Unregistering previous $MOFFILE
+        echo Unregistering previous $REGFILE
+        openlmi-mof-register unregister $BASEMOFFILE $MOFFILE $REGFILE || :
+    fi
+
+    echo Generating $MOFFILE
+    pminfo -h $PCP_HOST | sed -e 's,\.,__,g'  | 
+    awk '{print "class PCP_Metric_" $1 " : PCP_MetricValue { } ;" }' > $MOFFILE
+
+    echo Generating $REGFILE
+    pminfo -h $PCP_HOST | sed -e 's,\.,__,g'  |
+    awk '{print "[PCP_Metric_" $1 "]"
+         print "  provider: '$PROVIDER'"
+         print "  location: pyCmpiProvider"
+         print "  type: instance"
+         print "  namespace: root/cimv2"
+         print "  group: pcp"
+         print ""}' > $REGFILE
+
+    echo Registering $BASEMOFFILE
+    echo Registering new $MOFFILE
+    echo Registering new $REGFILE
+    openlmi-mof-register register $BASEMOFFILE $MOFFILE $REGFILE 2>&1 | # filter out two noise diagnostics
+    egrep -v 'Warning: the instance already exists.|In this implementation, that means it cannot be changed.' || :
+    touch $STAMPFILE
+else
+    echo Doing nothing, $PCP_PMNS older than $STAMPFILE
+fi

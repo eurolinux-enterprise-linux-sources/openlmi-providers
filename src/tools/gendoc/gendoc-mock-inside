@@ -1,0 +1,76 @@
+#!/bin/bash -x
+
+cd $HOME/doc || exit 1
+
+# clone all git reprositories
+mkdir clones || exit 1
+pushd clones || exit 1
+git clone https://git.fedorahosted.org/git/openlmi-providers.git || exit 1
+pushd openlmi-providers || exit 1
+git checkout $1 || exit 1
+popd
+
+git clone https://git.fedorahosted.org/git/openlmi-networking.git || exit 1
+pushd openlmi-networking || exit 1
+git checkout $2 || exit 1
+popd
+
+git clone https://git.fedorahosted.org/git/openlmi-storage.git || exit 1
+pushd openlmi-storage || exit 1
+git checkout $3 || exit 1
+popd
+
+popd
+
+# prepare output directory
+OUT=~/out
+mkdir $OUT
+
+# build docs for individual providers
+pushd clones/openlmi-storage/doc/admin
+make fullhtml || exit 1
+mkdir -p $OUT/openlmi-storage/$3
+cp -r _build/html/* $OUT/openlmi-storage/$3/
+# prepare the directory for inclusion in overall documentation
+# we don't want class documentation here, there will be one
+# on the top level
+/bin/rm mof/*.rst
+popd
+
+pushd clones/openlmi-providers/
+mkdir build || exit 1
+cd build || exit 1
+cmake .. || exit 1
+make doc || exit 1
+for d in account fan hardware journald logicalfile power realmd service-dbus software; do
+    mkdir -p $OUT/openlmi-providers/$1/$d
+    cp -r doc/admin/$d/html/* $OUT/openlmi-providers/$1/$d/
+done
+# prepare the directory for inclusion in overall documentation
+# we don't want class documentation here, there will be one
+# on the top level
+find . -wholename "*mof/*.rst" | xargs /bin/rm
+popd
+
+pushd clones/openlmi-networking
+mkdir build || exit 1
+cd build || exit 1
+cmake .. || exit 1
+make doc || exit 1
+mkdir -p $OUT/openlmi-networking/$2
+cp -r doc/admin/html/* $OUT/openlmi-networking/$2/
+# prepare the directory for inclusion in overall documentation
+# we don't want class documentation here, there will be one
+# on the top level
+rm doc/admin/mof/*.rst
+popd
+
+# Update project versions in RST files
+sed -i -e "s/PROVIDERSVER/$1/" -e "s/NETWORKINGVER/$2/" -e "s/STORAGEVER/$3/" *.rst *.py
+
+# Generate the overall documentation
+make html || exit 1
+mkdir $OUT/all
+cp -r _build/html/* $OUT/all
+
+tar cfz doc.tgz $OUT || exit 1

@@ -1,0 +1,21 @@
+#!/usr/bin/env lmishell
+#
+# Simple example script to iterate over complete journal
+
+import os
+
+url = os.environ.get("LMI_CIMOM_URL", "localhost")
+username = os.environ.get("LMI_CIMOM_USERNAME", "root")
+password = os.environ.get("LMI_CIMOM_PASSWORD", "")
+
+c = connect(url, username, password)
+inst = c.root.cimv2.LMI_JournalMessageLog.first_instance()
+r = inst.PositionToFirstRecord()
+iter_id = r.rparams['IterationIdentifier']
+
+while True:
+    x = inst.GetRecord(IterationIdentifier=iter_id, PositionToNext=True)
+    if x.rval != 0:
+        break
+    print "".join(map(chr, x.rparams['RecordData']))
+    iter_id = x.rparams['IterationIdentifier']

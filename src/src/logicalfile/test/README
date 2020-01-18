@@ -1,0 +1,32 @@
+LogicalFile tests
+=================
+Basic tests for the LogicalFile provider. In the initial phase, a directory is
+created and populated by various types of files (symlink, device file, fifo
+file, ...). These are then used to test the provider.
+
+As the LogicalFile provider explicitly implements all of its
+associations-related methods, they should all be tested from both sides, meaning
+that the respective associations should be called twice with both of their
+"arguments".
+
+Dependencies
+------------
+$ yum install python-pyudev
+
+Usage
+-----
+The tests must be run on the same machine as the CIMOM!
+
+Set following environment variables:
+LMI_CIMOM_URL - URL to the CIMOM, e.g. 'https://localhost:5989'.
+LMI_CIMOM_USERNAME - Name of the user on CIMOM the test will use, e.g. 'root'.
+LMI_CIMOM_PASSWORD - Password of the user, e.g. 'opensesame'.
+LMI_LOGICALFILE_TESTDIR - Testing directory where all the files and testing will
+                          take place. This directory must *not* exist on the
+                          system and will be delete after the tests are
+                          finished. Default is '/var/tmp/logicalfile-tests'.
+
+Running the tests:
+    LMI_CIMOM_PASSWORD=opensesame \
+    LMI_LOGICALFILE_TESTDIR="/home/user/my-testing-dir" \
+    python test/test_basic.py

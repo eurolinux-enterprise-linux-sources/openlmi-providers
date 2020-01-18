@@ -1,0 +1,83 @@
+[ Version("0.2.0"),
+  Description (
+  "Access to the Realmd Service. "
+  "Realmd is used to discover realms available for joining as well as "
+  "providing a mechanism for joining and leaving a realm."),
+  Provider("cmpi:cmpiLMI_Realmd") ]
+class LMI_RealmdService : CIM_Service
+{
+    // Proof of concept simplfied API starts here
+
+    [Description (
+        "The name of the domain that this computer is a member of "
+	"or NULL if not a member of any domain.")]
+    string Domain;
+
+    [Description (
+        "Join the computer to a domain.")]
+   uint32 JoinDomain(
+      [In, Description (
+        "The name of the domain to join.")]
+      string Domain,
+      [In, Description (
+        "The administrative user who is authorizing joining the domain. "
+	"Or NULL for a one time password based join.")]
+      string User,
+      [In, Description (
+        "Either NULL for an automatic join, a one time password, or the "
+	"password for the administrative user in the User parameter.")]
+      string Password,
+      [In, ArrayType ( "Indexed" ), Description (
+        "This array is correlated with the OptionValues array. "
+        "Each entry is related to the entries in the other array "
+        "located at the same index. In this way a (name,value) tuple "
+        "can be constructed.")]
+      string OptionNames[],
+      [In, ArrayType ( "Indexed" ), Description (
+        "This array is correlated with the OptionNames array. "
+        "Each entry is related to the entries in the other array "
+        "located at the same index. In this way a (name,value) tuple "
+        "can be constructed.")]
+       string OptionValues[]);
+
+    [Description (
+        "Make the computer leave its joined domain.")]
+   uint32 LeaveDomain(
+      [In, Description (
+        "The name of the domain to join.")]
+      string Domain,
+      [In, Description (
+        "The administrative user who is authorizing joining the domain. "
+	"Or NULL for a one time password based join.")]
+      string User,
+      [In, Description (
+        "Either NULL for an automatic join, a one time password, or the "
+	"password for the administrative user in the User parameter.")]
+      string Password,
+      [In, ArrayType ( "Indexed" ), Description (
+        "This array is correlated with the OptionValues array. "
+        "Each entry is related to the entries in the other array "
+        "located at the same index. In this way a (name,value) tuple "
+        "can be constructed.")]
+      string OptionNames[],
+      [In, ArrayType ( "Indexed" ), Description (
+        "This array is correlated with the OptionNames array. "
+        "Each entry is related to the entries in the other array "
+        "located at the same index. In this way a (name,value) tuple "
+        "can be constructed.")]
+       string OptionValues[]);
+};
+
+[ Version("0.2.0"),
+  Association,
+  Provider("cmpi:cmpiLMI_Realmd") ]
+class LMI_HostedRealmdService: CIM_HostedService
+{
+  [ Override("Antecedent"),
+    Description("The hosting System") ]
+  CIM_ComputerSystem REF Antecedent;
+
+  [ Override("Dependent"),
+    Description("The Central Instance of realm management") ]
+  LMI_RealmdService REF Dependent;
+};

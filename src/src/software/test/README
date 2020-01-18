@@ -1,0 +1,39 @@
+Testing
+=======
+Tests must be run as root on machine with cimom broker.
+There are number of environment variables, that affect test running:
+  LMI_CIMOM_USERNAME
+  LMI_CIMOM_PASSWORD
+  LMI_CIMOM_BROKER
+  LMI_CIMOM_URL
+  LMI_RUN_DANGEROUS      - valid values: 0, 1
+  LMI_SOFTWARE_USE_CACHE - valid values: 0, 1
+    - says, whether to use cache to download rpm packages, which will
+      be used to speed up testing
+  LMI_SOFTWARE_CACHE_DIR 
+    - directory, where to store rpm packages and other information
+    - if not set and LMI_SOFTWARE_USE_CACHE == '1', a temporary
+      directory will be created and deleted, when tests are
+      complete
+
+Preparation
+-----------
+Tests are installed together with source in single python egg. They are
+accessible from ``lmi.test.software`` package.
+
+Running tests
+-------------
+They can be run with a script ``lmi-test-software``.
+
+Each test module can be run as a stand-alone script or with run.py script: ::
+
+    ./run.py -c --cache-dir=/var/tmp
+
+To pass any arguments to underlying ``unittest.main()`` function, append them
+after "--" swith like this: ::
+
+    ./run.py -c --cache-dir=/var/tmp -- -v TestSoftwarePackage
+
+All environment variables defined above can be overriden by command-line
+arguments.
+

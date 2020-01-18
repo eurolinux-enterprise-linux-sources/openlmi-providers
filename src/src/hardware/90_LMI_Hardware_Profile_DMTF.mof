@@ -1,0 +1,125 @@
+instance of PG_ProviderProfileCapabilities
+{
+    CapabilityID = "LMI_Processor_DMTF";
+
+    ProviderModuleName = "cmpiLMI_Hardware";
+
+    ProviderName = "LMI_Processor";
+
+    RegisteredProfile = 507;
+
+    ProfileVersion = "1.0.2";
+
+    RegisteredSubprofiles = {
+        3016
+    };
+
+    SubprofileVersions = {
+        "1.0.1"
+    };
+
+    ConformingElements = {
+       "LMI_Processor"
+     };
+};
+
+instance of PG_ProviderProfileCapabilities
+{
+    CapabilityID = "LMI_Memory_DMTF";
+
+    ProviderModuleName = "cmpiLMI_Hardware";
+
+    ProviderName = "LMI_Memory";
+
+    RegisteredProfile = 507;
+
+    ProfileVersion = "1.0.2";
+
+    RegisteredSubprofiles = {
+        3020
+    };
+
+    SubprofileVersions = {
+        "1.0.1"
+    };
+
+    ConformingElements = {
+       "LMI_Memory"
+     };
+};
+
+instance of PG_ProviderProfileCapabilities
+{
+    CapabilityID = "LMI_Battery_DMTF";
+
+    ProviderModuleName = "cmpiLMI_Hardware";
+
+    ProviderName = "LMI_Battery";
+
+    RegisteredProfile = 507;
+
+    ProfileVersion = "1.0.2";
+
+    RegisteredSubprofiles = {
+        3024
+    };
+
+    SubprofileVersions = {
+        "1.0.0"
+    };
+
+    ConformingElements = {
+       "LMI_Battery"
+     };
+};
+
+instance of PG_ProviderProfileCapabilities
+{
+    CapabilityID = "LMI_PCIDevice_DMTF";
+
+    ProviderModuleName = "cmpiLMI_Hardware";
+
+    ProviderName = "LMI_PCIDevice";
+
+    RegisteredProfile = 507;
+
+    ProfileVersion = "1.0.2";
+
+    RegisteredSubprofiles = {
+        3038
+    };
+
+    SubprofileVersions = {
+        "1.0.0"
+    };
+
+    ConformingElements = {
+       "LMI_PCIDevice"
+     };
+};
+
+instance of PG_ProviderProfileCapabilities
+{
+    CapabilityID = "LMI_PCIBridge_DMTF";
+
+    ProviderModuleName = "cmpiLMI_Hardware";
+
+    ProviderName = "LMI_PCIBridge";
+
+    RegisteredProfile = 507;
+
+    ProfileVersion = "1.0.2";
+
+    RegisteredSubprofiles = {
+        3038
+    };
+
+    SubprofileVersions = {
+        "1.0.0"
+    };
+
+    ConformingElements = {
+       "LMI_PCIBridge"
+     };
+};
+

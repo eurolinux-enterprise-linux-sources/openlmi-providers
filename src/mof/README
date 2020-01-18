@@ -1,0 +1,28 @@
+This directory contains MOF and registration files for openlmi-providers.
+Registration files for c providers using KonkretCMPI are generated during
+build time from MOFs.
+
+Mof files are named according to this convetion:
+  <NN>_LMI_<Profile>.mof
+
+where <NN> is a string of two digits ensuring the correct order of
+their parsing by cimom tools like sfcbrepos [1]. Some mof files depend
+on others and thus need to be parsed after them.
+
+Here is a convention for choosing the right number:
+  05 - 10
+        Qualifiers and other simple mofs without any dependencies on LMI or
+        anything outside of cim-schema (05_LMI_Qualifiers.mof). These are
+        shipped with openlmi-providers.
+  20 - 40
+        Mofs with base classes for our providers (30_LMI_Jobs.mof). Also
+        shipped with openlmi-providers.
+  50 - 80
+        Mofs of our profiles shipped in their own package
+        (60_LMI_Software.mof).
+
+Mof files containing static indication filters[2] referencing other LMI
+classes should have higher number than mof files containing them.
+
+[1] belongs to sblim-sfcb
+[2] for example 70_LMI_SoftwareIndicationFilters.mof

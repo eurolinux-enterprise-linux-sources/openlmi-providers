@@ -1,0 +1,554 @@
+#!/usr/bin/python
+#
+# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+#
+# Authors: Radek Novacek <rnovacek@redhat.com>
+#          Jan Safranek <jsafrane@redhat.com>
+#          Tomas Smetana <tsmetana@redhat.com>
+#
+
+import getopt
+import sys
+import os
+import subprocess
+import datetime
+import re
+import sqlite3
+from tempfile import NamedTemporaryFile
+from shutil import copyfile
+
+global PEGASUS_REPOSITORY
+global DEFAULT_NAMESPACE
+global REG_DB_PATH
+global REG_DB_NAME
+
+PEGASUS_REPOSITORY = "/var/lib/Pegasus"
+DEFAULT_NAMESPACE = "root/cimv2"
+REG_DB_PATH = "/var/lib/openlmi-registration"
+REG_DB_NAME = "regdb.sqlite"
+
+reg_parse = re.compile(r"\[([^\]]+)\]\s+"
+"provider: ([^\s]+)\s+"
+"location: (\w+)\s+"
+"type: ([^\n]+)\s+"
+"namespace: ([^\n]+)\s+"
+"(group: ([^\n]+)|)") # the group is optional
+
+Types = {
+    'instance': '2',
+    'association': '3',
+    'indication': '4',
+    'method': '5',
+    'consumer': '6',
+    'instanceQuery': '7'
+}
+
+def usage():
+    print """
+Usage: %(progname)s [ --just-mofs ] [ -n namespace ] [ -c cimom ] [-v version]
+                    CMD <mof> [mof] [...] [reg]
+    CMD is one of [ register, unregister ]
+
+    %(progname)s reregister [ -c cimom ]
+
+    %(progname)s list
+
+    Registration/unregistreation:
+
+    Default namespace is %(default_ns)s, which can be changed with '-n' option.
+
+    If a registration file is provided, '-v' parameter is mandatory and specifies
+    version of the provider API.
+
+    Supported CIMOMs are sfcbd and tog-pegasus. Without \"-c\" argument, the
+    operation is processed for any cimom present on system (all of them).
+
+    --just-mofs option causes that all arguments after CMD will be
+      treated as mof files - no registration file is expected.
+
+      usage with --just-mofs:
+        %(progname)s --just-mofs CMD <mof> [mof] [...]
+      usage without:
+        %(progname)s -v <version> CMD <mof> [mof] [...] <reg>
+
+
+    Re-registration
+
+    Re-does all the known registrations for all the found or the specified
+    CIMOM.
+
+    The list command allows for listing the known registrations and their
+    parameters.
+""" % { 'progname': sys.argv[0], 'default_ns': DEFAULT_NAMESPACE }
+
+def log_msg(msg):
+    sys.stderr.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    sys.stderr.write(" " + msg + "\n")
+    sys.stderr.flush()
+
+def log_command(cmd, args):
+    log_msg("COMMAND: " + cmd + " " + " ".join(args))
+    try:
+        rv = subprocess.check_call([cmd] + args)
+    except subprocess.CalledProcessError as e:
+        log_msg(str(e))
+        rv = e.returncode
+    log_msg("EXIT CODE: " + str(rv))
+    return rv
+
+def db_init():
+    if not os.path.isdir(REG_DB_PATH):
+        os.makedirs(REG_DB_PATH + "/mof")
+        os.makedirs(REG_DB_PATH + "/reg")
+    db = sqlite3.connect(REG_DB_PATH + "/" + REG_DB_NAME)
+    dbc = db.cursor()
+    dbc.execute("PRAGMA foreign_keys = ON")
+    dbc.executescript("""
+        CREATE TABLE IF NOT EXISTS registration (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ctime varchar(23) NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now'))
+        );
+        CREATE TABLE IF NOT EXISTS mof (
+            fname VARCHAR PRIMARY KEY,
+            registration_id INTEGER REFERENCES registration(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS reg (
+            fname VARCHAR PRIMARY KEY,
+            registration_id INTEGER REFERENCES registration(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS cimom_opts (
+            cimom VARCHAR NOT NULL,
+            registration_id INTEGER REFERENCES registration(id) ON DELETE CASCADE,
+            namespace VARCHAR NOT NULL,
+            version VARCHAR,
+            PRIMARY KEY (cimom, registration_id)
+        );""")
+    db.commit()
+    return db
+
+def db_close(db):
+    db.close()
+
+def define_module(location, group, version):
+    return """instance of PG_ProviderModule
+{
+    Name = "%(group)s";
+    Location = "%(location)s";
+    Vendor = "OpenLMI";
+    Version = "%(version)s";
+    InterfaceType = "CMPI";
+    InterfaceVersion = "2.0.0";
+    ModuleGroupName = "%(group)s";
+};
+""" % { 'location': location, 'group': group, 'version': version }
+
+def get_types(types):
+    l = []
+    for key, value in Types.items():
+        if key in types:
+            l.append(value)
+    return ",".join(l)
+
+def define_capability(location, provider, cls, types, group):
+    return """instance of PG_Provider
+{
+    Name = "%(provider)s";
+    ProviderModuleName = "%(group)s";
+};
+
+instance of PG_ProviderCapabilities
+{
+   ProviderModuleName = "%(group)s";
+   ProviderName = "%(provider)s";
+   CapabilityID = "%(class)s";
+   ClassName = "%(class)s";
+   Namespaces = { "root/cimv2" };
+   ProviderType = { %(types)s };
+   SupportedProperties = NULL;
+   SupportedMethods = NULL;
+};
+""" % { 'location': location, 'provider': provider, 'class': cls, 'types': get_types(types), 'group': group }
+
+def start_pegasus():
+    if log_command("/usr/sbin/cimserver", ["daemon=true",
+            "enableHttpConnection=false",
+            "enableHttpsConnection=false",
+            "enableRemotePrivilegedUserAccess=false",
+            "slp=false"]) != 0:
+        log_msg("Cannot start Pegasus")
+        sys.exit(1)
+
+def stop_pegasus():
+    log_command("/usr/sbin/cimserver", ["-s"])
+
+def find_pegasus_interop():
+    # try to guess the interop namespace: root/interop is present only
+    # in the newer Pegasus versions so start with that one
+    if os.path.isdir(PEGASUS_REPOSITORY + "/repository/root#interop"):
+        ret = "root/interop"
+    elif os.path.isdir(PEGASUS_REPOSITORY + "/repository/root#PG_InterOp"):
+        ret = "root/PG_InterOp"
+    else:
+        log_msg("ERROR: Could not find the Pegasus interop namespace: Exiting")
+        sys.exit(1)
+    return ret
+
+def register_pegasus(reg, version, cimmof, cm_args):
+    modules_defined = {}
+    with open(reg, "r") as regfile:
+        reg_data = regfile.read()
+    tmpfile = NamedTemporaryFile()
+    for record in reg_parse.findall(reg_data):
+        cls, provider, location, types, namespace, _unused, group = record
+
+        if not group:
+            group = location
+
+        if group not in modules_defined:
+            tmpfile.write(define_module(location, group, version))
+            modules_defined[group] = True
+
+        tmpfile.write(define_capability(location, provider, cls, types, group))
+    tmpfile.flush()
+    interop_ns = find_pegasus_interop()
+    cm_args += ["-uc", "-n", interop_ns, tmpfile.name]
+    log_command(cimmof, cm_args)
+    tmpfile.close() # deletes the file
+
+def cimom_register(mofs, reg, version, namespace, cimom):
+    if cimom['sfcbd']:
+        args = ["-n", namespace]
+        if reg:
+            args += ["-r", reg]
+        args += mofs
+        log_command("/usr/bin/sfcbstage", args)
+        log_command("/usr/bin/sfcbrepos", ["-f"])
+        log_command("/usr/bin/systemctl", ["reload-or-try-restart", "sblim-sfcb.service"])
+    if cimom['tog-pegasus']:
+        args = ["-aEV", "-n", namespace]
+        with open("/dev/null", "w") as devnull:
+            if subprocess.call(["/usr/sbin/cimserver", "--status"],
+                    stdout = devnull, stderr = devnull) == 0:
+                cimmof = "/usr/bin/cimmof"
+                repo_args = []
+            else:
+                cimmof = "/usr/bin/cimmofl"
+                repo_args = ["-R", PEGASUS_REPOSITORY]
+        args += repo_args + ["-uc"] + mofs
+        log_command(cimmof, args)
+        if reg:
+            register_pegasus(reg, version, cimmof, repo_args)
+
+def cimom_unregister(mofs, reg, version, namespace, cimom):
+    if cimom['sfcbd']:
+        args = ["-n", namespace]
+        if reg:
+            args += ["-r", os.path.basename(reg)]
+        args += [os.path.basename(f) for f in mofs]
+        log_command("/usr/bin/sfcbunstage", args)
+        log_command("/usr/bin/sfcbrepos", ["-f"])
+        log_command("/usr/bin/systemctl", ["reload-or-try-restart", "sblim-sfcb.service"])
+    if cimom['tog-pegasus']:
+        custom_pegasus = False
+        with  open("/dev/null", "w") as devnull:
+            if subprocess.call(["/usr/sbin/cimserver", "--status"],
+                    stdout = devnull, stderr = devnull) != 0:
+                custom_pegasus = True
+                start_pegasus()
+            if reg:
+                pattern = re.compile(r"^\s*group:\s*(\w+)\s*$")
+                with open(reg, "r") as regfile:
+                    providers = set()
+                    for rline in regfile.readlines():
+                        p = pattern.sub(r'\1', rline)
+                        if p != rline:
+                            providers.add(p)
+                    if len(providers) == 0:
+                        pattern = re.compile(r"^\s*location:\s*(\w+)\s*$")
+                        regfile.seek(0)
+                        for rline in regfile.readlines():
+                            p = pattern.sub(r'\1', rline)
+                            if p != rline:
+                                providers.add(p)
+                for p in providers:
+                    log_command("/usr/bin/cimprovider", ["-d", "-m", p])
+                    log_command("/usr/bin/cimprovider", ["-r", "-m", p])
+            log_command("/usr/bin/mofcomp", ["-n", namespace] + mofs)
+        if custom_pegasus:
+            stop_pegasus()
+
+def db_get_registrations(cursor, mofs, reg):
+    bmofs = [os.path.basename(f) for f in mofs]
+    if (reg):
+        qry = "SELECT mof.registration_id FROM mof JOIN reg \
+               ON mof.registration_id = reg.registration_id \
+               WHERE (mof.fname in ('%(mofs)s') or reg.fname = '%(reg)s') \
+               GROUP BY mof.registration_id" \
+               % { 'mofs': "','".join(bmofs), 'reg': reg }
+    else:
+        qry = "SELECT mof.registration_id FROM mof \
+               WHERE (mof.fname in ('%(mofs)s')) GROUP BY mof.registration_id" \
+               % { 'mofs': "','".join(bmofs) }
+    cursor.execute(qry)
+    ret = cursor.fetchall()
+    return ret
+
+def db_register(mofs, reg, version, namespace, cimom):
+    db = db_init()
+    dbc = db.cursor()
+    rows = db_get_registrations(dbc, mofs, reg)
+    if (len(rows) == 1):
+        # updating existing registration
+        reg_id = rows[0][0]
+        dbc.execute("DELETE FROM reg WHERE (registration_id = ?)", (reg_id,))
+        dbc.execute("DELETE FROM mof WHERE (registration_id = ?)", (reg_id,))
+        dbc.execute("DELETE FROM cimom_opts WHERE (registration_id = ?)", (reg_id,))
+    elif (len(rows) == 0):
+        # new registration
+        dbc.execute("INSERT INTO registration DEFAULT VALUES")
+        reg_id = dbc.lastrowid
+    else:
+        # not supported...
+        log_msg("ERROR: Cannot update multiple registrations")
+        db_close(db)
+        return
+    for moffile in mofs:
+        # backup the mof file and create the database record
+        bmof = os.path.basename(moffile)
+        copyfile(moffile, REG_DB_PATH + "/mof/" + bmof)
+        dbc.execute("INSERT INTO mof (fname, registration_id) VALUES (?, ?)",
+                (bmof, reg_id))
+    if reg:
+        # backup the reg file and create the database record
+        copyfile(reg, REG_DB_PATH + "/reg/" + os.path.basename(reg))
+        dbc.execute("INSERT INTO reg (fname, registration_id) VALUES (?, ?)",
+                (os.path.basename(reg), reg_id))
+    if cimom['sfcbd']:
+        dbc.execute("INSERT INTO cimom_opts (cimom, registration_id, namespace, version) \
+                VALUES (?, ?, ?, ?)", ('sfcbd', reg_id, namespace, version))
+    if cimom['tog-pegasus']:
+        dbc.execute("INSERT INTO cimom_opts (cimom, registration_id, namespace, version) \
+                VALUES (?, ?, ?, ?)", ('tog-pegasus', reg_id, namespace, version))
+    db.commit()
+    db_close(db)
+
+def db_unregister(mofs, reg, version, namespace, cimom):
+    db = db_init()
+    dbc = db.cursor()
+    rows = db_get_registrations(dbc, mofs, reg)
+    if (len(rows) == 1):
+        # ok. just one registration, remove it
+        reg_id = str(rows[0][0])
+        for bmof in dbc.execute("SELECT fname FROM mof WHERE (registration_id = ?)", (reg_id,)):
+            try:
+                os.unlink(REG_DB_PATH + "/mof/" + bmof[0])
+            except OSError as e:
+                log_msg("Error deleting " + bmof[0] + ": " + e.strerror)
+        dbc.execute("SELECT fname FROM reg WHERE registration_id = ?", (reg_id,))
+        breg = dbc.fetchone()
+        if breg:
+            try:
+                os.unlink(REG_DB_PATH + "/reg/" + breg[0])
+            except OSError as e:
+                log_msg("Error deleting " + breg[0] + ": " + e.strerror)
+        dbc.execute("DELETE FROM registration WHERE (id = ?)", (reg_id,))
+    elif (len(rows) == 0):
+        log_msg("WARNING: No registration found in the database")
+    else:
+        log_msg("ERROR: Cannot delete multiple registrations")
+    db.commit()
+    db_close(db)
+
+def db_get_cimom_opts(cursor, cimom, reg_id):
+    cur = cursor.execute("SELECT namespace, version FROM cimom_opts \
+            WHERE (cimom = ? and registration_id = ?)", (cimom, reg_id))
+    row = cur.fetchone()
+    namespace = row[0]
+    version = row[1]
+    return (namespace, version)
+
+def reregister(cimom):
+    db = db_init()
+    dbc_1 = db.cursor()
+    dbc_2 = db.cursor()
+    for reg_id_row in dbc_1.execute("SELECT id FROM registration ORDER BY ctime"):
+        reg_id = str(reg_id_row[0])
+        mofs = []
+        for row in dbc_2.execute("SELECT fname FROM mof WHERE (registration_id = ?)", (reg_id,)):
+            mofs.append(REG_DB_PATH + "/mof/" + row[0])
+        cur = dbc_2.execute("SELECT fname FROM reg WHERE (registration_id = ?)", (reg_id,))
+        row = cur.fetchone()
+        if row:
+            reg = REG_DB_PATH + "/reg/" + row[0]
+        else:
+            reg = None
+        if cimom['sfcbd']:
+            (namespace, version) = db_get_cimom_opts(dbc_2, 'sfcbd', reg_id)
+            if not namespace is None:
+                cimom_sel = {'sfcbd': True, 'tog-pegasus': False}
+                cimom_register(mofs, reg, version, namespace, cimom_sel)
+        if cimom['tog-pegasus']:
+            (namespace, version) = db_get_cimom_opts(dbc_2, 'tog-pegasus', reg_id)
+            if not namespace is None:
+                cimom_sel = {'sfcbd': False, 'tog-pegasus': True}
+                cimom_register(mofs, reg, version, namespace, cimom_sel)
+    db_close(db)
+
+def list_db():
+    db = db_init()
+    dbc_1 = db.cursor()
+    dbc_2 = db.cursor()
+    reg_count = 1
+    print ""
+    for reg_row in dbc_1.execute("SELECT id, ctime FROM registration ORDER BY ctime"):
+        reg_id = str(reg_row[0])
+        ctime = str(reg_row[1])
+        print "Registration %(num)s (%(date)s)" % { 'num': reg_count, 'date': ctime }
+        cur = dbc_2.execute("SELECT group_concat(fname) FROM mof \
+                WHERE (registration_id = ?) ORDER BY fname", (reg_id,))
+        row = cur.fetchone()
+        mofs_str = str(row[0])
+        print "MOF files: " + mofs_str
+        cur = dbc_2.execute("SELECT fname FROM reg WHERE (registration_id = ?)", (reg_id,))
+        row = cur.fetchone()
+        if row:
+            reg_str = str(row[0])
+            print "REG file: " + reg_str
+        else:
+            print "No REG file."
+        print "CIMOM specific options"
+        for row in dbc_2.execute("SELECT cimom, namespace, version FROM cimom_opts \
+                WHERE (registration_id = ?) ORDER BY cimom", (reg_id,)):
+                print "%(cimom)s: Namespace %(ns)s, Registered version %(ver)s" \
+                        % {'cimom': row[0], 'ns': row[1], 'ver': row[2] }
+        reg_count += 1
+        print ""
+    db_close(db)
+
+def main():
+    if (len(sys.argv) == 1):
+        usage()
+        sys.exit(0)
+
+    try:
+        opts, args = getopt.gnu_getopt(sys.argv[1:], "hn:c:v:", ["just-mofs", "help"])
+    except getopt.GetoptError as e:
+        print(e)
+        usage()
+        sys.exit(1)
+
+    version = None
+    namespace = DEFAULT_NAMESPACE
+    cimom_sel = {'sfcbd': False, 'tog-pegasus': False}
+    db_sel = {'sfcbd': True, 'tog-pegasus': True}
+    cimom_found = {'sfcbd': False, 'tog-pegasus': False}
+    just_mofs = False
+
+    for o, a in opts:
+        if o == "-v":
+            version = a
+        elif o == "-n":
+            namespace = a
+        elif o == "-c":
+            if a not in ("sfcbd", "tog-pegasus"):
+                sys.stderr.write("Not supported cimom: " + a + "\n")
+                sys.exit(1)
+            else:
+                cimom_sel[a] = True
+        elif o in ("-h", "--help"):
+            usage()
+            sys.exit()
+        elif o == "--just-mofs":
+            just_mofs = True
+        else:
+            assert False, "unhandled option"
+
+    cmd = args[0]
+    if cmd == "register" or cmd == "unregister":
+        if (just_mofs and (len(args) < 2)) or ((not just_mofs) and (len(args) < 3)):
+            sys.stderr.write("Not enough parameters.\n" )
+            usage()
+            sys.exit(1)
+        if (not just_mofs) and (version is None):
+            print "Missing -v option"
+            usage()
+            sys.exit(1)
+    elif cmd == "reregister":
+        if len(args) > 2:
+            usage()
+            sys.exit(1)
+    elif cmd == "list":
+        if len(args) > 2:
+            usage()
+            sys.exit(1)
+    else:
+        sys.stderr.write("Unknown command: %s\n" % cmd)
+        usage()
+        sys.exit(1)
+
+    # if the user selected a particular cimom and it can't be found
+    # spit an error and give up
+    if os.path.isfile("/usr/sbin/sfcbd"):
+        cimom_found['sfcbd'] = True
+    elif cimom_sel['sfcbd']:
+        sys.stderr.write("Sfcbd not detected on system!\n")
+        sys.exit(1)
+    if os.path.isfile("/usr/sbin/cimserver"):
+        cimom_found['tog-pegasus'] = True
+    elif cimom_sel['tog-pegasus']:
+        sys.stderr.write("Pegasus not detected on system!\n")
+        sys.exit(1)
+
+    if just_mofs:
+        mofs = args[1:]
+        reg = None
+    else:
+        mofs = args[1:-1]
+        reg = args[-1]
+
+    if not cimom_found['tog-pegasus'] and not cimom_found['sfcbd']:
+        sys.stderr.write("No cimom installed on the system\n")
+        sys.exit(1)
+
+    # the user did not select the cimom: lets use all the found ones
+    if not cimom_sel['sfcbd'] and not cimom_sel['tog-pegasus']:
+        cimom_sel = cimom_found
+    else:
+        # the user has selected some CIMOM: all the registrations including
+        # the database will happen only for the selected CIMOM
+        db_sel = cimom_sel
+
+    if cmd == "register":
+        log_msg("Registering mofs: " + " ".join(mofs) + ", reg: " + str(reg))
+        cimom_register(mofs, reg, version, namespace, cimom_sel)
+        db_register(mofs, reg, version, namespace, db_sel)
+    elif cmd == "unregister":
+        log_msg("Unregistering mofs: " + " ".join(mofs) + ", reg: " + str(reg))
+        cimom_unregister(mofs, reg, version, namespace, cimom_sel)
+        db_unregister(mofs, reg, version, namespace, db_sel)
+    elif cmd == "reregister":
+        log_msg("Re-registering mofs: " + " ".join(mofs) + ", reg: " + str(reg))
+        reregister(cimom_sel)
+    elif cmd == "list":
+        list_db()
+    else:
+        usage()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+

@@ -1,0 +1,28 @@
+instance of PG_ProviderProfileCapabilities
+{
+    CapabilityID = "@CLASS@";
+
+    ProviderModuleName = "cmpiLMI_Account";
+
+    ProviderName = "@CLASS@";
+
+    RegisteredProfile = 0;
+
+    OtherRegisteredProfile = "OpenLMI-Account";
+    OtherProfileOrganization = "OpenLMI";
+
+    ProfileVersion = "@VERSION@";
+
+    RegisteredSubProfiles = {
+        3025
+    };
+
+    SubprofileVersions = {
+        "1.0.1"
+    };
+
+    ConformingElements = {
+       "@CLASS@"
+     };
+};
+

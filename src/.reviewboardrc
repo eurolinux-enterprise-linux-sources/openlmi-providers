@@ -1,0 +1,2 @@
+REVIEWBOARD_URL = 'https://reviewboard-openlmi.rhcloud.com'
+REPOSITORY = 'openlmi-providers'

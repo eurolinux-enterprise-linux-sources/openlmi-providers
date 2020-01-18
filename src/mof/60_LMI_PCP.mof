@@ -1,0 +1,44 @@
+/*
+ * Copyright (C) 2013 Red Hat, Inc.
+ *
+ * Stub MOF for the CIM<->PCP bridge.  Further MOF/REG clauses that
+ * describe the PCP PMNS details may be generated periodically using
+ * pcp2cim.sh.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Authors: Frank Ch. Eigler <fche@redhat.com>
+ */
+class PCP_MetricValue : CIM_StatisticalData
+{
+    [Description("PCP metric PMID")]
+    uint32 PMID;
+
+    [Description("PMAPI indom instance number")]
+    uint32 InstanceNumber;
+
+    [Description("PMAPI indom instance name")]
+    string InstanceName;
+
+    [Description("The metric type, as returned by pmTypeStr(3)")]
+    string Type;
+
+    [Description("The metric value, as rendered into string form by pmAtomStr() or pmPrintValue(3)")]
+    string ValueString;
+
+    [Description("The metric units, as returned by pmUnitsStr(3)")]
+    string Units;
+}; 
+

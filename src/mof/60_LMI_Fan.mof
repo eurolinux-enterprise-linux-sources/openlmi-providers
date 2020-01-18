@@ -1,0 +1,109 @@
+/*
+ * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Authors: Michal Minar <miminar@redhat.com>
+ */
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_Fan") ]
+class LMI_Fan: CIM_Fan
+{
+    [ Key, Override("DeviceID"),
+      Description("Uniquely identifies fan. It is a composition of "
+          "SysPath and Name glued with slash ('/').") ]
+    string DeviceID;
+
+    [ Override("Name"),
+      Description("Name of fan provided by system.") ]
+    string Name;
+
+    [ Description("Array of fan features, that are exposed through system "
+          " interface. In other words: those that are readible/writable."),
+      ValueMap { "1", "2", "3", "4", "5", "6", "7", "8" },
+      Values { "MinSpeed", "MaxSpeed", "Divisor", "Pulses", "Beep",
+               "Alarm", "MinAlarm", "MaxAlarm" }
+    ]
+    uint16 AccessibleFeatures[];
+
+    [ Description("Minimum speed value."), Write,
+      Units("Revolutions per Minute") ]
+    uint64 MinSpeed;
+
+    [ Description("Maximum speed value."), Write,
+      Units("Revolutions per Minute") ]
+    uint64 MaxSpeed;
+
+    [ Description("Fan divisisor. It affects Minimum and Maximum speed value "
+          "and accuracy of readings. "
+          "The drivers account for the 'fan divisor' in their calculation "
+          "of RPM. So changing the fan divisor will NOT change the "
+          "nominal RPM reading, it will only affect the minimum and maximum "
+          "readings and the accuracy of the readings. "
+          "The actual formula is RPM = (60 * 22500) / (count * divisor)"),
+      Write ]
+    uint32 Divisor;
+
+    [ Description("Number of tachometer pulses per fan revolution. "
+          "Integer value, typically between 1 and 4. "
+          "This value is a characteristic of the fan connected to the "
+          "device's input, so it has to be set in accordance with the fan "
+          "model."),
+      Write ]
+    uint32 Pulses;
+
+    [ Description("This indicates, whether a PC's speaker should beep "
+          "when an alarm occurs."),
+      Write ]
+    boolean Beep;
+
+    [ Description("ALARM warning indicating, that current speed is out of "
+          "range. This information is supplied by fan's chip driver.") ]
+    boolean Alarm;
+
+    [ Description("ALARM warning indicating, that current speed is below "
+          "the critical level. This information is supplied by fan's chip "
+          "driver.") ]
+    boolean MinAlarm;
+
+    [ Description("ALARM warning indicating, that current speed is above "
+          "the critical level. This information is supplied by fan's chip "
+          "driver.") ]
+    boolean MaxAlarm;
+};
+
+[ Provider("cmpi:cmpiLMI_Fan") ]
+class LMI_FanSensor: CIM_NumericSensor
+{
+    [ Key, Override("DeviceID"),
+      Description("Uniquely identifies fan. It is a composition of "
+          "SysPath and Name glued with slash ('/').") ]
+    string DeviceID;
+
+    [ Override("Name"),
+      Description("Name of fan provided by system.") ]
+    string Name;
+};
+
+[ Association,
+  Provider("cmpi:cmpiLMI_Fan") ]
+class LMI_FanAssociatedSensor: CIM_AssociatedSensor
+{
+    [ Override("Antecedent") ]
+    LMI_FanSensor REF Antecedent;
+
+    [ Override("Dependent") ]
+    LMI_Fan REF Dependent;
+};

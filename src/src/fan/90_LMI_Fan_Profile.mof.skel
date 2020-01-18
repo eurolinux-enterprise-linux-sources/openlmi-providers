@@ -1,0 +1,41 @@
+instance of PG_ProviderProfileCapabilities
+{
+    CapabilityID = "@CLASS@";
+
+    ProviderModuleName = "cmpiLMI_Fan";
+
+    ProviderName = "@CLASS@";
+
+    RegisteredProfile = 0;
+
+    OtherRegisteredProfile = "OpenLMI-Fan";
+    OtherProfileOrganization = "OpenLMI";
+
+    ProfileVersion = "@VERSION@";
+
+    ConformingElements = {
+       "@CLASS@"
+    };
+    RegisteredSubProfiles = {};
+};
+
+instance of PG_ProviderProfileCapabilities
+{
+    CapabilityID = "DMTF_@CLASS@";
+
+    ProviderModuleName = "cmpiLMI_Fan";
+
+    ProviderName = "@CLASS@";
+
+    RegisteredProfile = 0;
+
+    OtherRegisteredProfile = "Fan";
+    OtherProfileOrganization = "DMTF";
+
+    ProfileVersion = "1.0.1";
+
+    ConformingElements = {
+       "@CLASS@"
+    };
+    RegisteredSubProfiles = {};
+};

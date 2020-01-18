@@ -1,0 +1,7 @@
+[Unit]
+Description=unit %n
+
+[Service]
+Type=oneshot
+ExecStart=-/usr/bin/false
+ExecStop=-/usr/bin/false

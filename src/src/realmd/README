@@ -1,0 +1,221 @@
+Realmd CIM Provider
+
+Building
+========
+
+Prerequisites:
+--------------
+
+To build you'll need these packages installed:
+
+cmake
+openlmi-providers-devel
+konkretcmpi
+
+
+To install and run you'll need at a minimum:
+--------------------------------------------
+
+tog-pegasus
+openlmi-providers
+
+
+This project uses the same build mechanism as openlmi-provider which
+is based on cmake. It's also important specify the same cmake
+configuration parameters enforced by RPM.
+
+My short term solution is to use the following shell script. I add the
+CFLAGS override to turn on options useful for debugging during
+development, you may wish to omit that.
+
+<<<<<<<<<<
+#!/bin/sh
+
+export CFLAGS='-g -O0 -DRDCP_DEBUG'
+
+/usr/bin/cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_INSTALL_PREFIX:PATH=/usr -DINCLUDE_INSTALL_DIR:PATH=/usr/include -DLIB_INSTALL_DIR:PATH=/usr/lib -DSYSCONF_INSTALL_DIR:PATH=/etc -DSHARE_INSTALL_PREFIX:PATH=/usr/share -DBUILD_SHARED_LIBS:BOOL=ON .
+
+if [ $? -eq 0 ]; then
+    make
+fi
+>>>>>>>>>>
+
+Installing:
+-----------
+
+% sudo make install
+
+This copies the mof file, the registration file and the loadable
+module to their destination. Then you must register your module with
+the Pegasus CIMOM. Note: pegasus MUST be running!
+
+% openlmi-mof-register register /usr/share/openlmi-providers/LMI_Realmd.mof /usr/share/openlmi-providers/LMI_Realmd.reg
+
+Development Tips:
+-----------------
+
+Understanding konkret code generation issues:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+konkret is a tool that reads in a mof file and generates C code. For
+every XXX class it will generate a XXX.h and XXXProvider.c file. The
+code generation occurs due to CMake macros provided by the
+openlmi-providers-devel package. konkret needs to run any time you
+modify the mof file. It *always* generates a new XXX.h file because
+that's where definitions based on the contents of the mof file are
+located. If there is no XXXProvider.c file it will also generate
+it. This is a "stub" file in which you will fill in with your
+implementation. If XXXProvider.c exits it will not overwrite it,
+however it always overwrites the XXX.h file.
+
+Do not put anything into the XXX.h file you'll need to retain.
+
+After editing the mof file the make targets will cause konkret to run
+again. You'll get brand new XXX.h files. But your old XXXProvider.c
+files may no longer have the correct definitions (e.g. prototypes)
+found in the XXX.h file so you may need to hand edit by copying the
+function prototype from the XXX.h file into your XXXProvider.c file.
+
+If you've written definitions that logically belong in XXX.h but don't
+want them nuked the next time konkret runs my solution was to put them
+in someother .h file that's included by the XXXProvider.c file.
+
+Initializing class instances:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The way konkret works is to emit specialized inline functions to
+initialize each member of a class. If the class is subclassed you get
+different initializers depending on whether the property is in the
+parent class or the subclass. You cannot call a parent class property
+initializer in a subclass (yuck), you have to use the subclass
+initializer for the property inherited from the parent class. This
+creates a maintenance problem if the parent class changes, you have
+find every place parent class properties are inialized and make
+changes. To solve this problem I defined macros that initialize class
+properties. The macro takes a "klass" parameter and token pastes it to
+generate the class specific property manipulation function call. Using
+these macros means anytime a class changes due to a change in the mof
+file there is only one place where you need to change the code. These
+macros are a good example of what logically belongs in the XXX.h file
+but are separated out into a different .h file because konkret will
+nuke anything you've added to a XXX.h file.
+
+Modifications to the provider:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+During development if the mof file changes you have to make Pegasus
+reload the mof. It's not sufficient to retart cimserver, you have to
+unregister the provider and register it again for Pegasus to see the
+mof changes. Thus you would use the openlmi-mof-register command above
+except pass the unregister option, followed by the above command, e.g.
+
+% openlmi-mof-register unregister /usr/share/openlmi-providers/LMI_Realmd.mof /usr/share/openlmi-providers/LMI_Realmd.reg
+% openlmi-mof-register register /usr/share/openlmi-providers/LMI_Realmd.mof /usr/share/openlmi-providers/LMI_Realmd.reg
+
+If all you've done during devopment is modify the provider (not it's
+mof definition) then all you need to do is:
+
+% sudo cimserver -s
+% sudo make install
+% sudo cimserver
+
+How do I run the Pegasus CIMOM so I can see debug statements?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+% sudo cimserver daemon=false forceProviderProcesses=false
+
+How do I use GDB to debug my provider?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create the following .gdbinit file where XXX is where you want to break.
+
+<<<<<<<<<<
+set breakpoint pending on
+b XXX
+r daemon=false forceProviderProcesses=false
+>>>>>>>>>>
+
+then run gdb like this:
+
+% sudo gdb cimserver
+
+How do I trace what Pegasus is doing?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+% cimserver daemon=false forceProviderProcesses=false logLevel=TRACE traceLevel=5 traceFacility=File traceComponents=All
+
+The trace file is written to:
+
+/var/lib/Pegasus/cache/trace/cimserver.trc
+
+More information about cimserver tracing can be found in the
+"OpenPegasus Tracing User Guide" PDF. Google the title to get a
+current URL.
+
+FAQ
+===
+
+Q: What does the rdcp acronym stand for?
+
+A: Realmd CIM Provider. The "rd" is for Realmd, the "c" is for CIM and
+   the "p" is for Provider
+
+Q: What decisions influenced your DBus implementation strategy?
+
+A: There are essentially two supported DBus API's. A very high level
+   GDBus and a very low level libdbus.
+
+   GDBus requires you to utilize Gnome's GObject pseudo
+   object-orientated framework. If you're not familar with it it's a
+   fairly steep learning curve to become proficient. Also if you're
+   not proficient in GObject programming it's hard to comprehend code
+   which utilizes it thus putting normal C developers at a
+   disadvantage. However GDBus gives you a lot of nice support, one of
+   the nice features is everything is based on GVariants, a powerful
+   data structure.
+
+   On the other hand libdbus is very low level, there is very little
+   support for the necessary DBus operations. However it is used
+   extensively by other projects so it's not an aberration to use it,
+   it's pure C code making it easier to understand and it doesn't pull
+   in the whole GObject system. But it's a lot of work to use.
+
+   I took a compromise approach. I didn't have the time to become
+   proficient with GObject and I felt the GObject based code was
+   difficult for C programmers without GObject experience to read
+   and modify. However I recognized the value of expressing most
+   things in terms of GVariants, a hallmark of GDBus. So I wrote some
+   utility code that supports serializing GVariants into and out of
+   libdbus. This allowed me to use the powerful GVariant without
+   having to get involved with GObjects and GDBus. If we ever decide
+   to port the code to GDBus it shold be fairly straight forward
+   because we're already using GVariant's as a fundamental type. This
+   seemed to represent a reasonable compromise between libdus and
+   GDBus, it avoids the pseudo object-orientated framework of GObject
+   in favor of vanilla C code but retains the powerful use of
+   GVariants. I guess only time will tell if it was a smart choice or
+   not.
+
+ToDo
+====
+
+Implement locale in RealmdService.
+
+Utilize CMPI Logging instead of debug printf statements (currently
+controlled by the RDCP_DEBUG compile time flag).
+
+Generate indications when realms are added or removed from the Realms
+property of the LMI_RealmdService.
+
+Any blocking operations should not block the CIMOM.
+(e.g. communicating with DBus). I think the right way to do this is
+via the CMPI threading support, but this needs further
+investigation. Other openlmi developers would be a good resource for
+this issue.
+
+We call DBus to get object properties a lot. There is I believe
+support for DBus clients which caches object properties and listens on
+the properties change signal to refresh the properties cache. Access
+to the properties are then performed via the local properties cache
+rather than the via RPC. Obviously this is much more efficient, we
+should support it.

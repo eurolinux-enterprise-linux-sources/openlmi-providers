@@ -1,0 +1,66 @@
+table {
+    text-align: left;
+    vertical-align: top;
+}
+th, td {
+    text-align: left;
+    border-style: inset;
+    border-width: 1px;
+    vertical-align: top;
+}
+
+table.properties{
+    border-style: outset;
+    border-width: 1px;
+}
+
+table.qualifiers{
+    border-style: none;
+}
+
+th.qualifiers, td.qualifiers {
+    border-style: none;
+}
+
+table.parameters{
+    border-style: outset;
+    border-width: 1px;
+}
+
+th.parameters, td.parameters {
+    border-style: inset;
+    border-width: 1px;
+}
+
+table.inherited {
+    border-style: outset;
+    border-width: 1px;
+}
+
+.tree {
+    border-style: none;
+}
+
+.deprecated{
+    color: red;
+    font-weight: bold;
+
+}
+
+span.tree_local {
+    font-weight: bold;
+}
+
+span.tree_inherited {
+    color: gray;
+}
+
+table.key {
+    border-style: outset;
+    border-width: 1px;
+}
+
+td.key {
+    border-style: inset;
+    border-width: 1px;
+}

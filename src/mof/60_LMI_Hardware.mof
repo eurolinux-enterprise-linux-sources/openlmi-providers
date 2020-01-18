@@ -1,0 +1,451 @@
+/*
+ * Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Authors: Tomas Smetana <tsmetana@redhat.com>
+ *          Peter Schiffer <pschiffe@redhat.com>
+ */
+
+/******************************************************************************
+ * Processor
+ */
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_Processor") ]
+class LMI_Processor: CIM_Processor
+{
+    [ Description("System architecture.") ]
+    string Architecture;
+
+    /* Added "Multi-Core" characteristic from dmidecode program. */
+    [ Override("Characteristics"),
+    ValueMap { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9..32567",
+        "32568", "32569..65535" },
+    Values { "Unknown", "DMTF Reserved", "64-bit Capable", "32-bit Capable",
+        "Enhanced Virtualization", "Hardware Thread", "NX-bit",
+        "Power/Performance Control", "Core Frequency Boosting",
+        "DMTF Reserved", "Multi-Core", "Vendor Reserved" } ]
+    uint16 Characteristics[];
+
+    /* Flag IDs and names are based on:
+       linux-3.8/arch/x86/include/asm/cpufeature.h */
+    [ Description ("Flags supported by Processor. "
+        "(Available only for x86 architecture.)"),
+    ValueMap {
+        /* 0*32 */
+        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "11", "12", "13",
+        "14", "15", "16", "17", "18", "19", "21", "22", "23", "24", "25", "26",
+        "27", "28", "29", "30", "31",
+        /* 1*32 */
+        "43", "51", "52", "54", "57", "58", "59", "61", "62", "63",
+        /* 2*32 */
+        "64", "65", "67",
+        /* 3*32 */
+        "96", "97", "98", "99", "100", "101", "102", "103", "104", "105",
+        "106", "107", "108", "109", "110", "111", "112", "113", "114", "115",
+        "116", "118", "119", "120", "121", "122", "123", "124", "125",
+        /* 4*32 */
+        "128", "129", "130", "131", "132", "133", "134", "135", "136", "137",
+        "138", "140", "141", "142", "143", "145", "146", "147", "148", "149",
+        "150", "151", "152", "153", "154", "155", "156", "157", "158", "159",
+        /* 5*32 */
+        "162", "163", "166", "167", "168", "169", "170", "171", "172", "173",
+        /* 6*32 */
+        "192", "193", "194", "195", "196", "197", "198", "199", "200", "201",
+        "202", "203", "204", "205", "207", "208", "209", "211", "213", "214",
+        "215",
+        /* 7*32 */
+        "224", "225", "226", "227", "228", "229", "230", "231", "232",
+        /* 8*32 */
+        "256", "257", "258", "259", "260", "261", "262", "263", "264", "265",
+        "266", "267", "268", "269", "270",
+        /* 9*32 */
+        "288", "289", "291", "292", "293", "295", "296", "297", "298", "299",
+        "306", "307", "308" },
+    Values {
+        /* 0*32 */
+        "fpu", "vme", "de", "pse", "tsc", "msr", "pae", "mce", "cx8", "apic",
+        "sep", "mtrr", "pge", "mca", "cmov", "pat", "pse36", "pn", "clflush",
+        "dts", "acpi", "mmx", "fxsr", "sse", "sse2", "ss", "ht", "tm", "ia64",
+        "pbe",
+        /* 1*32 */
+        "syscall", "mp", "nx", "mmxext", "fxsr_opt", "pdpe1gb", "rdtscp", "lm",
+        "3dnowext", "3dnow",
+        /* 2*32 */
+        "recovery", "longrun", "lrti",
+        /* 3*32 */
+        "cxmmx", "k6_mtrr", "cyrix_arr", "centaur_mcr", "k8", "k7", "p3", "p4",
+        "constant_tsc", "up", "fxsave_leak", "arch_perfmon", "pebs", "bts",
+        "syscall32", "sysenter32", "rep_good", "mfence_rdtsc", "lfence_rdtsc",
+        "11ap", "nopl", "xtopology", "tsc_reliable", "nonstop_tsc",
+        "clflush_monitor", "extd_apicid", "amd_dcm", "aperfmperf", "eagerfpu",
+        /* 4*32 */
+        "pni", "pclmulqdq", "dtes64", "monitor", "ds_cpl", "vmx", "smx", "est",
+        "tm2", "ssse3", "cid", "fma", "cx16", "xtpr", "pdcm", "pcid", "dca",
+        "sse4_1", "sse4_2", "x2apic", "movbe", "popcnt", "tsc_deadline_timer",
+        "aes", "xsave", "osxsave", "avx", "f16c", "rdrand", "hypervisor",
+        /* 5*32 */
+        "rng", "rng_en", "ace", "ace_en", "ace2","ace2_en", "phe", "phe_en",
+        "pmm", "pmm_en",
+        /* 6*32 */
+        "lahf_lm", "cmp_legacy", "svm", "extapic", "cr8_legacy", "abm",
+        "sse4a", "misalignsse", "3dnowprefetch", "osvw", "ibs", "xop",
+        "skinit", "wdt", "lwp", "fma4", "tce", "nodeid_msr", "tbm", "topoext",
+        "perfctr_core",
+        /* 7*32 */
+        "ida", "arat", "cpb", "epb", "xsaveopt", "pln", "pts", "dtherm",
+        "hw_pstate",
+        /* 8*32 */
+        "tpr_shadow", "vnmi", "flexpriority", "ept", "vpid", "npt", "lbrv",
+        "svm_lock", "nrip_save", "tsc_scale", "vmcb_clean", "flushbyasid",
+        "decodeassists", "pausefilter", "pfthreshold",
+        /* 9*32 */
+        "fsgsbase", "tsc_adjust", "bmi1", "hle", "avx2", "smep", "bmi2",
+        "erms", "invpcid", "rtm", "rdseed", "adx", "smap" } ]
+    uint16 Flags[];
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_ProcessorCapabilities") ]
+class LMI_ProcessorCapabilities: CIM_ProcessorCapabilities
+{
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_ProcessorElementCapabilities"), Association ]
+class LMI_ProcessorElementCapabilities: CIM_ElementCapabilities
+{
+    [Override("ManagedElement")]
+    LMI_Processor REF ManagedElement;
+
+    [Override("Capabilities")]
+    LMI_ProcessorCapabilities REF Capabilities;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_ProcessorCacheMemory") ]
+class LMI_ProcessorCacheMemory: CIM_Memory
+{
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_AssociatedProcessorCacheMemory"), Association ]
+class LMI_AssociatedProcessorCacheMemory: CIM_AssociatedCacheMemory
+{
+    [Override("Antecedent")]
+    LMI_ProcessorCacheMemory REF Antecedent;
+
+    [Override("Dependent")]
+    LMI_Processor REF Dependent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_ProcessorChip") ]
+class LMI_ProcessorChip: CIM_Chip
+{
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_ProcessorChipRealizes"), Association ]
+class LMI_ProcessorChipRealizes: CIM_Realizes
+{
+    [Override("Antecedent")]
+    LMI_ProcessorChip REF Antecedent;
+
+    [Override("Dependent")]
+    LMI_Processor REF Dependent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_ProcessorSystemDevice"), Association ]
+class LMI_ProcessorSystemDevice: CIM_SystemDevice
+{
+    [Override("GroupComponent")]
+    CIM_ComputerSystem REF GroupComponent;
+
+    [Override("PartComponent")]
+    LMI_Processor REF PartComponent;
+};
+
+/******************************************************************************
+ * Memory
+ */
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_Memory") ]
+class LMI_Memory: CIM_Memory
+{
+    [ Description("Indicates whether memory has NUMA layout.") ]
+    boolean HasNUMA;
+
+    [ Description("Standard memory page size in kB."),
+      Units("Kilobytes"), PUnit("kilobyte")]
+    uint32 StandardMemoryPageSize;
+
+    [ Description("All supported huge memory page sizes in currently "
+        "running kernel in kB."),
+      Units("Kilobytes"), PUnit("kilobyte")]
+    uint32 SupportedHugeMemoryPageSizes[];
+
+    [ Description ("Current state of the transparent huge memory pages. The "
+        "state can be \"Unsupported\", what means that the feature is not "
+        "available on the system, \"Never\" when the feature is disabled, "
+        "\"Madvise\" when huge pages are used only in marked memory area or "
+        "\"Always\" when this feature is used all the time. "),
+    ValueMap { "0", "1", "2", "3" },
+    Values { "Unsupported", "Never", "Madvise", "Always" } ]
+    uint16 TransparentHugeMemoryPageStatus;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_PhysicalMemory") ]
+class LMI_PhysicalMemory: CIM_PhysicalMemory
+{
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_PhysicalMemoryRealizes"), Association ]
+class LMI_PhysicalMemoryRealizes: CIM_Realizes
+{
+    [Override("Antecedent")]
+    LMI_PhysicalMemory REF Antecedent;
+
+    [Override("Dependent")]
+    LMI_Memory REF Dependent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_MemorySystemDevice"), Association ]
+class LMI_MemorySystemDevice: CIM_SystemDevice
+{
+    [Override("GroupComponent")]
+    CIM_ComputerSystem REF GroupComponent;
+
+    [Override("PartComponent")]
+    LMI_Memory REF PartComponent;
+};
+
+/******************************************************************************
+ * Physical Asset
+ */
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_Chassis") ]
+class LMI_Chassis: CIM_Chassis
+{
+    [ Description("Product name.") ]
+    string ProductName;
+
+    [ Description("UUID.") ]
+    string UUID;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_Baseboard") ]
+class LMI_Baseboard: CIM_Card
+{
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_BaseboardContainer"), Association ]
+class LMI_BaseboardContainer: CIM_Container
+{
+    [Override("GroupComponent")]
+    LMI_Chassis REF GroupComponent;
+
+    [Override("PartComponent")]
+    LMI_Baseboard REF PartComponent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_ProcessorChipContainer"), Association ]
+class LMI_ProcessorChipContainer: CIM_Container
+{
+    [Override("GroupComponent")]
+    LMI_Chassis REF GroupComponent;
+
+    [Override("PartComponent")]
+    LMI_ProcessorChip REF PartComponent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_ChassisComputerSystemPackage"), Association ]
+class LMI_ChassisComputerSystemPackage: CIM_ComputerSystemPackage
+{
+    [Override("Antecedent")]
+    LMI_Chassis REF Antecedent;
+
+    [Override("Dependent")]
+    CIM_ComputerSystem REF Dependent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_MemorySlot") ]
+class LMI_MemorySlot: CIM_Slot
+{
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_MemorySlotContainer"), Association ]
+class LMI_MemorySlotContainer: CIM_Container
+{
+    [Override("GroupComponent")]
+    LMI_Chassis REF GroupComponent;
+
+    [Override("PartComponent")]
+    LMI_MemorySlot REF PartComponent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_MemoryPhysicalPackage") ]
+class LMI_MemoryPhysicalPackage: CIM_PhysicalPackage
+{
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_MemoryPhysicalPackageInConnector"), Association ]
+class LMI_MemoryPhysicalPackageInConnector: CIM_PackageInConnector
+{
+    [Override("Antecedent")]
+    LMI_MemorySlot REF Antecedent;
+
+    [Override("Dependent")]
+    LMI_MemoryPhysicalPackage REF Dependent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_PhysicalMemoryContainer"), Association ]
+class LMI_PhysicalMemoryContainer: CIM_Container
+{
+    [Override("GroupComponent")]
+    LMI_MemoryPhysicalPackage REF GroupComponent;
+
+    [Override("PartComponent")]
+    LMI_PhysicalMemory REF PartComponent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_PortPhysicalConnector") ]
+class LMI_PortPhysicalConnector: CIM_PhysicalConnector
+{
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_PortPhysicalConnectorContainer"), Association ]
+class LMI_PortPhysicalConnectorContainer: CIM_Container
+{
+    [Override("GroupComponent")]
+    LMI_Chassis REF GroupComponent;
+
+    [Override("PartComponent")]
+    LMI_PortPhysicalConnector REF PartComponent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_SystemSlot") ]
+class LMI_SystemSlot: CIM_Slot
+{
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_SystemSlotContainer"), Association ]
+class LMI_SystemSlotContainer: CIM_Container
+{
+    [Override("GroupComponent")]
+    LMI_Chassis REF GroupComponent;
+
+    [Override("PartComponent")]
+    LMI_SystemSlot REF PartComponent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_PointingDevice") ]
+class LMI_PointingDevice: CIM_PointingDevice
+{
+};
+
+/******************************************************************************
+ * Battery
+ */
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_Battery") ]
+class LMI_Battery: CIM_Battery
+{
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_BatteryPhysicalPackage") ]
+class LMI_BatteryPhysicalPackage: CIM_PhysicalPackage
+{
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_PhysicalBatteryRealizes"), Association ]
+class LMI_PhysicalBatteryRealizes: CIM_Realizes
+{
+    [Override("Antecedent")]
+    LMI_BatteryPhysicalPackage REF Antecedent;
+
+    [Override("Dependent")]
+    LMI_Battery REF Dependent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_PhysicalBatteryContainer"), Association ]
+class LMI_PhysicalBatteryContainer: CIM_Container
+{
+    [Override("GroupComponent")]
+    LMI_Chassis REF GroupComponent;
+
+    [Override("PartComponent")]
+    LMI_BatteryPhysicalPackage REF PartComponent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_BatterySystemDevice"), Association ]
+class LMI_BatterySystemDevice: CIM_SystemDevice
+{
+    [Override("GroupComponent")]
+    CIM_ComputerSystem REF GroupComponent;
+
+    [Override("PartComponent")]
+    LMI_Battery REF PartComponent;
+};
+
+/******************************************************************************
+ * PCI Devices
+ */
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_PCIDevice") ]
+class LMI_PCIDevice: CIM_PCIDevice
+{
+    [ Description("Name of the vendor") ]
+    string VendorName;
+
+    [ Description("Name of the device") ]
+    string PCIDeviceName;
+
+    [ Description("Name of the subsystem vendor") ]
+    string SubsystemVendorName;
+
+    [ Description("Name of the subsystem") ]
+    string SubsystemName;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_PCIDeviceSystemDevice"), Association ]
+class LMI_PCIDeviceSystemDevice: CIM_SystemDevice
+{
+    [Override("GroupComponent")]
+    CIM_ComputerSystem REF GroupComponent;
+
+    [Override("PartComponent")]
+    LMI_PCIDevice REF PartComponent;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_PCIBridge") ]
+class LMI_PCIBridge: CIM_PCIBridge
+{
+    [ Description("Name of the vendor") ]
+    string VendorName;
+
+    [ Description("Name of the device") ]
+    string PCIDeviceName;
+
+    [ Description("Name of the subsystem vendor") ]
+    string SubsystemVendorName;
+
+    [ Description("Name of the subsystem") ]
+    string SubsystemName;
+};
+
+[ Version("0.2.0"), Provider("cmpi:cmpiLMI_PCIBridgeSystemDevice"), Association ]
+class LMI_PCIBridgeSystemDevice: CIM_SystemDevice
+{
+    [Override("GroupComponent")]
+    CIM_ComputerSystem REF GroupComponent;
+
+    [Override("PartComponent")]
+    LMI_PCIBridge REF PartComponent;
+};

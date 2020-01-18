@@ -1,0 +1,127 @@
+/*
+ * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Authors:
+ *   Jan Safranek <jsafrane@redhat.com>
+ *   Michal Minar <miminar@redhat.com
+ */
+
+[ Version("0.2.0"), Association]
+class LMI_AffectedJobElement : CIM_AffectedJobElement
+{
+};
+
+[ Version("0.2.0"), Association]
+class LMI_AssociatedJobMethodResult : CIM_AssociatedJobMethodResult
+{
+};
+
+[ Version("0.2.0"), Association]
+class LMI_OwningJobElement : CIM_OwningJobElement
+{
+};
+
+[ Version("0.2.0") ]
+class LMI_MethodResult : CIM_MethodResult
+{
+};
+
+[ Version("0.2.0") ]
+class LMI_ConcreteJob : CIM_ConcreteJob
+{
+    [ Implemented(true), Override("DeleteOnCompletion") ]
+   boolean DeleteOnCompletion;
+    [ Implemented(true), Override("ElapsedTime") ]
+   datetime ElapsedTime;
+    [ Implemented(true), Override("JobState") ]
+   uint16 JobState;
+    [ Implemented(true), Override("LocalOrUtcTime") ]
+   uint16 LocalOrUtcTime;
+    [ Implemented(true), Override("Name") ]
+   string Name;
+    [ Implemented(true), Override("OperationalStatus")]
+   uint16 OperationalStatus[];
+    [ Implemented(true), Override("PercentComplete") ]
+   uint16 PercentComplete;
+    [ Implemented(true), Override("StartTime") ]
+   datetime StartTime;
+    [ Implemented(true), Override("TimeBeforeRemoval") ]
+   datetime TimeBeforeRemoval;
+    [ Implemented(true), Override("TimeOfLastStateChange") ]
+   datetime TimeOfLastStateChange;
+    [ Implemented(true), Override("TimeSubmitted")]
+   datetime TimeSubmitted;
+
+    [ Implemented(true), Override("GetError"),
+      Deprecated{"CIM_ConcreteJob.GetErrors"} ]
+   uint32 GetError(
+         [OUT, Description (
+             "If the OperationalStatus on the Job is not \"OK\", "
+             "then this method will return a CIM Error instance. "
+             "Otherwise, when the Job is \"OK\", null is "
+             "returned." ),
+          EmbeddedInstance ( "CIM_Error" )]
+      string Error);
+
+    [Implemented(true), Override("GetErrors")]
+   uint32 GetErrors(
+         [OUT, Description (
+             "If the OperationalStatus on the Job is not \"OK\", "
+             "then this method will return one or more CIM Error "
+             "instance(s). Otherwise, when the Job is \"OK\", "
+             "null is returned." ),
+          EmbeddedInstance ( "CIM_Error" )]
+      string Errors[]);
+
+    [Implemented(true), Override("RequestStateChange")]
+   uint32 RequestStateChange(
+         [IN, Description (
+             "RequestStateChange changes the state of a job. The "
+             "possible values are as follows: \n"
+             "Start (2) changes the state to \'Running\'. \n"
+             "Suspend (3) stops the job temporarily. The "
+             "intention is to subsequently restart the job with "
+             "\'Start\'. It might be possible to enter the "
+             "\'Service\' state while suspended. (This is "
+             "job-specific.) \n"
+             "Terminate (4) stops the job cleanly, saving data, "
+             "preserving the state, and shutting down all "
+             "underlying processes in an orderly manner. \n"
+             "Kill (5) terminates the job immediately with no "
+             "requirement to save data or preserve the state. \n"
+             "Service (6) puts the job into a vendor-specific "
+             "service state. It might be possible to restart the "
+             "job." ),
+          ValueMap { "2", "3", "4", "5", "6", "7..32767",
+             "32768..65535" },
+          Values { "Start", "Suspend", "Terminate", "Kill",
+             "Service", "DMTF Reserved", "Vendor Reserved" }]
+      uint16 RequestedState,
+         [IN, Description (
+             "A timeout period that specifies the maximum amount "
+             "of time that the client expects the transition to "
+             "the new state to take. The interval format must be "
+             "used to specify the TimeoutPeriod. A value of 0 or "
+             "a null parameter indicates that the client has no "
+             "time requirements for the transition. \n"
+             "If this property does not contain 0 or null and "
+             "the implementation does not support this "
+             "parameter, a return code of \'Use Of Timeout "
+             "Parameter Not Supported\' must be returned." )]
+      datetime TimeoutPeriod);
+
+};

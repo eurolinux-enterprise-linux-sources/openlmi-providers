@@ -1,0 +1,10 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+includedir=${prefix}/include
+libdir=${exec_prefix}/lib@LIB_SUFFIX@
+
+Name: openlmiindmanager
+Description: OpenLMI indication manager support
+Version: @OPENLMIINDMANAGER_VERSION@
+Libs: -L${libdir} -lopenlmiindmanager
+CFlags: -I${includedir}/openlmi

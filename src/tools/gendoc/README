@@ -1,0 +1,63 @@
+Documentation generator for OpenLMI
+===================================
+
+OpenLMI uses Sphinx [1] for documentation of our providers. Documentation is
+kept close with appropriate provider implementations, that means it is spread
+across all OpenLMI git repositories. Since each OpenLMI provider has slightly
+different way how to generate documentation for it, this tool helps to compose
+the documentation together into one HTML site with all providers and OpenLMI
+classes.
+
+[1]: http://sphinx-doc.org/
+
+
+Design
+------
+
+The 'gendoc' tool is highly tailored to Fedora, as it uses 'mock' tool to create
+reproducible and untainted chroot with all tools needed to generate the docs.
+Documentation is always generated from fresh git clone.
+
+./gendoc tool does:
+
+- Install all necessary tools to appropriate mock chroot (planuml, dia, ...)
+- Inside the mock:
+  - Download git repositories of all OpenLMI provider subprojects.
+  - Check out given tag of OpenLMI provider subprojects.
+    - Therefore it's possible to generate docs for e.g. openlmi-storage 0.6.0,
+      openlmi-providers 0.3.0 and openlmi-networking 0.2.0.
+  - "Pre-build" the documentation, i.e. generate all SVG images and other files
+    individually for each provider.
+  - Generate RST files for all classes in MOF files for all providers.
+  - Finally, generate HTML documentation.
+
+Usage
+-----
+
+./gendoc -r <mock configuration name> <openlmi-providers tag> <openlmi-networking tag> <openlmi-storage tag>'
+
+Where:
+
+<mock configuration name> = name of MOCK configuration file, without .cfg
+                            suffix. Typically 'fedora-devel-x86_64'.
+
+<openlmi-providers tag> = name of tag in openlmi-providers git repository for
+                          which is the documentation generated.
+                          ./gendoc tool checks out this tag before the
+                          documentation is generated.
+                          'master' can be used for current git master head.
+
+<openlmi-networking tag>, <openlmi-storage tag> = dtto.
+
+
+Example:
+
+# initialize the mock (only the 1st. time)
+mock -r fedora-devel-x86_64 init
+
+# Generate doc for specific tags:
+./gendoc -r fedora-devel-x86_64 0.3.0 0.6.0 0.2.0
+
+# Generate doc for current git masters:
+./gendoc -r fedora-devel-x86_64 master master master
+

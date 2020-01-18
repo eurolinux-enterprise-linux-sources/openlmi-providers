@@ -1,0 +1,143 @@
+#!/usr/bin/python
+#
+# Copyright (C) 2012 Red Hat, Inc.  All rights reserved.
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+#
+# Authors: Jan Safranek <jsafrane@redhat.com>
+#          Radek Novacek <rnovacek@redhat.com>
+#
+
+import os
+import konkretmof
+import optparse
+import re
+import cgi
+import sys
+
+class UmlExporter(object):
+
+    def __init__(self):
+        self.classcache = {}
+        # original list of classes
+        self.classes = set()
+        self.file = sys.stdout
+
+    def get_class(self, cls):
+        c = konkretmof.MOF_Class_Decl.list.fget().find(cls)
+        if c is None:
+            raise Exception("No such class: %s" % cls)
+        return c
+
+    def display_type(self, param):
+        """
+            Return displayable type of given parameter.
+            It adds [] if it's array and class name of referenced classes.
+        """
+        if isinstance(param, konkretmof.MOF_Reference_Decl):
+            ptype = param.class_name
+        elif isinstance(param, konkretmof.MOF_Parameter) and (param.data_type == konkretmof.TOK_REF):
+            ptype = param.ref_name
+        else:
+            ptype = param.type_name()
+
+        if isinstance(param, (konkretmof.MOF_Property_Decl, konkretmof.MOF_Parameter)) and param.array_index != 0:
+            ptype = ptype + "[]"
+        return ptype
+
+    def print_class(self, c, display_local = True, box_only = False):
+        """
+            Print one class, inc. header.
+        """
+        parent = None
+
+        if c.super_class:
+            # draw arrow to parent
+            print >>self.file, "%s -up-|> %s" % (c.name, c.super_class.name)
+
+        if box_only:
+            self.file.write("class %s\n\n" % c.name)
+            return
+
+        self.file.write("class %s {\n" % c.name)
+
+        if display_local:
+            for prop in sorted(c.properties().values(), key=lambda x: x.name):
+                self.file.write("    %s %s\n" % (self.display_type(prop), prop.name))
+
+
+            for m in sorted(c.methods().values(), key=lambda x: x.name):
+                self.file.write("    %s()\n" % (m.name))
+
+        self.file.write("}\n")
+        self.file.write("url of %s is [[%s.html]]\n" % (c.name, c.name))
+
+    def add_class(self, classname):
+        self.classes.add(classname)
+
+    def export(self, shrink, noassoc = False):
+        """
+            Print all classes and their parents.
+        """
+        print >>self.file, "@startuml"
+        while self.classes:
+            c = self.classes.pop()
+
+            cl = self.get_class(c)
+            if noassoc and cl.qualifiers.get("Association"):
+                continue
+
+            if shrink and shrink.match(c):
+                self.print_class(cl, box_only = True)
+            else:
+                self.print_class(cl)
+
+        print >>self.file, "@enduml"
+
+description = """
+Generate UML image for given classes. Each class specified on command line
+will be drawn as one box, containing locally defined or re-defined properties
+and methods. Inheritance will be shown as arrow between a parent class and a
+subclass.
+
+The generated file can be coverted to a picture by PlantUML tool.
+"""
+
+parser = optparse.OptionParser(usage="usage: %prog [options] classname [classname ...]", description=description)
+parser.add_option('-M', '--mof', action='append', dest='mof', default=[], help='MOF files to generate documentation from, can be used multiple times')
+parser.add_option('-S', '--schema', action='append', dest='schema', default=[], help='MOF files to scan for dependencies, can be used multiple times')
+parser.add_option('-s', '--shrink', action='store', dest='shrink', default=None, help='Regular expression pattern of CIM classes, which will be drawn only as boxes, without properties.')
+parser.add_option('-A', '--no-associations', action='store_true', dest='noassoc', default=False, help='Skip association classes.')
+(options, args) = parser.parse_args()
+
+sys.stdout.softspace=0
+
+shrink = None
+if options.shrink:
+    shrink = re.compile(options.shrink)
+
+for mof in options.schema:
+    konkretmof.MOF_add_include_path(os.path.dirname(mof))
+    konkretmof.MOF_parse_file(mof)
+
+for mof in options.mof:
+    konkretmof.MOF_parse_file(mof)
+
+exporter = UmlExporter()
+
+for c in args:
+    exporter.add_class(c)
+
+exporter.export(shrink = shrink, noassoc = options.noassoc)

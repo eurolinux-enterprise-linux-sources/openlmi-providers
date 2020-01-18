@@ -1,0 +1,8 @@
+#!/bin/sh
+
+dir=`dirname $0`
+[[ -z "$dir" ]] && dir=.
+
+export PYLINTRC=$dir/pylintrc
+export PYTHONPATH="$PYTHONPATH:$dir/plugins"
+exec pylint $@

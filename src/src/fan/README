@@ -1,0 +1,28 @@
+*******************************************************************************
+ * Description
+*******************************************************************************
+CIM Linux_Fan providers for sfcb. Specific for linux, because of usage of
+lm_sensors library for hadware monitoring of fans. It uses CMPI, so
+it should be usable under any broker supporting this interface.
+
+There are three providers provided according to CIM model:
+ * Linux_Fan
+   - Provides instance for every fan founded by lm_sensors with basic
+     information.
+ * Linux_FanSensor
+   - Associated sensor for each instance of Linux_Fan.
+   - Value of fan speed can be obtained from property CurrentReading.
+ * Linux_FanAssociatedSensor
+   - Provides association of instances of above 2 providers.
+
+*******************************************************************************
+ * Build Dependencies
+*******************************************************************************
+ * lm_sensors - installed and configured
+ * lm_sensors-libs
+ * lm_sensors-devel
+ * konkretcmpi-devel
+
+to configure lm_sensors, you need to run as root:
+  # sensors-detect
+ that is provided by lm_sensors package (on Fedora)

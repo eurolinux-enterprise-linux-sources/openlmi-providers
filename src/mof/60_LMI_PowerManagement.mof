@@ -1,0 +1,109 @@
+/*
+ * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Authors: Radek Novacek <rnovacek@redhat.com>
+ */
+
+[ Provider("cmpi:cmpiLMI_PowerManagement"),
+  Version("0.2.0") ]
+class LMI_PowerManagementService: CIM_PowerManagementService
+{
+    [ Implemented(true) ]
+    uint32 RequestPowerStateChange(
+        [ IN, Description("The power state for ManagedElement."),
+          ValueMap { "2", "3", "4", "5", "6", "7", "8", "9",
+            "10", "11", "12", "13", "14", "15", "16" },
+          Values { "Power On", "Sleep - Light", "Sleep - Deep",
+            "Power Cycle (Off Soft)", "Power Off - Hard",
+            "Hibernate", "Power Off - Soft",
+            "Power Cycle (Off Hard)", "Master Bus Reset",
+            "Diagnostic Interrupt (NMI)",
+            "Power Off - Soft Graceful",
+            "Power Off - Hard Graceful",
+            "Master Bus Reset Graceful",
+            "Power Cycle (Off - Soft Graceful)",
+            "Power Cycle (Off - Hard Graceful)" }]
+        uint16 PowerState,
+
+        [ IN, Description("ManagedElement indicates the element whose state "
+            "is set.") ]
+        CIM_ManagedElement REF ManagedElement,
+
+        [ IN, Description("Time parameter is not currently supported.") ]
+        datetime Time,
+
+        [ IN(false), OUT, Description("Reference to the job.") ]
+        CIM_ConcreteJob REF Job,
+
+        [ IN, Description("TimeoutPeriod is not currently supported.") ]
+        datetime TimeoutPeriod);
+};
+
+[ Association,
+  Provider("cmpi:cmpiLMI_PowerManagement"),
+  Version("0.2.0") ]
+class LMI_AssociatedPowerManagementService: CIM_AssociatedPowerManagementService
+{
+    [ Override("ServiceProvided"), Max(1),
+      Description("The Service that is available.") ]
+    LMI_PowerManagementService REF ServiceProvided;
+
+    [ Override("UserOfService"),
+      Description("The ManagedElement that can use the Service.") ]
+    CIM_ComputerSystem REF UserOfService;
+};
+
+[ Provider("cmpi:cmpiLMI_PowerManagement"),
+  Version("0.2.0") ]
+class LMI_PowerManagementCapabilities: CIM_PowerManagementCapabilities
+{
+    [ Implemented(true) ]
+    uint16 PowerStatesSupported[];
+};
+
+[ Association,
+  Provider("cmpi:cmpiLMI_PowerManagement"),
+  Version("0.2.0") ]
+class LMI_HostedPowerManagementService: CIM_HostedService
+{
+    [ Override("Antecedent"), Min(1), Max(1),
+      Description("The hosting System.") ]
+    CIM_ComputerSystem REF Antecedent;
+
+    [ Override("Dependent"), Weak,
+      Description("The Service hosted on the System.") ]
+    LMI_PowerManagementService REF Dependent;
+};
+
+[ Provider("cmpi:cmpiLMI_PowerManagement"),
+  Version("0.2.0") ]
+class LMI_PowerConcreteJob: CIM_ConcreteJob
+{
+};
+
+[ Association,
+  Provider("cmpi:cmpiLMI_PowerManagement"),
+  Version("0.2.0") ]
+class LMI_ElementCapabilities: CIM_ElementCapabilities
+{
+    [ Key, Min(1), Description("The managed element.") ]
+    LMI_PowerManagementService REF ManagedElement;
+
+    [ Key,
+      Description("The Capabilities object associated with the element.") ]
+    LMI_PowerManagementCapabilities REF Capabilities;
+};

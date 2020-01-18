@@ -1,0 +1,15 @@
+@startuml
+
+object "CIM_ComputerSystem" as cs
+
+object "LMI_PowerManagementService" as pms
+pms : RequestPowerStateChange()
+
+object "LMI_PowerManagementCapabilities" as pmc
+pmc : PowerStatesSupportedValues = [OffSoftGraceful, OffSoft, ...]
+
+cs -- pms : LMI_AssociatedPowerManagementService
+pms -- cs : LMI_HostedPowerManagementService
+pms -- pmc : LMI_ElementCapabilities
+
+@enduml

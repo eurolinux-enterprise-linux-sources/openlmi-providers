@@ -1,0 +1,83 @@
+/*
+ * Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Authors: Michal Minar <miminar@redhat.com>
+ *          Jan Safranek <jsafrane@redhat.com>
+ */
+
+#pragma locale ("en_US")
+
+/******************************************************************************
+ * Method result associations for asynchronous methods. They're are used in
+ * CIM_ConcreteJob.JobOutParameters and LMI_InstMethodCall.MethodParameters.
+ * In ideal world, they wouldn't be needed. Let's use them temporarily
+ * until pegasus supports instances of unknown classes.
+ ******************************************************************************/
+[Version("0.2.0"), Association]
+class __MethodParameters_InstallFromSoftwareIdentity {
+};
+
+[Version("0.2.0"), Association]
+class __MethodParameters_InstallFromURI {
+};
+
+[Version("0.2.0"), Association]
+class __MethodParameters_InstallFromByteStream {
+};
+
+[Version("0.2.0"), Association]
+class __MethodParameters_VerifyInstalledIdentity {
+};
+
+
+[Version("0.2.0"), Association]
+class __MethodParameters_InstallFromSoftwareIdentity_Result
+    :  __MethodParameters_InstallFromSoftwareIdentity
+{
+    uint32 __ReturnValue;
+};
+
+[Version("0.2.0"), Association]
+class __MethodParameters_InstallFromURI_Result
+    : __MethodParameters_InstallFromURI
+{
+    uint32 __ReturnValue;
+};
+
+[Version("0.2.0"), Association]
+class __MethodParameters_InstallFromByteStream_Result
+    : __MethodParameters_InstallFromByteStream
+{
+    uint32 __ReturnValue;
+};
+
+[Version("0.2.0"), Association,
+Description("This class, representing results of"
+    " SoftwareInstallationService::VerifyInstalledIdentity() is missing"
+    " Failed property, which is an array of references to failed tests."
+    " These can be accessed through the LMI_AffectedSoftwareJobElement"
+    " association class between particular LMI_SoftwareVerificationJob"
+    " and LMI_SoftwareIdentityFileCheck.") ]
+class __MethodParameters_VerifyInstalledIdentity_Result
+    :  __MethodParameters_VerifyInstalledIdentity
+{
+    uint32 __ReturnValue;
+    /*
+     Array of references can not be listed as a property of association class.
+    LMI_SoftwareIdentityFileCheck REF Failed[];
+    */
+};
