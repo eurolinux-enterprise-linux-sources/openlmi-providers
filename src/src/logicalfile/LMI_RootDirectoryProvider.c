@@ -43,11 +43,13 @@ static CMPIStatus associators(
     const char *comp_ccname = get_system_creation_class_name();
     const char *path = get_string_property_from_op(cop, "Name");
     char *fsname;
+    char *fsclassname;
+    const char *systemname = lmi_get_system_creation_class_name();
 
     st = check_assoc_class(_cb, ns, assocClass, LMI_RootDirectory_ClassName);
     check_class_check_status(st);
 
-    st = get_fsname_from_path(_cb, "/", &fsname);
+    st = get_fsinfo_from_path(_cb, "/", &fsclassname, &fsname);
     check_status(st);
 
     if (CMClassPathIsA(_cb, cop, LMI_UnixDirectory_ClassName, &st)) {
@@ -71,7 +73,7 @@ static CMPIStatus associators(
             ci = _cb->bft->getInstance(_cb, cc, lmi_get_computer_system(), properties, &st);
             CMReturnInstance(cr, ci);
         }
-    } else {
+    } else if (CMClassPathIsA(_cb, cop, systemname, &st)) {
         /* got CIM_ComputerSystem - GroupComponent */
         st = check_assoc_class(_cb, ns, resultClass, LMI_UnixDirectory_ClassName);
         check_class_check_status(st);
@@ -84,7 +86,7 @@ static CMPIStatus associators(
 
         LMI_UnixDirectory lmi_ud;
         LMI_UnixDirectory_Init(&lmi_ud, _cb, ns);
-        fill_logicalfile(LMI_UnixDirectory, &lmi_ud, "/", fsname, LMI_UnixDirectory_ClassName);
+        fill_logicalfile(LMI_UnixDirectory, &lmi_ud, "/", fsclassname, fsname, LMI_UnixDirectory_ClassName);
         o = LMI_UnixDirectory_ToObjectPath(&lmi_ud, &st);
         if (names) {
             CMReturnObjectPath(cr, o);
@@ -92,7 +94,12 @@ static CMPIStatus associators(
             ci = _cb->bft->getInstance(_cb, cc, o, properties, &st);
             CMReturnInstance(cr, ci);
         }
+    } else {
+        /* this association does not associate with given 'cop' class */
+        free(fsname);
+        CMReturn(CMPI_RC_OK);
     }
+
     free(fsname);
     CMReturn(CMPI_RC_OK);
 }
@@ -115,12 +122,14 @@ static CMPIStatus references(
     const char *path = get_string_property_from_op(cop, "Name");
     char ccname[BUFLEN];
     get_class_from_path(path, ccname);
+    const char *systemname = lmi_get_system_creation_class_name();
 
     st = check_assoc_class(_cb, ns, assocClass, LMI_RootDirectory_ClassName);
     check_class_check_status(st);
 
     char *fsname;
-    st = get_fsname_from_path(_cb, "/", &fsname);
+    char *fsclassname;
+    st = get_fsinfo_from_path(_cb, "/", &fsclassname, &fsname);
     check_status(st);
 
     LMI_RootDirectory_Init(&lmi_rd, _cb, ns);
@@ -140,7 +149,7 @@ static CMPIStatus references(
 
         LMI_RootDirectory_SetObjectPath_GroupComponent(&lmi_rd,
                 lmi_get_computer_system());
-    } else {
+    } else if (CMClassPathIsA(_cb, cop, systemname, &st)) {
         /* got CIM_ComputerSystem - GroupComponent */
         if (role && strcmp(role, GROUP_COMPONENT) != 0) {
             CMReturn(CMPI_RC_OK);
@@ -149,9 +158,13 @@ static CMPIStatus references(
 
         LMI_UnixDirectory lmi_ud;
         LMI_UnixDirectory_Init(&lmi_ud, _cb, ns);
-        fill_logicalfile(LMI_UnixDirectory, &lmi_ud, "/", fsname, LMI_UnixDirectory_ClassName);
+        fill_logicalfile(LMI_UnixDirectory, &lmi_ud, "/", fsclassname, fsname, LMI_UnixDirectory_ClassName);
         o = LMI_UnixDirectory_ToObjectPath(&lmi_ud, &st);
         LMI_RootDirectory_SetObjectPath_PartComponent(&lmi_rd, o);
+    } else {
+        /* this association does not associate with given 'cop' class */
+        free(fsname);
+        CMReturn(CMPI_RC_OK);
     }
 
     if (names) {
@@ -198,6 +211,7 @@ static CMPIStatus LMI_RootDirectoryEnumInstances(
     CMPIObjectPath *o;
     CMPIStatus st;
     char *fsname;
+    char *fsclassname;
     const char *ns = KNameSpace(cop);
 
     LMI_RootDirectory lmi_rd;
@@ -207,9 +221,9 @@ static CMPIStatus LMI_RootDirectoryEnumInstances(
 
     LMI_UnixDirectory lmi_ud;
     LMI_UnixDirectory_Init(&lmi_ud, _cb, ns);
-    st = get_fsname_from_path(_cb, "/", &fsname);
+    st = get_fsinfo_from_path(_cb, "/", &fsclassname, &fsname);
     check_status(st);
-    fill_logicalfile(LMI_UnixDirectory, &lmi_ud, "/", fsname, LMI_UnixDirectory_ClassName);
+    fill_logicalfile(LMI_UnixDirectory, &lmi_ud, "/", fsclassname, fsname, LMI_UnixDirectory_ClassName);
     o = LMI_UnixDirectory_ToObjectPath(&lmi_ud, NULL);
     LMI_RootDirectory_SetObjectPath_PartComponent(&lmi_rd, o);
 

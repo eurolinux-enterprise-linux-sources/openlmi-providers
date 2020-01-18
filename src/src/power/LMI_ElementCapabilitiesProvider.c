@@ -21,11 +21,20 @@
 #include <konkret/konkret.h>
 #include "LMI_ElementCapabilities.h"
 #include "globals.h"
+#include "power.h"
 
 static const CMPIBroker* _cb;
 
-static void LMI_ElementCapabilitiesInitialize(const CMPIContext *ctx)
+static void LMI_ElementCapabilitiesInitialize(CMPIInstanceMI *mi,
+        const CMPIContext *ctx)
 {
+    mi->hdl = power_ref(_cb, ctx);
+}
+
+static void LMI_ElementCapabilitiesAssociationInitialize(CMPIAssociationMI *mi,
+        const CMPIContext *ctx)
+{
+    mi->hdl = power_ref(_cb, ctx);
 }
 
 static CMPIStatus LMI_ElementCapabilitiesCleanup(
@@ -33,6 +42,8 @@ static CMPIStatus LMI_ElementCapabilitiesCleanup(
     const CMPIContext* cc, 
     CMPIBoolean term)
 {
+    power_unref(mi->hdl);
+    mi->hdl = NULL;
     CMReturn(CMPI_RC_OK);
 }
 
@@ -134,6 +145,8 @@ static CMPIStatus LMI_ElementCapabilitiesAssociationCleanup(
     const CMPIContext* cc, 
     CMPIBoolean term) 
 {
+    power_unref(mi->hdl);
+    mi->hdl = NULL;
     CMReturn(CMPI_RC_OK);
 }
 
@@ -229,13 +242,13 @@ CMInstanceMIStub(
     LMI_ElementCapabilities,
     LMI_ElementCapabilities,
     _cb,
-    LMI_ElementCapabilitiesInitialize(ctx))
+    LMI_ElementCapabilitiesInitialize(&mi, ctx))
 
 CMAssociationMIStub( 
     LMI_ElementCapabilities,
     LMI_ElementCapabilities,
     _cb,
-    LMI_ElementCapabilitiesInitialize(ctx))
+    LMI_ElementCapabilitiesAssociationInitialize(&mi, ctx))
 
 KONKRET_REGISTRATION(
     "root/cimv2",

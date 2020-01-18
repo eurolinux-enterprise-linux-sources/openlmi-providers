@@ -10,7 +10,7 @@ setup(
     version=__version__,
     license='LGPLv2+',
     namespace_packages = ['lmi'],
-    packages = ['lmi', 'lmi.base', 'lmi.providers'],
+    packages = ['lmi', 'lmi.base', 'lmi.providers', 'lmi.test'],
     install_requires=['pywbem'],
     classifiers=[
         'License :: OSI Approved :: GNU Lesser General Public License'

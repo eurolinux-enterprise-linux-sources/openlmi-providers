@@ -55,7 +55,10 @@
 // Return values of functions
 // Delete user
 #define USER_NOT_EXIST      4096
-#define CANNOT_DELETE_HOME  4097
+#if 0
+  /* Unused */
+  #define CANNOT_DELETE_HOME  4097
+#endif
 #define CANNOT_DELETE_USER  4098
 #define CANNOT_DELETE_GROUP 4099
 // Change password
@@ -204,10 +207,16 @@ static CMPIStatus LMI_AccountEnumInstances(
           }
 
         password = aux_lu_get_str(lue, LU_SHADOWPASSWORD);
-        LMI_Account_Init_UserPassword(&la, 1);
-        LMI_Account_Set_UserPassword(&la, 0, password);
-        /* Assume all passwords (encrypted or not) are in ascii encoding */
-        LMI_Account_Set_UserPasswordEncoding(&la, 2);
+        if (password == NULL) {
+            /* password is not in /etc/shadow */
+            password = aux_lu_get_str(lue, LU_USERPASSWORD);
+        }
+        if (password) {
+            LMI_Account_Init_UserPassword(&la, 1);
+            LMI_Account_Set_UserPassword(&la, 0, password);
+            /* Assume all passwords (encrypted or not) are in ascii encoding */
+            LMI_Account_Set_UserPasswordEncoding(&la, 2);
+        }
 
         KReturnInstance(cr, la);
         lu_ent_free(lue);
@@ -275,6 +284,7 @@ static CMPIStatus LMI_AccountModifyInstance(
     struct lu_ent *lue = NULL;
     struct lu_error *error = NULL;
     GValue val;
+    GValueArray *groups = NULL;
     guint i = 0;
 
     long last_change;
@@ -316,7 +326,7 @@ static CMPIStatus LMI_AccountModifyInstance(
       }
 
     /* get list of groups and lock them. userlock variable is our stored username */
-    GValueArray *groups = lu_groups_enumerate_by_user (luc, userlock, &error);
+    groups = lu_groups_enumerate_by_user (luc, userlock, &error);
     if (groups == NULL)
       {
         rc = CMPI_RC_ERR_NOT_FOUND;
@@ -362,9 +372,11 @@ static CMPIStatus LMI_AccountModifyInstance(
       }
 
 #define PARAMSTR(ATTR, VAR)\
+    g_value_init(&val, G_TYPE_STRING);\
     g_value_set_string(&val, (VAR));\
     lu_ent_clear(lue, (ATTR));\
     lu_ent_add(lue, (ATTR), &val);\
+    g_value_unset(&val);\
 
 #define PARAMLONG(ATTR, VAR)\
     if (!(VAR).null) {\
@@ -390,7 +402,6 @@ static CMPIStatus LMI_AccountModifyInstance(
 
     /* First string values */
     memset(&val, 0, sizeof(val));
-    g_value_init(&val, G_TYPE_STRING);
 
     GETSTRVALUE("ElementName");
     PARAMSTR(LU_GECOS, value);
@@ -596,11 +607,9 @@ static CMPIrc delete_user(
         if (!ret) {
             const char *const home = lu_ent_get_first_string(lue, LU_HOMEDIRECTORY);
             /* If null is returned then asprintf handle it. */
-            asprintf(&errormsg,
-                     "User's homedir %s could not be deleted: %s\n", home,
-                     lu_strerror(error));
-            rc = CANNOT_DELETE_HOME;
-            goto clean;
+            warn("User's homedir %s could not be deleted: %s\n", home, lu_strerror(error));
+            /* Silently succeed, remove the user despite keeping homedir aside */
+            lu_error_free(&error);
         }
     }
 

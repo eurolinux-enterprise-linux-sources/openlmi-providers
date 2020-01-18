@@ -30,7 +30,7 @@
 
 #include "serviceutil.h"
 
-#define MAX_SLIST_CNT 1000
+#define INITIAL_SLIST_NALLOC 100
 
 #define MANAGER_NAME "org.freedesktop.systemd1"
 #define MANAGER_OP "/org/freedesktop/systemd1"
@@ -92,11 +92,16 @@ SList *service_find_all(
     }
 
     slist = malloc(sizeof(SList));
-    if (!slist) return NULL;
-    slist->name = malloc(MAX_SLIST_CNT * sizeof(char *));
+    if (!slist) {
+        strncpy(output, "Insufficient memory", output_len);
+        return NULL;
+    }
+    slist->nalloc = INITIAL_SLIST_NALLOC;
+    slist->name = malloc(slist->nalloc * sizeof(char *));
     if (!slist->name) {
         free(slist);
         g_object_unref(manager_proxy);
+        strncpy(output, "Insufficient memory", output_len);
         return NULL;
     }
     slist->cnt = 0;
@@ -105,6 +110,19 @@ SList *service_find_all(
     while (g_variant_iter_loop(arr, "(ss)", &primary_unit_name, NULL)) {
         /* Ignore instantiable units (containing '@') until we find out how to properly present them */
         if (strstr(primary_unit_name, ".service") && strchr(primary_unit_name, '@') == NULL) {
+            if (slist->cnt >= slist->nalloc) {
+                char **tmpp = NULL;
+                slist->nalloc *= 2;
+                tmpp = realloc(slist->name, slist->nalloc * sizeof(char *));
+                if (!tmpp) {
+                    g_variant_iter_free(arr);
+                    free(slist);
+                    g_object_unref(manager_proxy);
+                    strncpy(output, "Insufficient memory", output_len);
+                    return NULL;
+                }
+                slist->name = tmpp;
+            }
             tmps = strdup(primary_unit_name);
             if (!tmps)
                 continue;

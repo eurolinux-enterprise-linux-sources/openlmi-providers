@@ -252,7 +252,7 @@ done:
     cpuinfo_free_processor(&proc_cpu);
 
     if (error_msg) {
-        KReturn2(_cb, ERR_FAILED, error_msg);
+        KReturn2(_cb, ERR_FAILED, "%s", error_msg);
     }
 
     CMReturn(CMPI_RC_OK);

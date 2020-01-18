@@ -16,45 +16,58 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #
+# Authors: Jan Grec <jgrec@redhat.com>
 # Authors: Michal Minar <miminar@redhat.com>
 #
 """
-Unit tests for LMI_SoftwareIdentityResource provider.
+Unit tests for ``LMI_SoftwareIdentityResource`` provider.
 """
 
+import os
 import pywbem
 import time
+import shutil
+import subprocess
 import unittest
 
-from lmi.software.core.IdentityResource import Values
 from lmi.test.lmibase import enable_lmi_exceptions
-from lmi.test.util import mark_dangerous
-import base
 import repository
+import swbase
 import util
 
-class TestSoftwareIdentityResource(
-        base.SoftwareBaseTestCase): #pylint: disable=R0904
+ENABLED_DEFAULT_NOT_APPLICABLE = 5
+ENABLED_STATE_DISABLED = 3
+ENABLED_STATE_ENABLED = 2
+EXTENDED_RESOURCE_TYPE_RPM = 3
+HEALTH_STATE_MAJOR_FAILURE = 20
+HEALTH_STATE_OK = 5
+INFO_FORMAT_URL = 200
+OPERATIONAL_STATUS_ERROR = 6
+OPERATIONAL_STATUS_OK = 2
+REQUESTED_STATE_ENABLED = 2
+REQUESTED_STATE_DISABLED = 3
+REQUEST_STATE_CHANGE_SUCCESSFUL = 0
+REQUEST_STATE_CHANGE_ERROR = 2
+RESOURCE_TYPE_OTHER = 1
+PRIMARY_STATUS_ERROR = 3
+PRIMARY_STATUS_OK = 1
+TRANSITIONING_TO_STATE_NOT_APPLICABLE = 12
+
+DUMMY_TEST_REPO = 'lmi-test'
+
+class TestSoftwareIdentityResource(swbase.SwTestCase):
     """
-    Basic cim operations test.
+    Basic cim operations test on ``LMI_SoftwareIdentityResource``.
     """
 
     CLASS_NAME = "LMI_SoftwareIdentityResource"
     KEYS = ("CreationClassName", "Name", "SystemCreationClassName",
             "SystemName")
 
-    @classmethod
-    def needs_pkgdb(cls):
-        return False
-
-    @classmethod
-    def needs_repodb(cls):
-        return True
-
     def make_op(self, repo):
         """
-        @param ses SoftwareElementState property value
-        @return object path of SoftwareIdentityResource
+        :returns: Object path of ``LMI_SoftwareIdentityResource``
+        :rtype: :py:class:`lmi.shell.LMIInstanceName`
         """
         if isinstance(repo, repository.Repository):
             repo = repo.repoid
@@ -65,11 +78,6 @@ class TestSoftwareIdentityResource(
             "CreationClassName" : self.CLASS_NAME
         })
 
-    def tearDown(self):
-        for repo in self.repodb:
-            if repository.is_repo_enabled(repo) != repo.status:
-                repository.set_repo_enabled(repo, repo.status)
-
     def _check_repo_instance(self, repo, inst):
         """
         Checks instance properties of repository.
@@ -77,10 +85,14 @@ class TestSoftwareIdentityResource(
         objpath = self.make_op(repo)
         self.assertCIMNameEqual(objpath, inst.path)
         for key in self.KEYS:
-            self.assertEqual(getattr(inst, key), getattr(inst.path, key))
-        self.assertEqual(repo.repoid, inst.Name)
-        self.assertIsInstance(inst.AccessContext, pywbem.Uint16)
+            if key == 'SystemName':
+                self.assertIn(inst.SystemName, (self.SYSTEM_NAME, 'localhost'))
+                self.assertIn(inst.path.SystemName, (self.SYSTEM_NAME, 'localhost'))
+            else:
+                self.assertEqual(getattr(inst, key), getattr(inst.path, key))
+        self.assertEqual(inst.Name, repo.repoid)
 
+        self.assertIsInstance(inst.AccessContext, pywbem.Uint16)
         access_info = inst.AccessInfo
         if access_info is not None:
             access_info = access_info.rstrip('/')
@@ -99,157 +111,365 @@ class TestSoftwareIdentityResource(
                 "AccessInfo missing in base_urls for repo %s" % repo.repoid)
 
         self.assertIsInstance(inst.AvailableRequestedStates, list)
-        self.assertEqual(repo.name, inst.Caption)
+        # Unfortunately, yum-config-manager shortens lines on its output
+        # therefor we can not check very long names.
+        # 61 characters in version yum-utils-1.1.31-19.fc21
+        if len(repo.name) > 60:
+            self.assertTrue(inst.Caption.startswith(repo.name))
+        else:
+            self.assertEqual(inst.Caption, repo.name)
         self.assertIsInstance(inst.Cost, pywbem.Sint32)
         self.assertIsInstance(inst.Description, basestring)
-        self.assertEqual(repo.repoid, inst.ElementName)
-        self.assertEqual(5, inst.EnabledDefault)
-        self.assertEqual(2 if repo.status else 3, inst.EnabledState,
+        self.assertEqual(inst.ElementName, repo.repoid)
+        self.assertEqual(inst.EnabledDefault, ENABLED_DEFAULT_NOT_APPLICABLE)
+        self.assertEqual(
+                       ENABLED_STATE_ENABLED
+                    if repo.status else ENABLED_STATE_DISABLED,
+                inst.EnabledState,
                 "EnabledState does not match for repo %s" % repo.repoid)
-        self.assertEqual(3, inst.ExtendedResourceType)
-        if repo.revision is None:
-            self.assertIsNone(inst.Generation)
-        else:
-            self.assertTrue(isinstance(inst.Generation, (int, long)))
+        self.assertEqual(inst.ExtendedResourceType, EXTENDED_RESOURCE_TYPE_RPM)
+        if repo.revision is not None:
+            self.assertTrue(isinstance(inst.Generation, (int, long)),
+                    'Generation must be integer for repo %s' % repo.repoid)
         if repo.status:
-            self.assertEqual(5, inst.HealthState)    # OK
-            self.assertEqual([2], inst.OperationalStatus)    # OK
-            self.assertEqual(1, inst.PrimaryStatus)  # OK
+            self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
+            self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
+            self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
         else:
             # repo may not be enabled, but still it can be ready
             # (which is not documented), so let's check both posibilities
-            self.assertIn(inst.HealthState, [5, 20])     # OK, Major Failure
-            self.assertIn(inst.OperationalStatus, [[2], [6]])    # [OK], [Error]
-            self.assertIn(inst.PrimaryStatus, [1, 3])    # OK, Error
+            # TODO: health state should be OK for disabled repository
+            self.assertIn(inst.HealthState,
+                    [HEALTH_STATE_OK, HEALTH_STATE_MAJOR_FAILURE])
+            self.assertIn(inst.OperationalStatus,
+                    [[OPERATIONAL_STATUS_OK], [OPERATIONAL_STATUS_ERROR]])
+            self.assertIn(inst.PrimaryStatus, [PRIMARY_STATUS_OK, PRIMARY_STATUS_ERROR])
         self.assertIsInstance(inst.GPGCheck, bool)
-        self.assertEqual(200, inst.InfoFormat)
+        self.assertEqual(inst.InfoFormat, INFO_FORMAT_URL)
         self.assertEqual("LMI:LMI_SoftwareIdentityResource:"+repo.repoid,
                 inst.InstanceID)
-        if repo.mirror_list is None:
-            self.assertIsNone(inst.MirrorList)
-        else:
-            self.assertEqual(
-                    repo.metalink if repo.metalink else repo.mirror_list,
-                    inst.MirrorList)
+        self.assertEqual(inst.MirrorList, repo.mirror_list,
+                'MirrorList must match for repo %s' % repo.repoid)
         self.assertIsInstance(inst.OtherAccessContext, basestring)
-        #self.assertEqual(repo.pkg_count, inst.PackageCount,
-                #"PackageCount does not match for repo %s" % repo.repoid)
         self.assertIsInstance(inst.RepoGPGCheck, bool)
-        self.assertEqual(2 if repo.status else 3, inst.RequestedState)
-        self.assertEqual(1, inst.ResourceType)
+        self.assertEqual(
+                   ENABLED_STATE_ENABLED
+                if repo.status else ENABLED_STATE_DISABLED,
+                inst.RequestedState)
+        self.assertEqual(inst.ResourceType, RESOURCE_TYPE_OTHER)
         self.assertIsInstance(inst.StatusDescriptions, list)
         self.assertEqual(1, len(inst.StatusDescriptions))
-        if repo.last_updated is None:
-            self.assertIsNone(inst.TimeOfLastUpdate)
-        else:
+        if repo.last_updated is not None:
             time_stamp = repo.last_updated.replace(
                     microsecond=0, tzinfo=pywbem.cim_types.MinutesFromUTC(0))
             self.assertGreaterEqual(inst.TimeOfLastUpdate.datetime, time_stamp)
-        self.assertEqual(12, inst.TransitioningToState)
+        self.assertEqual(TRANSITIONING_TO_STATE_NOT_APPLICABLE,
+                inst.TransitioningToState)
 
-    def test_get_instance_safe(self):
-        """
-        Tests GetInstance call.
-        """
-        for repo in self.repodb:
-            objpath = self.make_op(repo)
-            inst = objpath.to_instance()
-            self._check_repo_instance(repo, inst)
-
-    @mark_dangerous
+    @swbase.test_with_repos(stable=True, updates=False)
     def test_get_instance(self):
         """
-        Dangerous test, making sure, that properties are set correctly
-        for enabled and disabled repositories.
+        Test ``GetInstance()`` call on ``LMI_SoftwareIdentityResource``.
         """
-        for repo in self.repodb:
-            objpath = self.make_op(repo)
-            self.assertIs(repository.is_repo_enabled(repo), repo.status)
-            inst = objpath.to_instance()
-            self.assertCIMNameEqual(objpath, inst.path)
-            for key in self.KEYS:
-                self.assertEqual(getattr(inst, key), getattr(inst.path, key))
-            self.assertEqual(repo.repoid, inst.Name)
-            self.assertEqual(2 if repo.status else 3, inst.EnabledState)
-            self.assertEqual(2 if repo.status else 3, inst.RequestedState)
-        for repo in self.repodb:
-            objpath = self.make_op(repo)
-            time.sleep(1) # to make sure, that change will be noticed
-            repository.set_repo_enabled(repo, not repo.status)
-            self.assertIs(repository.is_repo_enabled(repo), not repo.status)
-            inst = objpath.to_instance()
-            self.assertEqual(repo.repoid, inst.Name)
-            self.assertEqual(3 if repo.status else 2, inst.EnabledState)
-            self.assertEqual(3 if repo.status else 2, inst.RequestedState)
+        stablerepo = self.get_repo('stable')
+        self.assertTrue(stablerepo.status, "stable repository is enabled")
+        objpath = self.make_op(stablerepo)
+        inst = objpath.to_instance()
+        self.assertNotEqual(inst, None,
+                "GetInstance() call on stable repository is successful"
+                ' with path: "%s"' % str(objpath))
+        self._check_repo_instance(stablerepo, inst)
+        self.assertEqual(set(self.KEYS), set(inst.path.key_properties()))
+
+        updaterepo = self.get_repo('updates')
+        objpath = self.make_op(updaterepo)
+        self.assertFalse(updaterepo.status, "updates repository is disabled")
+        inst = objpath.to_instance()
+        self.assertNotEqual(inst, None,
+                'GetInstance() call on updates repository is successful'
+                ' with path "%s"' % str(objpath))
+        self._check_repo_instance(updaterepo, inst)
+        self.assertEqual(set(self.KEYS), set(inst.path.key_properties()))
 
     def test_enum_instance_names(self):
         """
-        Tests EnumInstanceNames call on all repositories.
+        Test ``EnumInstanceNames()`` call on ``LMI_SoftwareIdentityResource``.
         """
+        all_repo_names = set(self.repodb.keys()).union(
+                set(self.other_repos.keys()))
         inames = self.cim_class.instance_names()
-        self.assertEqual(len(inames), len(self.repodb))
-        repoids = set(r.repoid for r in self.repodb)
         for iname in inames:
-            self.assertEqual(iname.namespace, 'root/cimv2')
             self.assertEqual(set(iname.key_properties()), set(self.KEYS))
-            self.assertIn(iname.Name, repoids)
-            objpath = self.make_op(iname.Name)
-            self.assertCIMNameEqual(objpath, iname)
+            self.assertIn(iname.Name, all_repo_names)
+            all_repo_names.remove(iname.Name)
+            self.assertEqual(iname.SystemCreationClassName, self.system_cs_name)
+            self.assertEqual(iname.CreationClassName, self.CLASS_NAME)
+        self.assertEqual(len(all_repo_names), 0)
 
     def test_enum_instances(self):
         """
-        Tests EnumInstances call on all repositories.
+        Test ``EnumInstances()`` call on ``LMI_SoftwareIdentityResource``.
         """
+        all_repo_names = set(self.repodb.keys()).union(
+                set(self.other_repos.keys()))
         insts = self.cim_class.instances()
-        self.assertGreater(len(insts), 0)
-        repoids = dict((r.repoid, r) for r in self.repodb)
         for inst in insts:
-            self.assertIn(inst.Name, repoids)
-            self._check_repo_instance(repoids[inst.Name], inst)
+            self.assertEqual(set(inst.path.key_properties()), set(self.KEYS))
+            self.assertIn(inst.Name, all_repo_names)
+            all_repo_names.remove(inst.Name)
+            if inst.Name in self.repodb:
+                repo = self.repodb[inst.Name]
+            else:
+                repo = self.other_repos[inst.Name]
+            self._check_repo_instance(repo, inst)
+        self.assertEqual(len(all_repo_names), 0)
+
+    @swbase.test_with_repos('updates')
+    def test_disable_repo(self):
+        """
+        Test whether ``LMI_SoftwareIdentityResource`` provider recognizes
+        that repository has been disabled.
+        """
+        repo = self.get_repo('updates')
+        self.assertTrue(repo.status)
+        objpath = self.make_op(repo)
+        inst = objpath.to_instance()
+        self.assertNotEqual(inst, None,
+                'GetInstance() call on updates repository is successful'
+                ' with path "%s"' % str(objpath))
+        self.assertEqual(inst.EnabledState, ENABLED_STATE_ENABLED)
+        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
+        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
+        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+
+        repository.set_repos_enabled(repo, False)
+        repo.refresh()
+        self.assertFalse(repo.status)
+        time.sleep(0.1)
+        inst.refresh()
+        self.assertNotEqual(inst, None,
+                'GetInstance() call on updates repository is successful'
+                ' with path "%s"' % str(objpath))
+        self.assertEqual(inst.EnabledState, ENABLED_STATE_DISABLED)
+        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
+        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
+        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+
+
+    @swbase.test_with_repos(updates=False)
+    def test_enable_repo(self):
+        """
+        Test whether ``LMI_SoftwareIdentityResource`` provider recognizes that
+        repository has been enabled.
+        """
+        repo = self.get_repo('updates')
+        self.assertFalse(repo.status)
+        objpath = self.make_op(repo)
+        inst = objpath.to_instance()
+        self.assertNotEqual(inst, None,
+                'GetInstance() call on updates repository is successful'
+                ' with path "%s"' % str(objpath))
+        self.assertEqual(inst.EnabledState, ENABLED_STATE_DISABLED)
+        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
+        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
+        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+
+        repository.set_repos_enabled(repo, True)
+        repo.refresh()
+        self.assertTrue(repo.status)
+        inst.refresh()
+        self.assertNotEqual(inst, None,
+                'GetInstance() call on updates repository is successful'
+                ' with path "%s"' % str(objpath))
+        self.assertEqual(inst.EnabledState, ENABLED_STATE_ENABLED)
+        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
+        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
+        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+
+    @swbase.test_with_repos('stable')
+    def test_disable_enabled_repo(self):
+        """
+        Test ``RequestStateChange()`` method invocation on
+        ``LMI_SoftwareIdentityResource`` by requesting disablement of
+        repository.
+        """
+        repo = self.get_repo('stable')
+        self.assertTrue(repo.status)
+        objpath = self.make_op(repo)
+        inst = objpath.to_instance()
+        self.assertNotEqual(inst, None,
+                'GetInstance() call on stable repository is successful'
+                ' with path "%s"' % str(objpath))
+        self.assertEqual(inst.EnabledState, ENABLED_STATE_ENABLED)
+
+        # try to disable it with method invocation
+        (rval, oparms, _) = inst.RequestStateChange(
+                RequestedState=REQUESTED_STATE_DISABLED)
+        self.assertEqual(rval, REQUEST_STATE_CHANGE_SUCCESSFUL)
+        self.assertEqual(len(oparms), 0)
+        repo.refresh()
+        self.assertFalse(repo.status)
+        inst.refresh()
+        self.assertEqual(inst.EnabledState, ENABLED_STATE_DISABLED)
+        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
+        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
+        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+
+    @swbase.test_with_repos(stable=False)
+    def test_enable_disabled_repo(self):
+        """
+        Test ``RequestStateChange()`` method invocation on
+        ``LMI_SoftwareIdentityResource`` by requesting enablement of
+        repository.
+        """
+        repo = self.get_repo('stable')
+        self.assertFalse(repo.status)
+        objpath = self.make_op(repo)
+        inst = objpath.to_instance()
+        self.assertNotEqual(inst, None,
+                'GetInstance() call on stable repository is successful'
+                ' with path "%s"' % str(objpath))
+        self.assertEqual(inst.EnabledState, ENABLED_STATE_DISABLED)
+
+        # try to enable it with method invocation
+        (rval, oparms, _) = inst.RequestStateChange(
+                RequestedState=REQUESTED_STATE_ENABLED)
+        self.assertEqual(rval, REQUEST_STATE_CHANGE_SUCCESSFUL)
+        self.assertEqual(len(oparms), 0)
+        repo.refresh()
+        self.assertTrue(repo.status)
+        inst.refresh()
+        self.assertEqual(inst.EnabledState, ENABLED_STATE_ENABLED)
+        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
+        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
+        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+
+    @swbase.test_with_repos('stable')
+    def test_enable_enabled_repo(self):
+        """
+        Test ``RequestStateChange()`` method invocation on
+        ``LMI_SoftwareIdentityResource`` by requesting enablement of
+        enabled repository.
+        """
+        repo = self.get_repo('stable')
+        self.assertTrue(repo.status)
+        objpath = self.make_op(repo)
+        inst = objpath.to_instance()
+        self.assertNotEqual(inst, None,
+                'GetInstance() call on stable repository is successful'
+                ' with path "%s"' % str(objpath))
+        self.assertEqual(inst.EnabledState, ENABLED_STATE_ENABLED)
+
+        # try to enable it with method invocation
+        (rval, oparms, _) = inst.RequestStateChange(
+                RequestedState=REQUESTED_STATE_ENABLED)
+        self.assertEqual(rval, REQUEST_STATE_CHANGE_SUCCESSFUL)
+        self.assertEqual(len(oparms), 0)
+        repo.refresh()
+        self.assertTrue(repo.status)
+        inst.refresh()
+        self.assertEqual(inst.EnabledState, ENABLED_STATE_ENABLED)
+        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
+        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
+        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+
+    @swbase.test_with_repos(stable=False)
+    def test_disable_disabled_repo(self):
+        """
+        Test ``RequestStateChange()`` method invocation on
+        ``LMI_SoftwareIdentityResource`` by requesting disablement of
+        disabled repository.
+        """
+        repo = self.get_repo('stable')
+        self.assertFalse(repo.status)
+        objpath = self.make_op(repo)
+        inst = objpath.to_instance()
+        self.assertNotEqual(inst, None,
+                'GetInstance() call on stable repository is successful'
+                ' with path "%s"' % str(objpath))
+        self.assertEqual(inst.EnabledState, ENABLED_STATE_DISABLED)
+
+        # try to enable it with method invocation
+        (rval, oparms, _) = inst.RequestStateChange(
+                RequestedState=REQUESTED_STATE_DISABLED)
+        self.assertEqual(rval, REQUEST_STATE_CHANGE_SUCCESSFUL)
+        self.assertEqual(len(oparms), 0)
+        repo.refresh()
+        self.assertFalse(repo.status)
+        inst.refresh()
+        self.assertEqual(inst.EnabledState, ENABLED_STATE_DISABLED)
+        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
+        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
+        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
 
     @enable_lmi_exceptions
-    @mark_dangerous
-    def test_request_state_change(self):
+    def test_disable_unexisting_repository(self):
         """
-        Tests InvokeMethod on RequestStateChange().
+        Test disable unexisting repository.
+
+        Enable DUMMY_TEST_REPO repository, get its instance, delete it
+        from /etc/yum.repos.d and try to disable it by OpenLMI.
+        Cases:
+            OpenLMI won't disable repository - returns error in LMIReturnValue
         """
-        for repo in self.repodb:
-            objpath = self.make_op(repo)
-            self.assertIs(repository.is_repo_enabled(repo), repo.status)
+        repo_file_path = os.path.join(self.yum_repos_dir,
+                DUMMY_TEST_REPO + ".repo")
+        shutil.copy2(
+                "%s/%s.repo" % (
+                    os.path.dirname(swbase.__file__),
+                    DUMMY_TEST_REPO),
+                repo_file_path)
+        try:
+            repository.set_repos_enabled(DUMMY_TEST_REPO, True)
+            subprocess.call(["/usr/bin/yum-config-manager",
+                "--enable", DUMMY_TEST_REPO],
+                stdout=util.DEV_NULL, stderr=util.DEV_NULL)
+            repo = self.cim_class.first_instance_name(
+                    {"Name": DUMMY_TEST_REPO}).to_instance()
+            self.assertNotEqual(repo, None, "dummy repository exists")
 
-            # change state of repository (enabled/disabled)
-            req_state = (  Values.RequestStateChange.RequestedState.Disabled
-                        if repo.status else
-                           Values.RequestStateChange.RequestedState.Enabled)
-            inst = objpath.to_instance()
-            (res, oparms, _) = inst.RequestStateChange(RequestedState=req_state)
-            self.assertEqual(0, res) #Completed with no error
-            self.assertEqual(0, len(oparms))
-            inst.refresh()
-            self.assertEqual(inst.EnabledState, req_state)
-            for pkg in self.dangerous_pkgs:
-                if pkg.up_repo == repo:
-                    pkg_iname = util.make_identity_path(pkg)
-                    self.assertRaisesCIM(pywbem.CIM_ERR_NOT_FOUND,
-                        objpath.to_instance)
+            os.remove(repo_file_path)
 
-            # revert back to original configuration
-            req_state = (  Values.RequestStateChange.RequestedState.Enabled
-                        if repo.status else
-                           Values.RequestStateChange.RequestedState.Disabled)
-            (res, oparms, _) = inst.RequestStateChange(RequestedState=req_state)
-            self.assertEqual(0, res) #Completed with no error
-            self.assertEqual(0, len(oparms))
-            inst.refresh()
-            self.assertEqual(inst.EnabledState, req_state)
-            for pkg in self.dangerous_pkgs:
-                if pkg.up_repo == repo:
-                    pkg_iname = util.make_identity_path(pkg)
-                    inst = pkg_iname.to_instance()
-                    self.assertNotEqual(inst, None)
+            self.assertRaisesCIM(pywbem.CIM_ERR_NOT_FOUND,
+                    repo.RequestStateChange,
+                    RequestedState=REQUESTED_STATE_DISABLED)
+        finally:
+            if os.path.exists(repo_file_path):
+                os.remove(repo_file_path)
+
+    @enable_lmi_exceptions
+    def test_enable_unexisting_repository(self):
+        """
+        Test enable deleted repository.
+
+        Get DUMMY_TEST_REPO's instance, delete it from /etc/yum.repos.d
+        and try to enable it by OpenLMI.
+        Cases:
+            OpenLMI won't enable repository - returns error in LMIReturnValue
+        """
+        repo_file_path = os.path.join(self.yum_repos_dir,
+                DUMMY_TEST_REPO + ".repo")
+        shutil.copy2(
+                "%s/%s.repo" % (
+                    os.path.dirname(swbase.__file__),
+                    DUMMY_TEST_REPO),
+                repo_file_path)
+        try:
+
+            repo = self.cim_class.first_instance_name(
+                    {"Name": DUMMY_TEST_REPO}).to_instance()
+
+            os.remove(repo_file_path)
+
+            self.assertRaisesCIM(pywbem.CIM_ERR_NOT_FOUND,
+                    repo.RequestStateChange,
+                    RequestedState=REQUESTED_STATE_ENABLED)
+        finally:
+            if os.path.exists(repo_file_path):
+                os.remove(repo_file_path)
 
 def suite():
-    """For unittest loaders."""
+    """ For unittest loaders. """
     return unittest.TestLoader().loadTestsFromTestCase(
             TestSoftwareIdentityResource)
 

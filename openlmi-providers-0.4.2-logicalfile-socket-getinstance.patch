@@ -1,0 +1,20 @@
+commit 6c577ecbd6ac0edde093ba7ea0aa200ddd4ca94a
+Author: Jan Synacek <jsynacek@redhat.com>
+Date:   Mon Feb 10 11:44:00 2014 +0100
+
+    logicalfile: fix GetInstance() on a socket file
+
+diff --git a/src/logicalfile/file.c b/src/logicalfile/file.c
+index 546b770..100dbec 100644
+--- a/src/logicalfile/file.c
++++ b/src/logicalfile/file.c
+@@ -243,6 +243,9 @@ CMPIStatus stat_logicalfile_and_fill(
+         realpath(path, rpath);
+         LMI_SymbolicLink_Set_TargetFile(&lf->lf.symboliclink, rpath);
+         break;
++    case S_IFSOCK:
++        fill_basic(b, UnixSocket, &lf->lf.unixsocket, buf, fsclassname, fsname, sb);
++        break;
+     default:
+         /* impossible */
+         assert(0);

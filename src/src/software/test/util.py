@@ -18,6 +18,7 @@
 #
 # Authors: Radek Novacek <rnovacek@redhat.com>
 # Authors: Michal Minar <miminar@redhat.com>
+# Authors: Jan Grec <jgrec@redhat.com>
 
 """
 Common test utilities.
@@ -29,16 +30,18 @@ import re
 from subprocess import call, check_output
 
 RE_NEVRA = re.compile(
-    r'^(?P<name>.+)-(?P<evra>(?P<epoch>\d+):(?P<ver>[^-]+)'
-    r'-(?P<rel>.+)\.(?P<arch>[^.]+))$')
+    r'^(?P<name>[^\s]+)-(?P<evra>(?P<epoch>\d+):(?P<ver>[^-\s]+)'
+    r'-(?P<rel>[^\s]+)\.(?P<arch>[^.\s]+))$')
 RE_NEVRA_OPT_EPOCH = re.compile(
-    r'^(?P<name>.+)-(?P<evra>((?P<epoch>\d+):)?(?P<ver>[^-]+)'
-    r'-(?P<rel>.+)\.(?P<arch>[^.]+))$')
+    r'^(?P<name>[^\s]+)-(?P<evra>((?P<epoch>\d+):)?(?P<ver>[^-\s]+)'
+    r'-(?P<rel>[^\s]+)\.(?P<arch>[^.\s]+))$')
 RE_ENVRA = re.compile(
-    r'^(?P<epoch>\d+|\(none\)):(?P<name>.+)-(?P<ver>[^-]+)'
-    r'-(?P<rel>.+)\.(?P<arch>[^.]+)$')
+    r'^(?P<epoch>\d+|\(none\)):(?P<name>[^\s]+)-(?P<ver>[^-\s]+)'
+    r'-(?P<rel>[^\s]+)\.(?P<arch>[^.\s]+)$')
 RE_REPO = re.compile(
         r'(?:^\*?)(?P<name>[^\s/]+\b)(?!\s+id)', re.MULTILINE | re.IGNORECASE)
+
+DEV_NULL = open('/dev/null', 'w')
 
 def make_nevra(name, epoch, ver, rel, arch, with_epoch='NOT_ZERO'):
     """
@@ -49,17 +52,17 @@ def make_nevra(name, epoch, ver, rel, arch, with_epoch='NOT_ZERO'):
     """
     estr = ''
     if with_epoch.lower() == "always":
-        estr = epoch
+        estr = str(epoch)
     elif with_epoch.lower() == "not_zero":
-        if epoch and epoch.lower() not in {"0", "(none)"}:
-            estr = epoch
+        if epoch and str(epoch).lower() not in {"0", "(none)"}:
+            estr = str(epoch)
     if len(estr):
         estr += ":"
     return "%s-%s%s-%s.%s" % (name, estr, ver, rel, arch)
 
 def make_evra(epoch, ver, rel, arch):
     """ @return evra string """
-    if not epoch or epoch.lower() == "(none)":
+    if not epoch or str(epoch).lower() == "(none)":
         epoch = "0"
     return "%s:%s-%s.%s" % (epoch, ver, rel, arch)
 
@@ -139,3 +142,33 @@ def get_target_operating_system():
         if platform.uname()[4].lower() == 'x86_64':
             target_operating_system = 80 # RHEL 64bit
     return pywbem.Uint16(target_operating_system)
+
+def get_installed_packages():
+    """
+    :returns: list of packages in format: ``NAME-EPOCH:VERSION-RELEASE.ARCH``
+    """
+    output = check_output(
+            [ "/usr/bin/rpm", "-qa", "--qf"
+            , "%{NAME}-%{EPOCH}:%{VERSION}-%{RELEASE}.%{ARCH}\n"],
+            stderr=DEV_NULL).split()
+    package_list = []
+    for package in output:
+        # Skip all gpg public keys returned by rpm -qa
+        if "gpg-pubkey" not in package:
+            package_list.append(package.replace("(none)", "0"))
+    return package_list
+
+def make_pkg_op(ns, pkg):
+    """
+    :returns: Object path of ``LMI_SoftwareIdentity``
+    :rtype: :py:class:`lmi.shell.LMIInstanceName`
+    """
+    if not isinstance(pkg, basestring):
+        nevra = pkg.nevra
+    else:
+        nevra = pkg
+    return ns.LMI_SoftwareIdentity.new_instance_name({
+        "InstanceID" : 'LMI:LMI_SoftwareIdentity:' + nevra
+    })
+
+

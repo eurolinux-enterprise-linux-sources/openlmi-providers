@@ -49,6 +49,7 @@ struct _Service {
 struct _SList {
   char **name;
   int cnt;
+  int nalloc;
 };
 
 typedef struct _Service Service;

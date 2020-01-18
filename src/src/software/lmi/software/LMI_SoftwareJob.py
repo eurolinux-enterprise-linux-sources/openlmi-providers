@@ -290,7 +290,7 @@ class LMI_SoftwareJob(CIMProvider2):
         CIM_ERR_FAILED (some other unspecified error occurred)
         """
         job = Job.object_path2job(object_name)
-        error = Job.job2error(job)
+        error = Job.job2error(env, job)
         out_params = []
         if error is not None:
             param = pywbem.CIMParameter('Errors', type='instance',
@@ -378,7 +378,7 @@ class LMI_SoftwareJob(CIMProvider2):
         CIM_ERR_FAILED (some other unspecified error occurred)
         """
         job = Job.object_path2job(object_name)
-        error = Job.job2error(job)
+        error = Job.job2error(env, job)
         out_params = []
         if error is not None:
             param = pywbem.CIMParameter('Error', type='instance', value=error)

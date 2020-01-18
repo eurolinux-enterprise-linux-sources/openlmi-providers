@@ -25,7 +25,6 @@ Module holding the code of separate process accessing the YUM API.
 
 import errno
 from functools import wraps
-from itertools import chain
 import logging
 from multiprocessing import Process
 import os
@@ -45,11 +44,15 @@ from lmi.software.yumdb import jobs
 from lmi.software.yumdb import packageinfo
 from lmi.software.yumdb import packagecheck
 from lmi.software.yumdb import repository
-from lmi.software.yumdb.jobmanager import JobManager
+from lmi.software.yumdb.util import is_pkg_installed
 from lmi.software.yumdb.util import setup_logging
 
 # Global variable which gets its value after the start of YumWorker process.
 LOG = None
+
+class ShutDownWorker(Exception):
+    """ Raised when shut down job is received. """
+    pass
 
 # *****************************************************************************
 # Utilities
@@ -91,7 +94,7 @@ def _get_package_filter_function(filters, exact_match=True):
             "release", "repoid", "arch"):
         if not prop_name in filters:
             continue
-        if not exact_match and 'name' in filters:
+        if prop_name == 'name' and not exact_match and 'name' in filters:
             continue
         filter_list.append((prop_name, filters.pop(prop_name)))
     if not exact_match and 'name' in filters:
@@ -185,18 +188,17 @@ def _needs_database(method):
         Wrapper for the job handler method.
         """
         created_session = False
-        self._init_database()               #pylint: disable=W0212
-        if self._session_level == 0:        #pylint: disable=W0212
-            self._session_level = 1         #pylint: disable=W0212
+        self._init_database()
+        if self._state != YumWorker.STATE_LOCKED:
             created_session = True
-            self._lock_database()           #pylint: disable=W0212
+            self._lock_database()
+            self._check_repository_configs()
         try:
             result = logged(self, *args, **kwargs)
             return result
         finally:
-            if created_session is True:     #pylint: disable=W0212
-                self._session_level = 0     #pylint: disable=W0212
-                self._unlock_database()     #pylint: disable=W0212
+            if created_session is True:
+                self._unlock_database()
     return _wrapper
 
 # *****************************************************************************
@@ -209,19 +211,29 @@ class YumWorker(Process):
 
     Jobs are dispatched by their class names to particular handler method.
 
-    It spawns a second thread for managing asynchronous jobs and queue
-    of incoming jobs. It's an instance of JobManager.
+    It can process just one job at once. It has following states:
+
+        ``STATE_IDLE``
+            Initial state where no information is cached. Next state
+            is ``STATE_LOCKED``.
+        ``STATE_LOCKED``
+            Database is locked, and :py:class:`yum.YumBase` is initialied.
+            Next state is ``STATE_UNLOCKED``.
+        ``STATE_UNLOCKED``
+            Database is unlocked. Yum objects are cached. Next state is
+            any of above ones.
     """
+
+    STATE_IDLE, STATE_LOCKED, STATE_UNLOCKED = range(3)
 
     def __init__(self,
             queue_in,
             queue_out,
-            indication_manager,
             yum_kwargs=None):
         Process.__init__(self, name="YumWorker")
-        self._jobmgr = JobManager(queue_in, queue_out, indication_manager)
-        self._session_level = 0
-        self._session_ended = False
+        self._queue_in = queue_in
+        self._queue_out = queue_out
+        self._state = YumWorker.STATE_IDLE
 
         if yum_kwargs is None:
             yum_kwargs = {}
@@ -257,6 +269,7 @@ class YumWorker(Process):
         LOG.info("freing database")
         self._pkg_cache.clear()
         self._yum_base = None
+        self._state = YumWorker.STATE_IDLE
 
     @cmpi_logging.trace_method
     def _lock_database(self):
@@ -266,11 +279,12 @@ class YumWorker(Process):
 
         Try to lock it in loop, until success.
         """
+        assert self._state != YumWorker.STATE_LOCKED
         while True:
             try:
-                LOG.info("trying to lock database - session level %d",
-                        self._session_level)
+                LOG.info("trying to lock database")
                 self._yum_base.doLock()
+                self._state = YumWorker.STATE_LOCKED
                 LOG.info("successfully locked up")
                 break
             except yum.Errors.LockError as exc:
@@ -291,25 +305,26 @@ class YumWorker(Process):
         if self._yum_base is not None:
             LOG.info("unlocking database")
             self._yum_base.closeRpmDB()
+            del self._yum_base.history
             self._yum_base.doUnlock()
+            self._state = YumWorker.STATE_UNLOCKED
 
     @cmpi_logging.trace_method
     def _get_job(self):
         """
-        Get job from JobManager thread.
-        If no job comes for long time, free database to save memory.
+        Wait for new job to process. If no job comes for a long time, free
+        database to save memory.
         """
         while True:
-            if self._session_ended and self._session_level == 0:
+            if self._state == YumWorker.STATE_UNLOCKED:
                 try:
                     timeout = util.Configuration.get_instance().get_safe(
                             'Yum', 'FreeDatabaseTimeout', float)
-                    return self._jobmgr.get_job(timeout=timeout)
+                    return self._queue_in.get(timeout=timeout)
                 except TQueue.Empty:
                     self._free_database()
-                    self._session_ended = False
             else:
-                return self._jobmgr.get_job()
+                return self._queue_in.get()
 
     @cmpi_logging.trace_method
     def _transform_packages(self, packages,
@@ -328,7 +343,7 @@ class YumWorker(Process):
             self._pkg_cache.clear()
         res = []
         for orig in packages:
-            pkg = packageinfo.make_package_from_db(orig)
+            pkg = packageinfo.make_package_from_db(orig, self._yum_base.rpmdb)
             if cache_packages is True:
                 self._pkg_cache[pkg.objid] = orig
             res.append(pkg)
@@ -455,8 +470,8 @@ class YumWorker(Process):
                 jobs.YumRemovePackage    : self._handle_remove_package,
                 jobs.YumUpdateToPackage  : self._handle_update_to_package,
                 jobs.YumUpdatePackage    : self._handle_update_package,
-                jobs.YumBeginSession     : self._handle_begin_session,
-                jobs.YumEndSession       : self._handle_end_session,
+                jobs.YumLock             : self._handle_lock,
+                jobs.YumUnlock           : self._handle_unlock,
                 jobs.YumCheckPackage     : self._handle_check_package,
                 jobs.YumCheckPackageFile : self._handle_check_package_file,
                 jobs.YumInstallPackageFromURI : \
@@ -470,6 +485,8 @@ class YumWorker(Process):
             LOG.info("processing job %s(id=%d)",
                 job.__class__.__name__, job.jobid)
         except KeyError:
+            if isinstance(job, jobs.YumShutDown):
+                raise ShutDownWorker()
             LOG.error("No handler for job \"%s\"", job.__class__.__name__)
             raise errors.UnknownJob("No handler for job \"%s\"." %
                     job.__class__.__name__)
@@ -497,52 +514,50 @@ class YumWorker(Process):
     def _main_loop(self):
         """
         This is a main loop called from run(). Jobs are handled here.
-        It accepts a job from input queue, handles it,
-        sends the result to output queue and marks the job as done.
+        It accepts a job from input queue, handles it and
+        sends the result to output queue.
 
-        It is terminated, when None is received from input queue.
+        It is terminated, when :py:class:`~lmi.software.yumdb.jobs.YumShutDown`
+        object is received.
         """
         while True:
             job = self._get_job()
-            if job is not None:             # not a terminate command
-                result = jobs.YumJob.RESULT_SUCCESS
-                try:
-                    data = self._do_work(job)
-                except Exception:    #pylint: disable=W0703
-                    result = jobs.YumJob.RESULT_ERROR
-                    # (type, value, traceback)
-                    data = sys.exc_info()
-                    # traceback is not pickable - replace it with formatted
-                    # text
-                    data = (data[0], data[1], traceback.format_tb(data[2]))
-                    LOG.exception("job %s failed", job)
-                self._jobmgr.finish_job(job, result, data)
-            if job is None:
-                LOG.info("waiting for %s to finish", self._jobmgr.name)
-                self._jobmgr.join()
+            result = jobs.YumJob.RESULT_SUCCESS
+            try:
+                data = self._do_work(job)
+            except ShutDownWorker:
                 break
+            except Exception:    #pylint: disable=W0703
+                result = jobs.YumJob.RESULT_ERROR
+                # (type, value, traceback)
+                data = sys.exc_info()
+                # traceback is not pickable - replace it with formatted
+                # text
+                data = (data[0], data[1], traceback.format_tb(data[2]))
+                LOG.exception("job %s failed", job)
+            self._queue_out.put((job.jobid, result, data))
+        self._unlock_database()
+        self._free_database()
 
     @cmpi_logging.trace_method
-    def _handle_begin_session(self):
-        """
-        Handler for session begin job.
-        """
-        self._session_level += 1
-        LOG.info("beginning session level %s", self._session_level)
-        if self._session_level == 1:
+    def _handle_lock(self):
+        """ Handle lock request. """
+        if self._state != YumWorker.STATE_LOCKED:
             self._init_database()
             self._lock_database()
+            self._check_repository_configs()
+        else:
+            LOG.warn('requested lock while database is already locked')
 
     @cmpi_logging.trace_method
-    def _handle_end_session(self):
+    def _handle_unlock(self):
         """
-        Handler for session end job.
+        Handler for unlock job.
         """
-        LOG.info("ending session level %d", self._session_level)
-        self._session_level = max(self._session_level - 1, 0)
-        if self._session_level == 0:
+        if self._state == YumWorker.STATE_LOCKED:
             self._unlock_database()
-        self._session_ended = True
+        else:
+            LOG.trace_warn('requested unlock on not locked database')
 
     @_needs_database
     def _handle_get_package_list(self, kind, allow_duplicates, sort,
@@ -629,7 +644,7 @@ class YumWorker(Process):
             pkg_desired = pkgs[-1]
         else:
             pkg_desired = self._lookup_package(pkg)
-        if isinstance(pkg_desired, yum.rpmsack.RPMInstalledPackage):
+        if is_pkg_installed(pkg_desired, self._yum_base.rpmdb):
             if force is False:
                 raise errors.PackageAlreadyInstalled(pkg)
             action = "reinstall"
@@ -709,7 +724,7 @@ class YumWorker(Process):
             pkg = pkgs[-1]
         else:
             pkg = self._lookup_package(pkg)
-        if not isinstance(pkg, yum.rpmsack.RPMInstalledPackage):
+        if not is_pkg_installed(pkg, self._yum_base.rpmdb):
             raise errors.PackageNotInstalled(pkg)
         kwargs = { "name" : pkg.name, "arch" : pkg.arch }
         if any(v is not None for v in (to_epoch, to_version, to_release)):
@@ -747,7 +762,7 @@ class YumWorker(Process):
             pkg = self._transform_packages((rpm, ), cache_packages=False)[0]
         else:
             rpm = self._lookup_package(pkg)
-        if not isinstance(rpm, yum.rpmsack.RPMInstalledPackage):
+        if not is_pkg_installed(rpm, self._yum_base.rpmdb):
             raise errors.PackageNotInstalled(rpm)
         vpkg = yum.packages._RPMVerifyPackage(rpm, rpm.hdr.fiFromHeader(),
                 packagecheck.pkg_checksum_type(rpm), [], True)
@@ -798,7 +813,6 @@ class YumWorker(Process):
         """
         @return list of yumdb.Repository instances
         """
-        self._check_repository_configs()
         if kind == 'enabled':
             repos = sorted(self._yum_base.repos.listEnabled())
         else:
@@ -819,7 +833,6 @@ class YumWorker(Process):
         """
         filters = dict((k, v) for k, v in filters.items() if v is not None)
         if 'repoid' in filters:
-            self._check_repository_configs()
             try:
                 repo = repository.make_repository_from_db(
                             self._yum_base.repos.getRepo(filters["repoid"]))
@@ -855,7 +868,6 @@ class YumWorker(Process):
         """
         @return previous enabled state
         """
-        self._check_repository_configs()
         if isinstance(repo, repository.Repository):
             repoid = repo.repoid
         else:
@@ -868,10 +880,10 @@ class YumWorker(Process):
         try:
             if enable ^ res:
                 if enable is True:
-                    LOG.info("enabling repository %s" % repo)
+                    LOG.info("enabling repository %s", repo)
                     repo.enable()
                 else:
-                    LOG.info("disabling repository %s" % repo)
+                    LOG.info("disabling repository %s", repo)
                     repo.disable()
                 try:
                     yum.config.writeRawRepoFile(repo, only=["enabled"])
@@ -894,14 +906,14 @@ class YumWorker(Process):
         """
         @return input queue for jobs
         """
-        return self._jobmgr.queue_in
+        return self._queue_in
 
     @property
     def downlink(self):
         """
         @return output queue for job results
         """
-        return self._jobmgr.queue_out
+        return self._queue_out
 
     # *************************************************************************
     # Public methods
@@ -914,15 +926,7 @@ class YumWorker(Process):
         global LOG
         LOG = logging.getLogger(__name__)
         LOG.info("running as pid=%d", self.pid)
-        self._jobmgr.start()
-        LOG.info("started %s as thread %s",
-                self._jobmgr.name, self._jobmgr.ident)
         self._pkg_cache = weakref.WeakValueDictionary()
-
-        # This allows the code, that can be run both from broker and
-        # YumWorker, to check, whether it's called by this process.
-        from lmi.software.yumdb import YumDB
-        YumDB.RUNNING_UNDER_CIMOM_PROCESS = False
 
         self._main_loop()
         LOG.info("terminating")

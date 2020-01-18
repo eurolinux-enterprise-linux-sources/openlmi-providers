@@ -51,7 +51,10 @@ static CMPIStatus dir_file_objectpaths(
     struct dirent *de;
     DIR *dp;
     dp = opendir(path);
-
+    if (dp == NULL) {
+      st.rc = CMPI_RC_ERR_NOT_FOUND;
+      return st;
+    }
     while ((de = readdir(dp))) {
         if (strcmp(de->d_name, ".") == 0) {
             continue;
@@ -60,6 +63,7 @@ static CMPIStatus dir_file_objectpaths(
         char rpath[BUFLEN + 1]; /* \0 */
         char fileclass[BUFLEN];
         char *fsname;
+        char *fsclassname;
 
         if (strcmp(de->d_name, "..") == 0) {
             /* to get the parent directory, if either role or result role is
@@ -97,7 +101,7 @@ static CMPIStatus dir_file_objectpaths(
             } else if (st.rc != CMPI_RC_OK) {
                 goto done;
             }
-            st = get_fsname_from_stat(_cb, &sb, &fsname);
+            st = get_fsinfo_from_stat(_cb, &sb, rpath, &fsclassname, &fsname);
             if (st.rc != CMPI_RC_OK) {
                 goto done;
             }
@@ -105,7 +109,7 @@ static CMPIStatus dir_file_objectpaths(
 
         CIM_LogicalFileRef cim_lfr;
         CIM_LogicalFileRef_Init(&cim_lfr, _cb, namespace);
-        fill_logicalfile(CIM_LogicalFileRef, &cim_lfr, rpath, fsname, fileclass);
+        fill_logicalfile(CIM_LogicalFileRef, &cim_lfr, rpath, fsclassname, fsname, fileclass);
         o = CIM_LogicalFileRef_ToObjectPath(&cim_lfr, &st);
         CMSetClassName(o, fileclass);
 
@@ -140,10 +144,6 @@ static CMPIStatus associators(
     int group = -1;
     int rgroup = -1;
 
-    st = lmi_check_required(_cb, cc, cop);
-    if (st.rc != CMPI_RC_OK) {
-        return st;
-    }
     st = check_assoc_class(_cb, ns, assocClass, LMI_DirectoryContainsFile_ClassName);
     check_class_check_status(st);
     /* role && resultRole checks */
@@ -171,10 +171,15 @@ static CMPIStatus associators(
         CMReturn(CMPI_RC_OK);
     }
 
-    path = get_string_property_from_op(cop, "Name");
-
     if (CMClassPathIsA(_cb, cop, LMI_UnixDirectory_ClassName, &st)) {
         /* got UnixDirectory - GroupComponent */
+        st = lmi_check_required(_cb, cc, cop);
+        if (st.rc != CMPI_RC_OK) {
+            return st;
+        }
+        path = get_string_property_from_op(cop, "Name");
+        if (!path)
+            CMReturnWithChars(_cb, CMPI_RC_ERR_NOT_FOUND, "Cannot find Name property in provided LMI_UnixDirectory");
         st = dir_file_objectpaths(cc, cr, resultClass, group, rgroup, properties, ns, path, refs, &count);
         if (st.rc != CMPI_RC_OK) {
             return st;
@@ -193,11 +198,18 @@ static CMPIStatus associators(
                 CMReturnInstance(cr, ci);
             }
         }
-    } else {
+    } else if (CMClassPathIsA(_cb, cop, CIM_LogicalFile_ClassName, &st)) {
         /* got LogicalFile - PartComponent */
+        st = lmi_check_required(_cb, cc, cop);
+        if (st.rc != CMPI_RC_OK) {
+            return st;
+        }
         if (group == 1 || rgroup == 0) {
             CMReturn(CMPI_RC_OK);
         }
+        path = get_string_property_from_op(cop, "Name");
+        if (!path)
+            CMReturnWithChars(_cb, CMPI_RC_ERR_NOT_FOUND, "Cannot find Name property in provided CIM_logicalFile");
         st = check_assoc_class(_cb, ns, resultClass, LMI_UnixDirectory_ClassName);
         check_class_check_status(st);
 
@@ -206,14 +218,15 @@ static CMPIStatus associators(
         char *aux = strdup(path);
         char *dir = dirname(aux);
         char *fsname;
+        char *fsclassname;
 
-        st = get_fsname_from_path(_cb, path, &fsname);
+        st = get_fsinfo_from_path(_cb, path, &fsclassname, &fsname);
         if (st.rc != CMPI_RC_OK) {
             free(aux);
             return st;
         }
 
-        fill_logicalfile(CIM_DirectoryRef, &lmi_dr, dir, fsname, LMI_UnixDirectory_ClassName);
+        fill_logicalfile(CIM_DirectoryRef, &lmi_dr, dir, fsclassname, fsname, LMI_UnixDirectory_ClassName);
         o = CIM_DirectoryRef_ToObjectPath(&lmi_dr, &st);
         CMSetClassName(o, LMI_UnixDirectory_ClassName);
 
@@ -225,6 +238,9 @@ static CMPIStatus associators(
         }
         free(aux);
         free(fsname);
+    } else {
+        /* this association does not associate with given 'cop' class */
+        CMReturn(CMPI_RC_OK);
     }
     CMReturn(CMPI_RC_OK);
 }
@@ -244,6 +260,7 @@ static CMPIStatus references(
     const char *ns = KNameSpace(cop);
     const char *path;
     char *fsname;
+    char *fsclassname;
     char ccname[BUFLEN];
 
     /* GroupComponent */
@@ -265,21 +282,22 @@ static CMPIStatus references(
             group = 0;
         }
     }
-    st = lmi_check_required(_cb, cc, cop);
-    check_status(st);
 
     CIM_DirectoryRef_Init(&lmi_dr, _cb, ns);
     CIM_LogicalFileRef_Init(&lmi_lfr, _cb, ns);
     LMI_DirectoryContainsFile_Init(&lmi_dcf, _cb, ns);
 
-    path = get_string_property_from_op(cop, "Name");
-    get_class_from_path(path, ccname);
-    st = get_fsname_from_path(_cb, path, &fsname);
-    check_status(st);
 
-    if (strcmp(ccname, LMI_UnixDirectory_ClassName) == 0) {
+    if (CMClassPathIsA(_cb, cop, LMI_UnixDirectory_ClassName, &st)) {
+        st = lmi_check_required(_cb, cc, cop);
+        check_status(st);
+        path = get_string_property_from_op(cop, "Name");
+        if (!path)
+            CMReturnWithChars(_cb, CMPI_RC_ERR_NOT_FOUND, "Cannot find Name property in provided LMI_UnixDirectory");
+        st = get_fsinfo_from_path(_cb, path, &fsclassname, &fsname);
+        check_status(st);
         /* got GroupComponent - DirectoryRef */
-        fill_logicalfile(CIM_DirectoryRef, &lmi_dr, path, fsname, LMI_UnixDirectory_ClassName);
+        fill_logicalfile(CIM_DirectoryRef, &lmi_dr, path, fsclassname, fsname, LMI_UnixDirectory_ClassName);
         o = CIM_DirectoryRef_ToObjectPath(&lmi_dr, &st);
         CMSetClassName(o, LMI_UnixDirectory_ClassName);
         LMI_DirectoryContainsFile_SetObjectPath_GroupComponent(&lmi_dcf, o);
@@ -304,13 +322,21 @@ static CMPIStatus references(
                 CMReturnInstance(cr, ci);
             }
         }
-    } else {
+    } else if (CMClassPathIsA(_cb, cop, CIM_LogicalFile_ClassName, &st)) {
+        st = lmi_check_required(_cb, cc, cop);
+        check_status(st);
+        path = get_string_property_from_op(cop, "Name");
+        if (!path)
+            CMReturnWithChars(_cb, CMPI_RC_ERR_NOT_FOUND, "Cannot find Name property in provided CIM_LogicalFile");
+        get_class_from_path(path, ccname);
+        st = get_fsinfo_from_path(_cb, path, &fsclassname, &fsname);
+        check_status(st);
         /* got PartComponent - LogicalFileRef */
         if (group == 1) {
             CMReturn(CMPI_RC_OK);
         }
 
-        fill_logicalfile(CIM_LogicalFileRef, &lmi_lfr, path, fsname, ccname);
+        fill_logicalfile(CIM_LogicalFileRef, &lmi_lfr, path, fsclassname, fsname, ccname);
         o = CIM_LogicalFileRef_ToObjectPath(&lmi_lfr, &st);
         CMSetClassName(o, ccname);
         LMI_DirectoryContainsFile_SetObjectPath_PartComponent(&lmi_dcf, o);
@@ -318,14 +344,13 @@ static CMPIStatus references(
         /* GroupComponent */
         char *aux = strdup(path);
         char *dir = dirname(aux);
-        char *fsname;
-        st = get_fsname_from_path(_cb, dir, &fsname);
+        st = get_fsinfo_from_path(_cb, dir, &fsclassname, &fsname);
         if (st.rc != CMPI_RC_OK) {
             free(aux);
             return st;
         }
 
-        fill_logicalfile(CIM_DirectoryRef, &lmi_dr, dir, fsname, LMI_UnixDirectory_ClassName);
+        fill_logicalfile(CIM_DirectoryRef, &lmi_dr, dir, fsclassname, fsname, LMI_UnixDirectory_ClassName);
         o = CIM_DirectoryRef_ToObjectPath(&lmi_dr, &st);
         CMSetClassName(o, LMI_UnixDirectory_ClassName);
         LMI_DirectoryContainsFile_SetObjectPath_GroupComponent(&lmi_dcf, o);
@@ -337,8 +362,11 @@ static CMPIStatus references(
             CMReturnInstance(cr, ci);
         }
         free(aux);
-        free(fsname);
+    } else {
+        /* this association does not associate with given 'cop' class */
+        CMReturn(CMPI_RC_OK);
     }
+
     free(fsname);
     CMReturn(CMPI_RC_OK);
 }

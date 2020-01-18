@@ -31,7 +31,7 @@ class TestIndications(AccountBase):
         """
         Account: Test good indication filter
         """
-        filter_name = "test_good_filter_%d" % time.time() * 1000
+        filter_name = "test_good_filter_%d" % (time.time() * 1000000)
         sub = self.subscribe(filter_name, "select * from LMI_AccountInstanceCreationIndication where SourceInstance isa LMI_Account")
         self.assertIsNotNone(sub)
         self.unsubscribe(filter_name);
@@ -47,7 +47,7 @@ class TestIndications(AccountBase):
         Account: Test indication of group deletion
         """
         create_group(self.group_name)
-        filter_name = "test_delete_group_%d" % time.time() * 1000
+        filter_name = "test_delete_group_%d" % (time.time() * 1000000)
         sub = self.subscribe(filter_name, "select * from LMI_AccountInstanceDeletionIndication where SourceInstance isa LMI_Group")
         clean_group(self.group_name)
         indication = self.get_indication(10)
@@ -61,7 +61,7 @@ class TestIndications(AccountBase):
         Account: Test indication of group creation
         """
         clean_group(self.group_name)
-        filter_name = "test_create_group_%d" % time.time() * 1000
+        filter_name = "test_create_group_%d" % (time.time() * 1000000)
         sub = self.subscribe(filter_name, "select * from LMI_AccountInstanceCreationIndication where SourceInstance isa LMI_Group")
         create_group(self.group_name)
         indication = self.get_indication(10)
@@ -76,7 +76,7 @@ class TestIndications(AccountBase):
         Account: Test indication of account deletion
         """
         create_account(self.user_name)
-        filter_name = "test_delete_account_%d" % time.time() * 1000
+        filter_name = "test_delete_account_%d" % (time.time() * 1000000)
         sub = self.subscribe(filter_name, "select * from LMI_AccountInstanceDeletionIndication where SourceInstance isa LMI_Account")
         clean_account(self.user_name)
         indication = self.get_indication(10)
@@ -90,7 +90,7 @@ class TestIndications(AccountBase):
         Account: Test indication of account creation
         """
         clean_account(self.user_name)
-        filter_name = "test_create_account_%d" % time.time() * 1000
+        filter_name = "test_create_account_%d" % (time.time() * 1000000)
         sub = self.subscribe(filter_name, "select * from LMI_AccountInstanceCreationIndication where SourceInstance isa LMI_Account")
         create_account(self.user_name)
         indication = self.get_indication(10)

@@ -103,6 +103,8 @@ static CMPIStatus LMI_AssignedGroupIdentityEnumInstances(
         KReturnInstance(cr, lagi);
         lu_ent_free(lue);
       } /* for */
+    if (groups)
+        g_ptr_array_free(groups, TRUE);
     CMReturn(CMPI_RC_OK);
 }
 

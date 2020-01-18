@@ -68,8 +68,7 @@ typedef enum _IMIDiff {
     IM_I_CHANGE     // Instances are different in non-key properties
 } IMIDiff;
 
-IMIDiff compare_instances(CMPIInstance *, CMPIInstance *);
-bool maybe_remove_polled(IMManager *, CMPIObjectPath *, IMError *);
+static IMIDiff compare_instances(CMPIInstance *, CMPIInstance *);
 
 /* CMPI rc handler */
 CMPIStatus im_rc;
@@ -79,7 +78,7 @@ CMPIStatus im_rc;
  * return true if they are same, false otherwise
  * is using ft->toString()
  */
-bool compare_objectpaths(CMPIObjectPath *op1, CMPIObjectPath *op2)
+static bool compare_objectpaths(CMPIObjectPath *op1, CMPIObjectPath *op2)
 {
     return (strcmp(CMGetCharsPtr(CMObjectPathToString(op1, NULL), NULL),
                    CMGetCharsPtr(CMObjectPathToString(op2, NULL), NULL)) == 0);
@@ -90,7 +89,7 @@ bool compare_objectpaths(CMPIObjectPath *op1, CMPIObjectPath *op2)
  * return true if they are the same, false otherwise
  * note: inspired by value.c:sfcb_comp_CMPIValue() from sblim-sfcb
  */
-bool compare_values(CMPIValue *v1, CMPIValue *v2, CMPIType type)
+static bool compare_values(CMPIValue *v1, CMPIValue *v2, CMPIType type)
 {
 // Checks for NULL, but it is incorrect
 #define CHECK_PTRS \
@@ -161,7 +160,7 @@ bool compare_values(CMPIValue *v1, CMPIValue *v2, CMPIType type)
  * Compare 2 instances.
  * They can be same, different in key properties or different in non-key props
  */
-IMIDiff compare_instances(CMPIInstance *i1, CMPIInstance *i2)
+static IMIDiff compare_instances(CMPIInstance *i1, CMPIInstance *i2)
 {
     CMPIString *prop_name = NULL;
     // At first compare key properties. They will differ in most cases
@@ -213,7 +212,8 @@ IMIDiff compare_instances(CMPIInstance *i1, CMPIInstance *i2)
  * returns nothing
  * Does not perform any checks
  */
-void remove_diff(IMPolledDiffs *d)
+/* Called with lock held */
+static void remove_diff(IMPolledDiffs *d)
 {
     IMPolledDiff *first = d->first;
     if (first) {
@@ -227,8 +227,9 @@ void remove_diff(IMPolledDiffs *d)
  * First argument is diffs list.
  * Returns true when ok, false if not and set IMError
  */
-bool add_diff(IMPolledDiffs *d, CMPIInstance *newi, CMPIInstance *oldi,
-              IMError *err)
+/* Called with lock held */
+static bool add_diff(IMPolledDiffs *d, CMPIInstance *newi, CMPIInstance *oldi,
+                     IMError *err)
 {
         IMPolledDiff *nd = malloc(sizeof(IMPolledDiff));
         if (!nd) {
@@ -256,7 +257,8 @@ bool add_diff(IMPolledDiffs *d, CMPIInstance *newi, CMPIInstance *oldi,
  *  - old value and new NULL => instance deletion
  * Return true when ok, false if not and set IMError
  */
-bool gen_diffs(IMManager *manager, IMPolledDiffs *d, IMError *err)
+/* Called with lock held */
+static bool gen_diffs(IMManager *manager, IMPolledDiffs *d, IMError *err)
 {
     DEBUG("gen diffs called");
     if (!manager) {
@@ -350,7 +352,7 @@ bool gen_diffs(IMManager *manager, IMPolledDiffs *d, IMError *err)
  * Extract object path from select expression
  * returns match for the first occurence of ISA operator
  */
-CMPIObjectPath *get_object_path(const CMPIBroker *broker, CMPISelectExp *se)
+static CMPIObjectPath *get_object_path(const CMPIBroker *broker, CMPISelectExp *se)
 {
     CMPISelectCond *sc = CMGetDoc(se, NULL);
     CMPICount scount = CMGetSubCondCountAndType(sc,NULL,NULL);
@@ -376,16 +378,66 @@ CMPIObjectPath *get_object_path(const CMPIBroker *broker, CMPISelectExp *se)
 
 // compare 2 object paths, return true when equal, false if not
 // equality is set by comparing class names and namespaces
-bool equal_ops(CMPIObjectPath *op1, CMPIObjectPath *op2)
+static bool equal_ops(CMPIObjectPath *op1, CMPIObjectPath *op2)
 {
     return (strcmp(NS_STR_FROM_OP(op1), NS_STR_FROM_OP(op2)) == 0 &&
         strcmp(CN_STR_FROM_OP(op1), CN_STR_FROM_OP(op2)) == 0);
 }
 
+// Pair enumerations. This enum will become prev enum and new this enum
+// will be created by new obtained by object path
+/* Called with lock held */
+static bool pair_enumeration(IMManager *manager, IMEnumerationPair *epair)
+{
+    CMPIEnumeration *aux_e = CBEnumInstances(manager->broker,
+        manager->ctx_manage, epair->op, NULL, NULL);
+    if (!aux_e) {
+        return false;
+    }
+    CMPIArray *new_e = CMClone(CMToArray(aux_e, NULL), NULL);
+    if (!epair->prev_enum && !epair->this_enum) {
+        epair->prev_enum = CMClone(new_e, NULL);
+        epair->this_enum = new_e;
+        return true;
+    }
+    if (epair->prev_enum) {
+        CMRelease(epair->prev_enum);
+    }
+    epair->prev_enum = epair->this_enum;
+    epair->this_enum = new_e;
+    return true;
+}
+
+// When the filter is added there is no enum pairs created
+// This function will generate pairs where they are missing
+/* Called with lock held */
+static bool first_poll(IMManager *manager, IMError *err)
+{
+    DEBUG("IM first poll called");
+    if (!manager) {
+        *err = IM_ERR_MANAGER;
+        return false;
+    }
+    if (!manager->enums) {
+        // Nothing to poll
+        return true;
+    }
+    IMEnumerationPair *epair = NULL;
+    for (epair = manager->enums->first; epair; epair = epair->next) {
+        if (epair->this_enum == NULL && epair->prev_enum == NULL) {
+            if (!pair_enumeration(manager, epair)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 // Try to find enumeration with given object path
 // if found increase reference count
 // if not found add it to the end of list with ref count = 1
-bool add_enumeration(IMManager *manager, CMPIObjectPath *op, IMError *err)
+/* Called with lock held */
+static bool add_enumeration(IMManager *manager, CMPIObjectPath *op, IMError *err)
 {
     if (!manager) {
         *err = IM_ERR_MANAGER;
@@ -422,6 +474,11 @@ bool add_enumeration(IMManager *manager, CMPIObjectPath *op, IMError *err)
     new_ime->ref_count = 1;
     new_ime->prev_enum = NULL;
     new_ime->this_enum = NULL;
+    if (manager->ctx_manage) {
+        /* Fill the enumeration with values valid at the time the filter was registered and
+         * only if we're adding new filter when indications have been started already */
+        pair_enumeration(manager, new_ime);
+    }
     if (!last) { // there isn't any enumeration yet
         manager->enums->first = new_ime;
     } else {
@@ -430,54 +487,8 @@ bool add_enumeration(IMManager *manager, CMPIObjectPath *op, IMError *err)
     return true;
 }
 
-// Pair enumerations. This enum will become prev enum and new this enum
-// will be created by new obtained by object path
-bool pair_enumeration(IMManager *manager, IMEnumerationPair *epair)
-{
-    CMPIEnumeration *aux_e = CBEnumInstances(manager->broker,
-        manager->ctx_manage, epair->op, NULL, NULL);
-    if (!aux_e) {
-        return false;
-    }
-    CMPIArray *new_e = CMClone(CMToArray(aux_e, NULL), NULL);
-    if (!epair->prev_enum && !epair->this_enum) {
-        epair->prev_enum = CMClone(new_e, NULL);
-        epair->this_enum = new_e;
-        return true;
-    }
-    if (epair->prev_enum) {
-        CMRelease(epair->prev_enum);
-    }
-    epair->prev_enum = epair->this_enum;
-    epair->this_enum = new_e;
-    return true;
-}
-
-// When the filter is added there is no enum pairs created
-// This function will generate pairs where they are missing
-bool first_poll(IMManager *manager, IMError *err)
-{
-    DEBUG("IM first poll called");
-    if (!manager) {
-        *err = IM_ERR_MANAGER;
-        return false;
-    }
-    if (!manager->enums) {
-        // Nothing to poll
-        return true;
-    }
-    IMEnumerationPair *epair = NULL;
-    for (epair = manager->enums->first; epair; epair = epair->next) {
-        if (epair->this_enum == NULL && epair->prev_enum == NULL) {
-            if (!pair_enumeration(manager, epair)) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-bool _im_poll(IMManager *manager, IMError *err)
+/* Called with lock held */
+static bool _im_poll(IMManager *manager, IMError *err)
 {
     DEBUG("IM poll called");
     if (!manager) {
@@ -504,7 +515,7 @@ bool _im_poll(IMManager *manager, IMError *err)
 /*
  * Fill ind_inst with properties and send it
  */
-bool send_creation_indication(CMPIInstance *ind_inst, CMPIInstance *new_inst,
+static bool send_creation_indication(CMPIInstance *ind_inst, CMPIInstance *new_inst,
                               IMManager *manager)
 {
     DEBUG("Instance creation indication to be send");
@@ -521,7 +532,7 @@ bool send_creation_indication(CMPIInstance *ind_inst, CMPIInstance *new_inst,
 /*
  * Fill ind_inst with properties and send it
  */
-bool send_deletion_indication(CMPIInstance *ind_inst, CMPIInstance *old_inst,
+static bool send_deletion_indication(CMPIInstance *ind_inst, CMPIInstance *old_inst,
                               IMManager *manager)
 {
     DEBUG("Instance deletion indication to be send");
@@ -538,7 +549,7 @@ bool send_deletion_indication(CMPIInstance *ind_inst, CMPIInstance *old_inst,
 /*
  * Fill ind_inst with properties and send it
  */
-bool send_modification_indication(CMPIInstance *ind_inst, CMPIInstance *new,
+static bool send_modification_indication(CMPIInstance *ind_inst, CMPIInstance *new,
                                   CMPIInstance *old, IMManager *manager)
 {
     DEBUG("Instance modification indication to be send");
@@ -560,7 +571,7 @@ bool send_modification_indication(CMPIInstance *ind_inst, CMPIInstance *new,
  * returns NULL when not found or on error
  * Caller has to free memory.
  */
-char *get_classname(CMPISelectExp *se)
+static char *get_classname(CMPISelectExp *se)
 {
     if (!se) {
         return NULL;
@@ -599,7 +610,8 @@ char *get_classname(CMPISelectExp *se)
  * to send.
  * Returns true when everything is OK. False otherwise.
  */
-bool send_indication(CMPIInstance *old, CMPIInstance *new, IMManager *manager)
+/* Called with lock held */
+static bool send_indication(CMPIInstance *old, CMPIInstance *new, IMManager *manager)
 {
     if (!manager) {
         return false;
@@ -652,26 +664,20 @@ bool send_indication(CMPIInstance *old, CMPIInstance *new, IMManager *manager)
 /*
  * Run in separate thread
  */
-static void *manage(void *data)
+static IMError manage(IMManager *manager)
 {
-    // TODO: Switch Enable/Disable state on some places?
-    IMManager *manager = (IMManager *)data;
     IMError err = IM_ERR_OK; // TODO - How to handle potential errors?
-    DEBUG("manage thread started");
-
     IMPolledDiffs diffs = {NULL};
     CMPIInstance *iold = NULL, *inew = NULL;
-
-    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
-
-    DEBUG("manage thread - attaching thread manager context = %p", manager->ctx_manage);
-    CBAttachThread(manager->broker, manager->ctx_manage);
 
     while (1) {
         DEBUG("manage thread in infinite loop");
         // wait until manager is running
         pthread_mutex_lock(&manager->_t_mutex);
+        if (manager->cancelled) {
+            pthread_mutex_unlock(&manager->_t_mutex);
+            return IM_ERR_CANCELLED;
+        }
         while (!manager->running) {
             DEBUG("manage thread waiting to indication start");
             pthread_cond_wait(&manager->_t_cond, &manager->_t_mutex);
@@ -680,7 +686,7 @@ static void *manage(void *data)
         if (manager->polling) {
             if (!first_poll(manager, &err)) {
                 pthread_mutex_unlock(&manager->_t_mutex);
-                return (void *)err;
+                return err;
             }
         }
         pthread_mutex_unlock(&manager->_t_mutex);
@@ -690,16 +696,22 @@ static void *manage(void *data)
             continue;
         }
         pthread_mutex_lock(&manager->_t_mutex);
+        if (manager->cancelled) {
+            pthread_mutex_unlock(&manager->_t_mutex);
+            return IM_ERR_CANCELLED;
+        }
         if (manager->polling) {
             // poll enumerations
             if (!_im_poll(manager, &err)) {
                 pthread_mutex_unlock(&manager->_t_mutex);
-                return (void *)err;
+                return err;
             }
             // create list of diffs
             if (!gen_diffs(manager, &diffs, &err)) {
+                while (diffs.first)
+                    remove_diff(&diffs);
                 pthread_mutex_unlock(&manager->_t_mutex);
-                return (void *)err;
+                return err;
             }
             manager->data = &diffs;
         }
@@ -711,11 +723,46 @@ static void *manage(void *data)
     }
 }
 
+static void manage_cleanup(void *data)
+{
+    IMManager *manager = (IMManager *)data;
+
+    DEBUG("manage thread - detaching thread manager context = %p", manager->ctx_manage);
+    CBDetachThread(manager->broker, manager->ctx_manage);
+}
+
+/* Wrapper thread function, to isolate code control flow due to sensitive pthread_cleanup_ macros */
+static void *manage_wrapper(void *data)
+{
+    // TODO: Switch Enable/Disable state on some places?
+    IMManager *manager = (IMManager *)data;
+    IMError err;
+
+    DEBUG("manage thread started");
+
+    /* Allow thread cancellation */
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+
+    DEBUG("manage thread - attaching thread manager context = %p", manager->ctx_manage);
+    CBAttachThread(manager->broker, manager->ctx_manage);
+
+    /* Main execution block closed in a cleanup handler */
+    pthread_cleanup_push(manage_cleanup, data);
+    err = manage(manager);
+    pthread_cleanup_pop(1);
+
+    DEBUG("manage thread stopped");
+
+    return (void *)err;
+}
+
 /*
  * Default gather function using polling
  * It is going thru all polled instances. If there is some pair (previous enum
  * and this enum)
  */
+/* Called with lock held */
 static bool default_gather (const IMManager *manager, CMPIInstance **old_inst,
                             CMPIInstance **new_inst, void* data)
 {
@@ -795,10 +842,6 @@ IMManager* im_create_manager(IMInstGather gather, IMFilterChecker f_checker,
         *err = IM_ERR_GATHER;
         return NULL;
     }
-    if (!f_checker) {
-        *err = IM_ERR_FILTER_CHECKER;
-        return NULL;
-    }
     if (!watcher) {
         *err = IM_ERR_WATCHER;
         return NULL;
@@ -818,6 +861,7 @@ IMManager* im_create_manager(IMInstGather gather, IMFilterChecker f_checker,
     manager->filters = NULL;
     manager->running = false;
     manager->polling = polling;
+    manager->cancelled = false;
     manager->broker = broker;
     manager->f_checker = f_checker;
     manager->enums = NULL;
@@ -826,13 +870,11 @@ IMManager* im_create_manager(IMInstGather gather, IMFilterChecker f_checker,
     manager->data = NULL;
     DEBUG("Manager created");
 
-    if (pthread_mutexattr_init(&manager->_t_mutex_attr) ||
-        pthread_mutexattr_settype(&manager->_t_mutex_attr, PTHREAD_MUTEX_ERRORCHECK) ||
-        pthread_mutex_init(&manager->_t_mutex, &manager->_t_mutex_attr) ||
-        pthread_cond_init(&manager->_t_cond, NULL)) {
-            *err = IM_ERR_THREAD;
-            free(manager);
-            return NULL;
+    if (pthread_cond_init(&manager->_t_cond, NULL) ||
+            pthread_mutex_init(&manager->_t_mutex, NULL)) {
+        *err = IM_ERR_THREAD;
+        free(manager);
+        return NULL;
     }
 
     return manager;
@@ -849,21 +891,63 @@ bool im_destroy_manager(IMManager *manager, const CMPIContext *ctx,
         *err = IM_ERR_CONTEXT;
         return false;
     }
-    im_stop_ind(manager, ctx, err);
-    pthread_mutex_lock(&manager->_t_mutex);
-    if (!remove_all_filters(manager, err)) {
-        pthread_mutex_unlock(&manager->_t_mutex);
+    if (manager->running)
+        im_stop_ind(manager, ctx, err);
+    /* No need for locking as all running threads should be stopped at this point */
+    if (!remove_all_filters(manager, err))
         return false;
-    }
-    pthread_mutex_unlock(&manager->_t_mutex);
     DEBUG("Destroying manager");
     if (pthread_mutex_destroy(&manager->_t_mutex) ||
-        pthread_mutexattr_destroy(&manager->_t_mutex_attr)) {
+        pthread_cond_destroy(&manager->_t_cond)) {
         *err = IM_ERR_THREAD;
         return false;
     }
     free(manager);
     return true;
+}
+
+static bool default_ind_filter_cb(IMManager *manager, const CMPISelectExp *filter)
+{
+    /* Looks for a class to be subscribed and matches it against a list of
+     * allowed classes. Filter query may contain more conditions, only those
+     * with a ISA operator are looked for.
+     */
+    CMPIStatus st;
+    unsigned int i;
+
+    CMPISelectCond *sec = CMGetDoc(filter, &st);
+    if (!sec)
+        return false;
+    CMPICount count = CMGetSubCondCountAndType(sec, NULL, &st);
+    if (count != 1)
+        return false;
+    CMPISubCond *sub = CMGetSubCondAt(sec, 0, &st);
+    if (!sub)
+        return false;
+    count = CMGetPredicateCount(sub, &st);
+    if (count == 0)
+        return false;
+
+    for (i = 0; i < count; i++) {
+        CMPIType type;
+        CMPIPredOp op;
+        CMPIString *lhs = NULL;
+        CMPIString *rhs = NULL;
+        CMPIPredicate *pred = CMGetPredicateAt(sub, i, &st);
+        if (!pred)
+            return false;
+        st = CMGetPredicateData(pred, &type, &op, &lhs, &rhs);
+        if (st.rc != CMPI_RC_OK || op != CMPI_PredOp_Isa)
+            continue;
+        const char *rhs_str = CMGetCharsPtr(rhs, &st);
+        if (!rhs_str)
+            continue;
+        while (manager->f_allowed_classes[i]) {
+            if (strcasecmp(rhs_str, manager->f_allowed_classes[i++]) == 0)
+                return true;
+        }
+    }
+    return false;
 }
 
 bool im_verify_filter(IMManager *manager, const CMPISelectExp *filter,
@@ -875,14 +959,24 @@ bool im_verify_filter(IMManager *manager, const CMPISelectExp *filter,
     }
     if (!ctx) {
         *err = IM_ERR_CONTEXT;
+        return NULL;
     }
     if (!filter) {
         *err = IM_ERR_FILTER;
         return NULL;
     }
+    if (!manager->f_checker && !manager->f_allowed_classes) {
+        *err = IM_ERR_FILTER_CHECKER;
+        return NULL;
+    }
     manager->ctx_main = ctx;
-    DEBUG("Verifying filter. Manager = %p, filter checker = %p", manager, manager->f_checker);
-    return manager->f_checker(filter);
+    if (manager->f_checker) {
+        DEBUG("Verifying filter. Manager = %p, filter checker = %p", manager, manager->f_checker);
+        return manager->f_checker(filter);
+    } else {
+        DEBUG("Verifying filter. Manager = %p, using default filter checker", manager);
+        return default_ind_filter_cb(manager, filter);
+    }
 }
 
 /*
@@ -891,7 +985,8 @@ bool im_verify_filter(IMManager *manager, const CMPISelectExp *filter,
  * Return true when ok, or NULL and error set
  * appropiately
  */
-bool _im_add_filter(IMManager *manager, CMPISelectExp *se, IMError *err)
+/* Called with lock held */
+static bool _im_add_filter(IMManager *manager, CMPISelectExp *se, IMError *err)
 {
     if (!se) {
         *err = IM_ERR_SELECT_EXP;
@@ -919,17 +1014,25 @@ bool _im_add_filter(IMManager *manager, CMPISelectExp *se, IMError *err)
         *err = IM_ERR_MALLOC;
         return false;
     }
+    CMPIObjectPath *op = get_object_path(manager->broker, se);
+    if (!op) {
+        *err = IM_ERR_SELECT_EXP;
+        free(ses);
+        return false;
+    }
 
     if(!manager->filters) {
         DEBUG("This is the first filter creation");
         IMFilters *filters = malloc(sizeof(IMFilters));
         if (!filters) {
             *err = IM_ERR_MALLOC;
+            CMRelease(op);
             free(ses);
             return false;
         }
         if (!(filters->class_name = get_classname(se))) {
             *err = IM_ERR_MALLOC;
+            CMRelease(op);
             free(ses);
             free(filters);
             return false;
@@ -948,17 +1051,19 @@ bool _im_add_filter(IMManager *manager, CMPISelectExp *se, IMError *err)
     IMFilter *next = malloc(sizeof(IMFilter));
     if (!next) {
         *err = IM_ERR_MALLOC;
+        CMRelease(op);
         free(ses);
         return false;
     }
     next->next = NULL;
     next->select_exp_string = ses;
-    next->op = CMClone(get_object_path(manager->broker, se), NULL);
+    next->op = CMClone(op, NULL);
     if (prev) {
         prev->next = next;
     } else {
         manager->filters->first = next;
     }
+    CMRelease(op);
 
     return true;
 }
@@ -966,12 +1071,11 @@ bool _im_add_filter(IMManager *manager, CMPISelectExp *se, IMError *err)
 bool im_add_filter(IMManager *manager, CMPISelectExp *filter,
                    const CMPIContext *ctx, IMError *err)
 {
-    pthread_mutex_lock(&manager->_t_mutex);
     if (!manager) {
         *err = IM_ERR_MANAGER;
-        pthread_mutex_unlock(&manager->_t_mutex);
         return false;
     }
+    pthread_mutex_lock(&manager->_t_mutex);
     if (!ctx) {
         *err = IM_ERR_CONTEXT;
         pthread_mutex_unlock(&manager->_t_mutex);
@@ -1000,12 +1104,24 @@ bool im_add_filter(IMManager *manager, CMPISelectExp *filter,
     return true;
 }
 
+bool im_register_filter_classes(IMManager *manager,
+                                const char** allowed_classes, IMError *err)
+{
+    if (!manager) {
+        *err = IM_ERR_MANAGER;
+        return false;
+    }
+    manager->f_allowed_classes = allowed_classes;
+    return true;
+}
+
 /*
  * Decrease reference count for polled enumerations. If count is 0, remove
  * the whole enumerations.
  * Returns true/false on success/fail and set err.
  */
-bool maybe_remove_polled(IMManager *manager, CMPIObjectPath *op, IMError *err)
+/* Called with lock held */
+static bool maybe_remove_polled(IMManager *manager, CMPIObjectPath *op, IMError *err)
 {
     if (!manager->enums || !manager->enums->first) {
         *err = IM_ERR_NOT_FOUND;
@@ -1021,8 +1137,10 @@ bool maybe_remove_polled(IMManager *manager, CMPIObjectPath *op, IMError *err)
                 } else {
                     manager->enums->first = current->next;
                 }
-                CMRelease(current->prev_enum);
-                CMRelease(current->this_enum);
+                if (current->prev_enum)
+                    CMRelease(current->prev_enum);
+                if (current->this_enum)
+                    CMRelease(current->this_enum);
                 CMRelease(current->op);
             }
             return true;
@@ -1102,16 +1220,18 @@ bool im_start_ind(IMManager *manager, const CMPIContext *ctx, IMError *err)
         *err = IM_ERR_THREAD;
         return false;
     }
+    manager->cancelled = false;
     manager->ctx_main = ctx;
     manager->ctx_manage = CBPrepareAttachThread(manager->broker,
                                                 manager->ctx_main);
     DEBUG("Creating second thread");
-    if (pthread_create(&manager->_t_manage, NULL, manage, manager)) {
+    if (pthread_create(&manager->_t_manage, NULL, manage_wrapper, manager)) {
         *err = IM_ERR_THREAD;
         return false;
     }
     DEBUG("Starting indications");
     manager->running = true;
+
     pthread_cond_signal(&manager->_t_cond);
     return true;
 }
@@ -1131,11 +1251,25 @@ bool im_stop_ind(IMManager *manager, const CMPIContext *ctx, IMError *err)
     DEBUG("Stopping indications");
     manager->running = false;
 
-    /* No locking here due to potential deadlock */
+    /* First lock the mutex so we are sure the thread does not hold it. */
+    pthread_mutex_lock(&manager->_t_mutex);
+    /* Then cancel the thread in deferred mode and set a private flag.
+     * The thread may be doing unlocked stuff that will cancel just fine
+     * or may be waiting for mutex acquisition where it will cancel and
+     * unlock right after that using our private flag.
+     */
+    manager->cancelled = true;
+    /* Note that mutex functions ARE NOT cancellation points! */
     if (pthread_cancel(manager->_t_manage)) {
         *err = IM_ERR_THREAD;
+        pthread_mutex_unlock(&manager->_t_mutex);
         return false;
     }
+
+    /* Unlock the mutex and give the thread chance to cancel properly. */
+    pthread_mutex_unlock(&manager->_t_mutex);
+
+    /* Wait until thread cancellation is finished. */
     if (pthread_join(manager->_t_manage, NULL)) {
         *err = IM_ERR_THREAD;
         return false;
@@ -1145,8 +1279,7 @@ bool im_stop_ind(IMManager *manager, const CMPIContext *ctx, IMError *err)
     remove_all_enums(manager, err);
     manager->data = NULL;
     manager->ctx_manage = NULL;
-    /* Mutex could have been in locked state when the thread was canceled */
-    pthread_mutex_unlock(&manager->_t_mutex);
+    manager->cancelled = false;
 
     return true;
 }

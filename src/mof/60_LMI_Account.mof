@@ -18,7 +18,7 @@
  * Authors: Roman Rakus <rrakus@redhat.com>
  */
 
-[ Version("0.3.0"),
+[ Version("0.4.2"),
   Description("Class representing Linux Account"),
   Provider("cmpi:cmpiLMI_Account")
 ]
@@ -49,13 +49,15 @@ class LMI_Account: CIM_Account
       "Delete the user. Along with the user, the home directory and user's "
       "primary group are deleted. If the user is not owner of the home "
       "directory it is not deleted. However this directory can be deleted "
-      "if force parameter is set to True." ),
+      "if force parameter is set to True. If the home directory couldn't be "
+      "deleted, no error is returned to be able to remove the user even when "
+      "its home directory is inaccessible (e.g. unreachable NFS mount)." ),
        ValueMap { "0", "1", "..", "4096", "4097", "4098", "4099" },
        Values { "Operation completed successfully",
           "Failed",
           "DMTF Reserved",
           "Non existing user",
-          "Unable to delete Home Direcotry",
+          "Unable to delete Home Direcotry (currently unused)",
           "Unable to remove user, home directory removed",
           "Unable to remove group, user and home directory removed" }]
   uint32 DeleteUser(

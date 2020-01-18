@@ -52,7 +52,7 @@ static CMPIStatus LMI_ServiceEnumInstanceNames(
 
     slist = service_find_all(output, sizeof(output));
     if (slist == NULL) {
-        KReturn2(_cb, ERR_FAILED, output);
+        KReturn2(_cb, ERR_FAILED, "%s", output);
     }
 
     for (int i = 0; i < slist->cnt; i++) {
@@ -139,7 +139,7 @@ static CMPIStatus LMI_ServiceGetInstance(
     } else if (res == -2) { /* service of that name doesn't exist */
         KReturn(ERR_NOT_FOUND);
     } else { /* some error occured when getting properties */
-        KReturn2(_cb, ERR_FAILED, output);
+        KReturn2(_cb, ERR_FAILED, "%s", output);
     }
 }
 

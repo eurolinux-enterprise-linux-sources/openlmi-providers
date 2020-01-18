@@ -23,6 +23,7 @@
 Define job classes representing kinds of jobs of worker process.
 """
 
+import logging
 import os
 import threading
 import time
@@ -171,15 +172,18 @@ class YumJob(object):  #pylint: disable=R0903
         """
         JobControl jobs have the highest priority.
         """
-        return (  (  isinstance(self, YumJobControl)
-                  and not isinstance(other, YumJobControl))
-               or (  self.priority < other.priority
-                  or (   self.priority == other.priority
-                     and (  self.jobid < other.jobid
-                         or (   self.jobid == other.jobid
-                            and (self.created < other.created))))))
+        return (   other is not None    # terminating command
+               and (  (  isinstance(self, YumJobControl)
+                      and not isinstance(other, YumJobControl))
+                   or (  self.priority < other.priority
+                      or (   self.priority == other.priority
+                         and (  self.jobid < other.jobid
+                             or (   self.jobid == other.jobid
+                                and (self.created < other.created)))))))
 
     def __cmp__(self, other):
+        if other is None:   # terminating command
+            return 1
         if (   isinstance(self, YumJobControl)
            and not isinstance(other, YumJobControl)):
             return -1
@@ -336,17 +340,25 @@ class YumJobTerminate(YumJobOnJob):   #pylint: disable=R0903
 # *****************************************************************************
 # Yum API functions
 # *****************************************************************************
-class YumBeginSession(YumJob):    #pylint: disable=R0903
+class YumLock(YumJob):              #pylint: disable=R0903
     """
-    Begin session on YumWorker which ensures that yum database is locked
-    during its lifetime. Sessions can be nested, but the number of
-    YumEndSession jobs must be processed to make the database unlocked.
+    This job shall be sent when session starts. Session consists of several
+    requests to ``YumWorker`` during which no other application shall
+    interfere. Exclusive access to yum database is enforced with this job. When
+    the session is over, YumUnlock job needs to be sent to YumWorker.
     """
     pass
-class YumEndSession(YumJob):      #pylint: disable=R0903
+
+class YumUnlock(YumJob):            #pylint: disable=R0903
     """
-    End the session started with YumBeginSession. If the last active session
-    is ended, database will be unlocked.
+    This job shall be sent when session ends.
+    """
+    pass
+
+class YumShutDown(YumJob):
+    """
+    Last job executed before provider terminates. It shuts down *YumWorker*,
+    *SessionManager* and *JobManager*.
     """
     pass
 
@@ -673,4 +685,29 @@ class YumSetRepositoryEnabled(YumSpecificRepositoryJob):#pylint: disable=R0903
     def __init__(self, repo, enable):
         YumSpecificRepositoryJob.__init__(self, repo)
         self.enable = bool(enable)
+
+def log_reply_error(job, reply):
+    """
+    Raises an exception in case of error occured in worker process
+    while processing job.
+    """
+    if isinstance(reply, (int, long)):
+        # asynchronous job
+        return
+    logger = logging.getLogger(__name__)
+    if not isinstance(reply, YumJob):
+        raise TypeError('expected instance of YumJob for reply, not "%s"'
+                % reply.__class__.__name__)
+    if reply.result == YumJob.RESULT_ERROR:
+        logger.error("%s failed with error %s: %s",
+                job, reply.result_data[0].__name__, str(reply.result_data[1]))
+        logger.trace_warn("%s exception traceback:\n%s%s: %s",
+                job, "".join(reply.result_data[2]),
+                reply.result_data[0].__name__, str(reply.result_data[1]))
+        reply.result_data[1].tb_printed = True
+        raise reply.result_data[1]
+    elif reply.result == YumJob.RESULT_TERMINATED:
+        logger.warn('%s terminated', job)
+    else:
+        logger.debug('%s completed with success', job)
 

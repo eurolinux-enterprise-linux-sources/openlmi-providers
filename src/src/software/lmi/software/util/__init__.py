@@ -36,16 +36,16 @@ RE_INSTANCE_ID = re.compile(r'LMI:(?P<clsname>[a-z][a-z_0-9]+):(?P<id>\d+)',
     re.IGNORECASE)
 
 RE_EVRA  = re.compile(
-    r'^(?P<epoch>\d+):(?P<version>[\w.+{}]+)-(?P<release>[\w.+{}]+)'
+    r'^(?P<epoch>\d+):(?P<version>[~\w.+{}]+)-(?P<release>[\w.+{}]+)'
     r'\.(?P<arch>[^.]+)$')
 RE_NEVRA = re.compile(
-    r'^(?P<name>.+)-(?P<evra>(?P<epoch>\d+):(?P<version>[\w.+{}]+)'
+    r'^(?P<name>.+)-(?P<evra>(?P<epoch>\d+):(?P<version>[~\w.+{}]+)'
     r'-(?P<release>[\w.+{}]+)\.(?P<arch>[^.]+))$')
 RE_NEVRA_OPT_EPOCH = re.compile(
-    r'^(?P<name>.+)-(?P<evra>(?:(?P<epoch>\d+):)?(?P<version>[\w.+{}]+)'
+    r'^(?P<name>.+)-(?P<evra>(?:(?P<epoch>\d+):)?(?P<version>[~\w.+{}]+)'
     r'-(?P<release>[\w.+{}]+)\.(?P<arch>[^.]+))$')
 RE_ENVRA = re.compile(
-    r'^(?P<epoch>\d+):(?P<name>.+)-(?P<evra>(?P<version>[\w.+{}]+)'
+    r'^(?P<epoch>\d+):(?P<name>.+)-(?P<evra>(?P<version>[~\w.+{}]+)'
     r'-(?P<release>[\w.+{}]+)\.(?P<arch>[^.]+))$')
 
 def _get_distname():
@@ -104,7 +104,7 @@ def check_target_operating_system(system):
         raise TypeError("system must be either string or integer, not %s" %
                 system.__class__.__name__)
     tos = get_target_operating_system()
-    if system == tos:
+    if system == tos[0]:
         return True
     if system == 36: # linux
         if platform.system().lower() == "linux":

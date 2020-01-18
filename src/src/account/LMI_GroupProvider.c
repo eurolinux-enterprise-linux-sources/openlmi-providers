@@ -200,6 +200,8 @@ static CMPIrc delete_group(
     }
 
 clean:
+    if (users)
+        g_value_array_free(users);
     if (lueg)
         lu_ent_free(lueg);
     if (lueu)

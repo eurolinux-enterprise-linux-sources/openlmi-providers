@@ -246,23 +246,26 @@ class LMI_SoftwareIdentityResource(CIMProvider2):
             return ( self.values.RequestStateChange.Invalid_State_Transition
                    , out_params)
 
-        with YumDB.get_instance() as ydb:
-            repo = IdentityResource.object_path2repo(env,
-                    object_name, 'all')
-            enable = param_requestedstate == \
-                    self.values.RequestStateChange.RequestedState.Enabled
-            LOG().info("%s repository %s" % ("enabling"
-                if enable else "disabling", repo))
-            try:
-                prev = ydb.set_repository_enabled(
-                        repo, enable)
-            except errors.RepositoryChangeError as exc:
-                msg = "failed to modify repository %s: %s" % (repo, str(exc))
-                LOG().error(msg)
-                raise pywbem.CIMError(pywbem.CIM_ERR_FAILED, msg)
-            msg = ( "repository %s already %s"
-                  if prev == enable else "repository %s %s")
-            LOG().info(msg % (repo, "enabled" if enable else "disabled"))
+        try:
+            with YumDB.get_instance() as ydb:
+                repo = IdentityResource.object_path2repo(env,
+                        object_name, 'all')
+                enable = param_requestedstate == \
+                        self.values.RequestStateChange.RequestedState.Enabled
+                LOG().info("%s repository %s" % ("enabling"
+                    if enable else "disabling", repo))
+                try:
+                    prev = ydb.set_repository_enabled(
+                            repo, enable)
+                except errors.RepositoryChangeError as exc:
+                    msg = "failed to modify repository %s: %s" % (repo, str(exc))
+                    LOG().error(msg)
+                    raise pywbem.CIMError(pywbem.CIM_ERR_FAILED, msg)
+                msg = ( "repository %s already %s"
+                      if prev == enable else "repository %s %s")
+                LOG().info(msg % (repo, "enabled" if enable else "disabled"))
+        except errors.RepositoryNotFound as err:
+            raise pywbem.CIMError(pywbem.CIM_ERR_NOT_FOUND, err.message)
 
         rval = self.values.RequestStateChange.Completed_with_No_Error
         return (rval, out_params)

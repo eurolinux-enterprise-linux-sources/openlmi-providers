@@ -59,7 +59,7 @@ def object_path2job(op):
         raise pywbem.CIMError(pywbem.CIM_ERR_NOT_FOUND, "No such job.")
 
 @cmpi_logging.trace_function
-def job2model(job, keys_only=True, model=None):
+def job2model(env, job, keys_only=True, model=None):
     """
     This accepts job's id and produces corresponding result model.
     """
@@ -81,9 +81,9 @@ def job2model(job, keys_only=True, model=None):
         model['ElementName'] = 'MethodResult-%d' % job.jobid
         model['PostCallIndication'] = pywbem.CIMProperty("PostCallIndication",
                 type="instance",
-                value=InstMethodCall.job2model(job, pre=False))
+                value=InstMethodCall.job2model(env, job, pre=False))
         model['PreCallIndication'] = pywbem.CIMProperty("PreCallIndication",
                 type="instance",
-                value=InstMethodCall.job2model(job))
+                value=InstMethodCall.job2model(env, job))
     return model
 

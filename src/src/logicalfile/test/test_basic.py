@@ -67,6 +67,13 @@ class TestLogicalFile(LogicalFileTestBase):
                             'class': 'LMI_UnixDirectory',
                             'props': {}}}
 
+        self.transient_file = {'path' : self.testdir + "/transient",
+                               'class' : 'LMI_UnixDirectory',
+                               'props' : {'FSCreationClassName' : 'LMI_TransientFileSystem',
+                                          'FSName' : 'PATH=' + self.testdir + "/transient"}}
+
+        self.num_files = len(self.files.keys()) + 1
+
         self.cop = pywbem.CIMInstanceName(classname='LMI_UnixDirectory',
                                           namespace='root/cimv2',
                                           keybindings={
@@ -121,8 +128,12 @@ class TestLogicalFile(LogicalFileTestBase):
             bldev = self.files['bldev']
             bldev_device = os.makedev(bldev['props']['DeviceMajor'], bldev['props']['DeviceMinor'])
             os.mknod(bldev['path'], 0666 | stat.S_IFBLK, bldev_device)
+            transient_file = self.transient_file['path']
+            os.mkdir(transient_file)
+            subprocess.call(['mount', '-t', 'tmpfs', 'tmpfs', transient_file, '-o', 'size=1M'])
 
     def _cleanup(self):
+        subprocess.call(['umount', self.transient_file['path']])
         shutil.rmtree(self.testdir)
 
     def test_lmi_directorycontainsfile(self):
@@ -130,7 +141,7 @@ class TestLogicalFile(LogicalFileTestBase):
         ### Associators and AssociatorNames
         for assoc_method in [self.wbemconnection.Associators, self.wbemconnection.AssociatorNames]:
             assocs = assoc_method(self.cop, AssocClass=assoc_class)
-            self.assertEquals(len(assocs), len(self.files.keys()))
+            self.assertEquals(len(assocs), self.num_files)
             for k, f in self.files.iteritems():
                 # test that the files are actually there and have the correct class name
                 match = filter(lambda a: a['Name'] == f['path'], assocs)
@@ -186,7 +197,7 @@ class TestLogicalFile(LogicalFileTestBase):
         ### References and ReferenceNames
         for assoc_method in [self.wbemconnection.References, self.wbemconnection.ReferenceNames]:
             assocs = assoc_method(self.cop, ResultClass='LMI_DirectoryContainsFile')
-            self.assertEquals(len(assocs), len(self.files.keys()))
+            self.assertEquals(len(assocs), self.num_files)
             for k, f in self.files.iteritems():
                 # test that the files are actually there and have the correct class name
                 match = filter(lambda a: a['PartComponent']['Name'] == f['path'], assocs)
@@ -216,7 +227,7 @@ class TestLogicalFile(LogicalFileTestBase):
         assoc_class = 'LMI_FileIdentity'
         for assoc_method in [self.wbemconnection.Associators, self.wbemconnection.AssociatorNames]:
             assocs = assoc_method(self.cop, AssocClass='LMI_DirectoryContainsFile')
-            self.assertEquals(len(assocs), len(self.files.keys()))
+            self.assertEquals(len(assocs), self.num_files)
             for k, f in self.files.iteritems():
                 match = filter(lambda a: a['Name'] == f['path'], assocs)
                 self.assertEquals(len(match), 1)
@@ -289,7 +300,7 @@ class TestLogicalFile(LogicalFileTestBase):
         ### References and ReferenceNames
         for assoc_method in [self.wbemconnection.References, self.wbemconnection.ReferenceNames]:
             assocs = assoc_method(self.cop, ResultClass='LMI_DirectoryContainsFile')
-            self.assertEquals(len(assocs), len(self.files.keys()))
+            self.assertEquals(len(assocs), self.num_files)
             for k, f in self.files.iteritems():
                 match = filter(lambda a: a['PartComponent']['Name'] == f['path'], assocs)
                 self.assertEquals(len(match), 1)
@@ -482,6 +493,18 @@ class TestLogicalFile(LogicalFileTestBase):
 
     def test_logicalfile_missing_or_wrong_properties(self):
         self._test_missing_or_wrong_properties(False)
+
+    def test_transient_file(self):
+        cop = self.cop.copy()
+        cop['Name'] = self.transient_file['path']
+
+        try:
+            inst = self.wbemconnection.GetInstance(cop)
+        except pywbem.CIMError as pe:
+            self.fail(pe[1])
+
+        self.assertEquals(inst['FSCreationClassName'], 'LMI_TransientFileSystem')
+        self.assertEquals(inst['FSName'], 'PATH=' + cop['Name'])
 
 if __name__ == '__main__':
     unittest.main()

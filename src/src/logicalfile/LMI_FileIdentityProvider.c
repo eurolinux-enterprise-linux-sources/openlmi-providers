@@ -46,6 +46,7 @@ static CMPIStatus associators(
     const char *path;
     char fileclass[BUFLEN];
     char *fsname;
+    char *fsclassname;
 
     st = check_assoc_class(_cb, ns, assocClass, LMI_FileIdentity_ClassName);
     check_class_check_status(st);
@@ -57,7 +58,7 @@ static CMPIStatus associators(
 
         path = get_string_property_from_op(cop, "LFName");
         get_class_from_path(path, fileclass);
-        st = get_fsname_from_path(_cb, path, &fsname);
+        st = get_fsinfo_from_path(_cb, path, &fsclassname, &fsname);
         check_status(st);
 
         st = check_assoc_class(_cb, ns, resultClass, fileclass);
@@ -71,10 +72,10 @@ static CMPIStatus associators(
 
         CIM_LogicalFileRef cim_lfr;
         CIM_LogicalFileRef_Init(&cim_lfr, _cb, ns);
-        fill_logicalfile(CIM_LogicalFileRef, &cim_lfr, path, fsname, fileclass);
+        fill_logicalfile(CIM_LogicalFileRef, &cim_lfr, path, fsclassname, fsname, fileclass);
         o = CIM_LogicalFileRef_ToObjectPath(&cim_lfr, &st);
         CMSetClassName(o, fileclass);
-    } else {
+    } else if (CMClassPathIsA(_cb, cop, CIM_LogicalFile_ClassName, &st)) {
         /* got LogicalFile - SystemElement */
         st = lmi_check_required(_cb, cc, cop);
         check_status(st);
@@ -91,7 +92,7 @@ static CMPIStatus associators(
         }
 
         get_class_from_path(path, fileclass);
-        st = get_fsname_from_path(_cb, path, &fsname);
+        st = get_fsinfo_from_path(_cb, path, &fsclassname, &fsname);
         check_status(st);
 
         LMI_UnixFile lmi_uf;
@@ -99,10 +100,13 @@ static CMPIStatus associators(
         LMI_UnixFile_Set_LFName(&lmi_uf, path);
         LMI_UnixFile_Set_CSCreationClassName(&lmi_uf, get_system_creation_class_name());
         LMI_UnixFile_Set_CSName(&lmi_uf, get_system_name());
-        LMI_UnixFile_Set_FSCreationClassName(&lmi_uf, FSCREATIONCLASSNAME);
+        LMI_UnixFile_Set_FSCreationClassName(&lmi_uf, fsclassname);
         LMI_UnixFile_Set_FSName(&lmi_uf, fsname);
         LMI_UnixFile_Set_LFCreationClassName(&lmi_uf, fileclass);
         o = LMI_UnixFile_ToObjectPath(&lmi_uf, &st);
+    } else {
+        /* this association does not associate with given 'cop' class */
+        CMReturn(CMPI_RC_OK);
     }
 
     if (names) {
@@ -133,6 +137,7 @@ static CMPIStatus references(
     const char *path;
     char fileclass[BUFLEN];
     char *fsname;
+    char *fsclassname;
 
     st = check_assoc_class(_cb, ns, assocClass, LMI_FileIdentity_ClassName);
     check_class_check_status(st);
@@ -150,7 +155,7 @@ static CMPIStatus references(
 
         path = get_string_property_from_op(cop, "LFName");
         get_class_from_path(path, fileclass);
-        st = get_fsname_from_path(_cb, path, &fsname);
+        st = get_fsinfo_from_path(_cb, path, &fsclassname, &fsname);
         check_status(st);
 
         if (role && strcmp(role, SAME_ELEMENT) != 0) {
@@ -160,12 +165,12 @@ static CMPIStatus references(
         /* SystemElement */
         CIM_LogicalFileRef lmi_lfr;
         CIM_LogicalFileRef_Init(&lmi_lfr, _cb, ns);
-        fill_logicalfile(CIM_LogicalFileRef, &lmi_lfr, path, fsname, fileclass);
+        fill_logicalfile(CIM_LogicalFileRef, &lmi_lfr, path, fsclassname, fsname, fileclass);
 
         o = CIM_LogicalFileRef_ToObjectPath(&lmi_lfr, &st);
         CMSetClassName(o, fileclass);
         LMI_FileIdentity_SetObjectPath_SystemElement(&lmi_fi, o);
-    } else {
+    } else if (CMClassPathIsA(_cb, cop, CIM_LogicalFile_ClassName, &st)) {
         /* got LogicalFile - SystemElement */
         LMI_FileIdentity_SetObjectPath_SystemElement(&lmi_fi, cop);
 
@@ -179,7 +184,7 @@ static CMPIStatus references(
         }
         path = get_string_property_from_op(cop, "Name");
         get_class_from_path(path, fileclass);
-        st = get_fsname_from_path(_cb, path, &fsname);
+        st = get_fsinfo_from_path(_cb, path, &fsclassname, &fsname);
         check_status(st);
 
         /* SameElement */
@@ -188,11 +193,14 @@ static CMPIStatus references(
         LMI_UnixFile_Set_LFName(&lmi_uf, path);
         LMI_UnixFile_Set_CSCreationClassName(&lmi_uf, get_system_creation_class_name());
         LMI_UnixFile_Set_CSName(&lmi_uf, get_system_name());
-        LMI_UnixFile_Set_FSCreationClassName(&lmi_uf, FSCREATIONCLASSNAME);
+        LMI_UnixFile_Set_FSCreationClassName(&lmi_uf, fsclassname);
         LMI_UnixFile_Set_FSName(&lmi_uf, fsname);
         LMI_UnixFile_Set_LFCreationClassName(&lmi_uf, fileclass);
         o = LMI_UnixFile_ToObjectPath(&lmi_uf, &st);
         LMI_FileIdentity_SetObjectPath_SameElement(&lmi_fi, o);
+    } else {
+        /* this association does not associate with given 'cop' class */
+        CMReturn(CMPI_RC_OK);
     }
 
     if (names) {

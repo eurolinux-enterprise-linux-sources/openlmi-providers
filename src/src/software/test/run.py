@@ -23,8 +23,8 @@ Runs all defined tests.
 
 Test modules are expected to be in directory with this script and
 should contain subclasses of unittest.TestCase, that will be loaded.
-Preferably a suite() function should be defined there as well.
-They must be named according to shell regexp: "test_*.py".
+Preferably a ``suite()`` function should be defined there as well.
+They must be named according to shell regexp: ``"test_*.py"``.
 """
 
 import argparse
@@ -33,16 +33,12 @@ import getpass
 import inspect
 import pywbem
 import os
-import shutil
 import sys
 import tempfile
 import unittest
 
-import rpmcache
-
-# this is a global variable, that can be modified by environment or program
-# argument
-CACHE_DIR = ''
+import reposetup
+import swbase
 
 class NotFound(Exception):
     """Raised when test of particular name could no be found."""
@@ -52,7 +48,9 @@ class NotFound(Exception):
 def parse_cmd_line():
     """
     Use ArgumentParser to parse command line arguments.
-    @return (parsed arguments object, arguments for unittest.main())
+
+    :returns: ``(parsed arguments object, arguments for unittest.main())``.
+    :rtype: tuple
     """
     parser = argparse.ArgumentParser(
             add_help=False,     # handle help message ourselves
@@ -90,37 +88,22 @@ def parse_cmd_line():
             default=os.environ.get('LMI_RUN_TEDIOUS', '0') == '1',
             help="Disable tedious tests.")
 
-    cache_group = parser.add_mutually_exclusive_group()
-    cache_group.add_argument("-c", "--use-cache", action="store_true",
-            default=(os.environ.get('LMI_SOFTWARE_USE_CACHE', '0') == '1'),
-            help="Use a cache directory to download rpm packages for"
-            " testing purposes. It greatly speeds up testing."
-            " Also a database file \"${LMI_SOFTWARE_CACHE_DIR}/%s\""
-            " will be created to store information"
-            " for this system. Overrides environment variable"
-            " LMI_SOFTWARE_USE_CACHE." % rpmcache.DB_BACKUP_FILE)
-    cache_group.add_argument("--no-cache", action="store_false",
-            dest="use_cache",
-            default=(os.environ.get('LMI_SOFTWARE_USE_CACHE', '0') == '1'),
-            help="Do not cache rpm packages for speeding up tests."
-            " Overrides environment variable LMI_SOFTWARE_USE_CACHE.")
-    parser.add_argument('--cache-dir',
-            default=os.environ.get('LMI_SOFTWARE_CACHE_DIR', ''),
-            help="Use particular directory, instead of temporary one, to store"
-            " rpm packages for testing purposes. Overrides environment"
-            " variable LMI_SOFTWARE_CACHE_DIR.")
-    parser.add_argument('--test-repos',
-            default=os.environ.get('LMI_SOFTWARE_REPOSITORIES', ''),
-            help="Use this option to specify list of repositories, that"
-            " alone should be used for testing. Overrides environment"
-            " variable LMI_SOFTWARE_REPOSITORIES.")
-    parser.add_argument('--test-packages',
-            default=os.environ.get('LMI_SOFTWARE_PACKAGES', ''),
-            help="Specify packages for dangerous tests. If empty"
-            " and cache is enabled, some will be picked up by algorithm")
-    parser.add_argument('--force-update', action="store_true",
-            help="Force update of package database. Otherwise an old"
-            " one will be used (if any exists).")
+    cleanup_group = parser.add_mutually_exclusive_group()
+    cleanup_group.add_argument("--cleanup-cache", action="store_true",
+            default=os.environ.get('LMI_SOFTWARE_CLEANUP_CACHE', '1') == '1',
+            help="Clean up all temporary files created for testing purposes."
+            " If LMI_SOFTWARE_DB_CACHE is set and this is set to False, next"
+            " run will be much faster because testing database won't need to"
+            " be generated again. Overrides environment variable"
+            " LMI_SOFTWARE_CLEANUP_CACHE.")
+    cleanup_group.add_argument('--no-cleanup', action="store_false",
+            dest="cleanup_cache",
+            default=os.environ.get('LMI_SOFTWARE_CLEANUP_CACHE', '1') == '1',
+            help="Do not delete database cache file and created repositories."
+            " This speeds up testing because testing repositories don't need"
+            " to be recreated upon next run. This applies only when"
+            " LMI_SOFTWARE_DB_CACHE is set.")
+
     parser.add_argument('-l', '--list-tests', action="store_true",
             help="List all possible test names.")
     parser.add_argument('-h', '--help', action="store_true",
@@ -147,7 +130,9 @@ def try_connection(args):
     """
     Try to connect to cim broker. If authentication fails, ask
     the user for credentials in loop.
-    @return (user, password)
+
+    :returns: ``(user, password)``
+    :rtype: tuple
     """
     user = args.user
     password = args.password
@@ -166,6 +151,9 @@ def try_connection(args):
 def prepare_environment(args):
     """
     Set the environment for test scripts.
+
+    :returns: Whether the database cache needs to be deleted.
+    :rtype: boolean
     """
     os.environ['LMI_CIMOM_URL'] = args.url
     os.environ['LMI_CIMOM_USERNAME'] = args.user
@@ -174,16 +162,23 @@ def prepare_environment(args):
             '1' if args.run_dangerous else '0')
     os.environ["LMI_RUN_TEDIOUS"] = (
             '1' if args.run_tedious else '0')
-    os.environ['LMI_SOFTWARE_USE_CACHE'] = '1' if args.use_cache else '0'
-    if args.use_cache:
-        os.environ['LMI_SOFTWARE_CACHE_DIR'] = CACHE_DIR
-    os.environ['LMI_SOFTWARE_REPOSITORIES'] = args.test_repos
-    os.environ['LMI_SOFTWARE_PACKAGES'] = args.test_packages
+    db_cache = os.environ.get("LMI_SOFTWARE_DB_CACHE", None)
+    needs_cleanup = args.cleanup_cache or not bool(db_cache)
+    if not db_cache or not os.path.exists(db_cache):
+        repos_dir = tempfile.mkdtemp()
+        repodb, other_repos = reposetup.make_object_database(repos_dir)
+        db_cache = reposetup.save_test_database(
+                repos_dir, repodb, other_repos, db_cache)
+    os.environ["LMI_SOFTWARE_DB_CACHE"] = db_cache
+    os.environ['LMI_SOFTWARE_CLEANUP_CACHE'] = (
+            '1' if needs_cleanup else '0')
+    return needs_cleanup
 
 def load_tests(loader, standard_tests, pattern):
     """
-    Helper function for unittest.main() test loader.
-    @return TestSuite instance
+    Helper function for ``unittest.main()`` test loader.
+
+    :returns: :py:class:`unittest.TestSuite` instance.
     """
     this_dir = os.path.dirname(__file__)
     if standard_tests:
@@ -206,10 +201,12 @@ class LMITestLoader(unittest.TestLoader):
     def find_in_test_nodes(node, name):
         """
         Traverses suite tree nodes to find a test named name.
-        @param name is a name of test to find
-        @return desired TestCase or test function
+
+        :param string name: Name of test to find.
+        :returns: Desired :py:class:`TestCase` or test function.
         """
         if (   isinstance(node, unittest.TestSuite)
+           and node.countTestCases() > 0
            and isinstance(next(iter(node)), unittest.TestCase)
            and next(iter(node)).__class__.__name__ == name):
             return node
@@ -242,8 +239,10 @@ class LMITestLoader(unittest.TestLoader):
 def unwind_test_suite_tree(node):
     """
     Make a list of test names out of TestSuite.
-    @param node is a suite
-    @return [ test_name, ... ]
+
+    :param node: A test suite.
+    :type node: :py:class:`unittest.TestSuite`
+    :returns: ``[ test_name, ... ]``
     """
     result = []
     for subnode in node:
@@ -269,33 +268,18 @@ def main():
     """
     Main functionality of script.
     """
-    global CACHE_DIR
     args, ut_args = parse_cmd_line()
     if args.list_tests:
         list_tests()
-    if args.use_cache and not args.cache_dir:
-        CACHE_DIR = tempfile.mkdtemp(suffix="software_database")
-    elif args.use_cache:
-        CACHE_DIR = args.cache_dir
-        if not os.path.exists(args.cache_dir):
-            os.makedirs(args.cache_dir)
     try_connection(args)
-    if args.test_repos:
-        repolist = args.test_repos.split(',')
-    else:
-        repolist = []
-    rpmcache.get_pkg_database(
-            args.force_update,
-            args.use_cache,
-            dangerous=args.run_dangerous,
-            cache_dir=CACHE_DIR,
-            repolist=repolist)
-    prepare_environment(args)
-    test_program = unittest.main(__name__, argv=ut_args,
-            testLoader=LMITestLoader(), exit=False)
-    if args.use_cache and not args.cache_dir:
-        shutil.rmtree(CACHE_DIR)
-    sys.exit(test_program.result.wasSuccessful())
+    cleanup = prepare_environment(args)
+    swbase.SwTestCase.setUpClass()
+    try:
+        test_program = unittest.main(__name__, argv=ut_args,
+                testLoader=LMITestLoader(), exit=False)
+    finally:
+        swbase.SwTestCase.tearDownClass()
+    sys.exit(0 if test_program.result.wasSuccessful() else 1)
 
 if __name__ == '__main__':
     main()

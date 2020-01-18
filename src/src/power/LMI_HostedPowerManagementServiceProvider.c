@@ -23,18 +23,30 @@
 #include "LMI_HostedPowerManagementService.h"
 
 #include "globals.h"
+#include "power.h"
 
 static const CMPIBroker* _cb;
 
-static void LMI_HostedPowerManagementServiceInitialize(const CMPIContext *ctx)
+static void LMI_HostedPowerManagementServiceInitialize(CMPIInstanceMI *mi,
+        const CMPIContext *ctx)
 {
+    mi->hdl = power_ref(_cb, ctx);
 }
+
+static void LMI_HostedPowerManagementServiceAssociationInitialize(
+        CMPIAssociationMI *mi, const CMPIContext *ctx)
+{
+    mi->hdl = power_ref(_cb, ctx);
+}
+
 
 static CMPIStatus LMI_HostedPowerManagementServiceCleanup(
     CMPIInstanceMI* mi,
     const CMPIContext* cc, 
     CMPIBoolean term)
 {
+    power_unref(mi->hdl);
+    mi->hdl = NULL;
     CMReturn(CMPI_RC_OK);
 }
 
@@ -131,6 +143,8 @@ static CMPIStatus LMI_HostedPowerManagementServiceAssociationCleanup(
     const CMPIContext* cc, 
     CMPIBoolean term) 
 {
+    power_unref(mi->hdl);
+    mi->hdl = NULL;
     CMReturn(CMPI_RC_OK);
 }
 
@@ -226,13 +240,13 @@ CMInstanceMIStub(
     LMI_HostedPowerManagementService,
     LMI_HostedPowerManagementService,
     _cb,
-    LMI_HostedPowerManagementServiceInitialize(ctx))
+    LMI_HostedPowerManagementServiceInitialize(&mi, ctx))
 
 CMAssociationMIStub( 
     LMI_HostedPowerManagementService,
     LMI_HostedPowerManagementService,
     _cb,
-    LMI_HostedPowerManagementServiceInitialize(ctx))
+    LMI_HostedPowerManagementServiceAssociationInitialize(&mi, ctx))
 
 KONKRET_REGISTRATION(
     "root/cimv2",

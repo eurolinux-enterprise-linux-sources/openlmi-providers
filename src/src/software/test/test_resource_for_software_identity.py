@@ -19,17 +19,17 @@
 # Authors: Michal Minar <miminar@redhat.com>
 #
 """
-Unit tests for LMI_ResourceForSoftwareIdentity provider.
+Unit tests for ``LMI_ResourceForSoftwareIdentity`` provider.
 """
 
-import pywbem
 import unittest
 
-from lmi.test.util import mark_dangerous
-from lmi.test.util import mark_tedious
-import base
+import package
+import swbase
 
-class TestResourceForSoftwareIdentity(base.SoftwareBaseTestCase):
+ENABLED_STATE_ENABLED = 2
+
+class TestResourceForSoftwareIdentity(swbase.SwTestCase):
     """
     Basic cim operations test.
     """
@@ -37,13 +37,10 @@ class TestResourceForSoftwareIdentity(base.SoftwareBaseTestCase):
     CLASS_NAME = "LMI_ResourceForSoftwareIdentity"
     KEYS = ("ManagedElement", "AvailableSAP")
 
-    @classmethod
-    def needs_repodb(cls):
-        return True
-
-    def make_op(self, pkg=None, newer=True, repo=None):
+    def make_op(self, pkg=None, repo=None):
         """
-        @return object path of ResourceForSoftwareIdentity association
+        :returns: Object path of ``LMI_ResourceForSoftwareIdentity``
+        :rtype: :py:class:`lmi.shell.LMIInstanceName`
         """
         objpath = self.cim_class.new_instance_name({
             "AvailableSAP" : self.ns.LMI_SoftwareIdentityResource. \
@@ -52,125 +49,232 @@ class TestResourceForSoftwareIdentity(base.SoftwareBaseTestCase):
                     "SystemCreationClassName" : self.system_cs_name,
                     "SystemName" : self.SYSTEM_NAME
                 }),
-            "ManagedElement" : self.ns.LMI_SoftwareIdentity.new_instance_name({})
+            "ManagedElement" :
+                self.ns.LMI_SoftwareIdentity.new_instance_name({})
             })
         if repo is not None:
             objpath.AvailableSAP.wrapped_object["Name"] = repo.repoid
         elif pkg is not None:
-            objpath.AvailableSAP.wrapped_object["Name"] = getattr(pkg,
-                    'up_repo' if newer else 'repo')
+            objpath.AvailableSAP.wrapped_object["Name"] = pkg.repoid
         if pkg is not None:
-            objpath.ManagedElement.wrappe_object["InstanceID"] = (
-                      'LMI:LMI_SoftwareIdentity:'
-                    + pkg.get_nevra(newer=newer, with_epoch="ALWAYS"))
+            objpath.ManagedElement.wrapped_object["InstanceID"] = (
+                      'LMI:LMI_SoftwareIdentity:' + pkg.nevra)
         return objpath
 
-    @mark_dangerous
+    @swbase.test_with_repos('stable', 'updates', 'misc',
+            **{'updates-testing' : True})
     def test_get_instance(self):
         """
-        Tests GetInstance call on packages from our rpm cache.
+        Test ``GetInstance()`` call on ``LMI_ResourceForSoftwareIdentity``.
         """
-        for pkg in self.dangerous_pkgs:
-            objpath = self.make_op(pkg)
-            inst = objpath.to_instance()
-            self.assertCIMNameEqual(objpath, inst.path,
-                    "Object paths should match for package %s"%pkg)
-            for key in self.KEYS:
-                self.assertIn(key, inst.properties(),
-                    'OP is missing \"%s\" key for package "%s".' % (key, pkg))
-                self.assertCIMNameEqual(
+        for repo in self.repodb.values():
+            self.assertTrue(repo.status)
+            for pkg in repo.packages:
+                objpath = self.make_op(pkg, repo)
+                inst = objpath.to_instance()
+                self.assertNotEqual(inst, None)
+                self.assertEqual(set(inst.path.key_properties()),
+                        set(self.KEYS))
+                for key in self.KEYS:
+                    self.assertCIMNameEqual(
                         getattr(inst, key), getattr(inst.path, key),
-                        'Key property "%s" does not match for package "%s"!' %
-                        (key, pkg))
+                        'Key property "%s" does not match for package "%s#%s"!'
+                        % (key, repo.repoid, pkg))
 
-    @mark_tedious
-    def test_get_resource_referents(self):
+    @swbase.test_with_repos(**{'updates' : False})
+    def test_get_instance_disabled_repo(self):
         """
-        Test ReferenceNames for AvailableSAP.
+        Test ``GetInstance()`` call on ``LMI_ResourceForSoftwareIdentity``
+        with disabled repository.
         """
-        for repo in self.repodb:
-            objpath = self.make_op(repo=repo)
-            if not repo.pkg_count or repo.pkg_count > 10000:
-                # do not test too big repositories
-                continue
-            refs = objpath.AvailableSAP.to_instance().associator_names(
-                    AssocClass=self.CLASS_NAME,
-                    Role="AvailableSAP",
-                    ResultRole="ManagedElement",
-                    ResultClass="LMI_SoftwareIdentity")
-            if repo.pkg_count > 0:
-                self.assertGreater(len(refs), 0,
-                        'repository "%s" is missing software identities'
-                        % repo.name)
-            for ref in refs:
-                self.assertEqual(ref.namespace, 'root/cimv2')
-                self.assertEqual(ref.classname, "LMI_SoftwareIdentity")
-                self.assertEqual(ref.key_properties(), ["InstanceID"])
-                self.assertTrue(
-                        ref.InstanceID.startswith("LMI:LMI_SoftwareIdentity:"))
+        repo = self.get_repo('updates')
+        self.assertFalse(repo.status)
+        for pkg in repo.packages:
+            objpath = self.make_op(pkg, repo)
+            inst = objpath.to_instance()
+            self.assertNotEqual(inst, None)
+            self.assertEqual(set(inst.path.key_properties()),
+                    set(self.KEYS))
+            for key in self.KEYS:
+                self.assertCIMNameEqual(
+                    getattr(inst, key), getattr(inst.path, key),
+                    'Key property "%s" does not match for package "%s#%s"!' %
+                    (key, repo.repoid, pkg))
 
-            nevra_set = set(i.InstanceID for i in refs)
-            # NOTE: installed packages might not be available
-            for pkg, up in ((pkg, up) for pkg in self.dangerous_pkgs
-                    for up in (True, False)):
-                nevra = 'LMI:LMI_SoftwareIdentity:'+pkg.get_nevra(
-                        newer=up, with_epoch="ALWAYS")
-                reponame = getattr(pkg, 'up_repo' if up else 'repo')
-                if reponame == repo.repoid:
-                    self.assertTrue(nevra in nevra_set,
-                            'Missing nevra "%s" for repo "%s".' % (nevra,
-                                reponame))
+    @swbase.test_with_repos('stable')
+    def test_repo_identity_names(self):
+        """
+        Test ``AssociatorNames()`` call on ``LMI_ResourceForSoftwareIdentity``.
+        """
+        repo = self.get_repo('stable')
+        self.assertTrue(repo.status)
+        self.assertGreater(repo.pkg_count, 0)
 
-    @mark_tedious
-    def test_get_resource_referents_for_disabled_repo(self):
-        """
-        Test ReferenceNames for AvailableSAP, which is disabled.
-        """
-        for repo in self.repodb:
-            if repo.status:
-                continue    # test only disabled repositories
-            objpath = self.make_op(repo=repo)
-            refs = objpath.AvailableSAP.to_instance().associator_names(
-                    AssocClass=self.CLASS_NAME,
-                    Role="AvailableSAP",
-                    ResultRole="ManagedElement",
-                    ResultClass="LMI_SoftwareIdentity")
-            if repo.pkg_count:
-                self.assertGreater(len(refs), 0,
-                    'no software identities associated to repo "%s"' % repo.name)
-            for ref in refs:
-                self.assertEqual(ref.namespace, 'root/cimv2')
-                self.assertEqual(ref.classname, "LMI_SoftwareIdentity")
-                self.assertEqual(ref.key_properties(), ["InstanceID"])
-                self.assertTrue(
-                        ref.InstanceID.startswith("LMI:LMI_SoftwareIdentity:"))
+        objpath = self.make_op(repo=repo)
+        refs = objpath.AvailableSAP.to_instance().associator_names(
+                AssocClass=self.CLASS_NAME,
+                Role="AvailableSAP",
+                ResultRole="ManagedElement",
+                ResultClass="LMI_SoftwareIdentity")
+        self.assertEqual(len(refs), repo.pkg_count,
+                'repository "%s" is missing software identities'
+                % repo.name)
+        for ref in refs:
+            self.assertEqual(ref.namespace, 'root/cimv2')
+            self.assertEqual(ref.classname, "LMI_SoftwareIdentity")
+            self.assertEqual(ref.key_properties(), ["InstanceID"])
+            self.assertTrue(
+                    ref.InstanceID.startswith("LMI:LMI_SoftwareIdentity:"))
 
-    @mark_dangerous
-    def test_get_managed_element_referents(self):
+        nevra_set = set(i.InstanceID for i in refs)
+        for pkg in repo.packages:
+            nevra = 'LMI:LMI_SoftwareIdentity:'+pkg.nevra
+            self.assertTrue(nevra in nevra_set,
+                    'Missing nevra "%s" for repo "%s".' % (nevra,
+                        repo.repoid))
+            nevra_set.remove(nevra)
+        self.assertEqual(len(nevra_set), 0,
+                "all packages from repository have been listed")
+
+    @swbase.test_with_repos(stable=False)
+    def test_disabled_repo_identity_names(self):
         """
-        Test ReferenceNames for SoftwareIdentity.
+        Test ``AssociatorNames()`` call on ``LMI_ResourceForSoftwareIdentity``.
         """
-        for pkg, up in ((pkg, up) for pkg in self.dangerous_pkgs
-                for up in (True, False)):
-            objpath = self.make_op(pkg, newer=up)
-            refs = objpath.ManagedElement.to_instance().associator_names(
+        repo = self.get_repo('stable')
+        self.assertFalse(repo.status)
+        self.assertGreater(repo.pkg_count, 0)
+
+        objpath = self.make_op(repo=repo)
+        refs = objpath.AvailableSAP.to_instance().associator_names(
+                AssocClass=self.CLASS_NAME,
+                Role="AvailableSAP",
+                ResultRole="ManagedElement",
+                ResultClass="LMI_SoftwareIdentity")
+        self.assertEqual(len(refs), repo.pkg_count,
+                'repository "%s" is missing software identities'
+                % repo.name)
+        for ref in refs:
+            self.assertEqual(ref.namespace, 'root/cimv2')
+            self.assertEqual(ref.classname, "LMI_SoftwareIdentity")
+            self.assertEqual(ref.key_properties(), ["InstanceID"])
+            self.assertTrue(
+                    ref.InstanceID.startswith("LMI:LMI_SoftwareIdentity:"))
+
+    @swbase.test_with_repos('updates')
+    @swbase.test_with_packages(**{
+            'updates#pkg1' : True,
+            'updates#pkg2' : True,
+            'updates#pkg3' : False,
+            'updates#pkg4' : False
+    })
+    def test_repo_identities(self):
+        """
+        Test ``Associators()`` call on ``LMI_ResourceForSoftwareIdentity``.
+        """
+        repo = self.get_repo('updates')
+        self.assertTrue(repo.status)
+        self.assertGreater(repo.pkg_count, 0)
+
+        objpath = self.make_op(repo=repo)
+        refs = objpath.AvailableSAP.to_instance().associators(
+                AssocClass=self.CLASS_NAME,
+                Role="AvailableSAP",
+                ResultRole="ManagedElement",
+                ResultClass="LMI_SoftwareIdentity")
+        if repo.pkg_count:
+            self.assertGreater(len(refs), 0,
+                'no software identities associated to repo "%s"'
+                % repo.repoid)
+        for ref in refs:
+            self.assertEqual(ref.namespace, 'root/cimv2')
+            self.assertEqual(ref.classname, "LMI_SoftwareIdentity")
+            self.assertEqual(ref.path.key_properties(), ["InstanceID"])
+
+        nevra_dict = {i.ElementName: i for i in refs}
+        installed_count = 0
+        for pkg in repo.packages:
+            self.assertTrue(pkg.nevra in nevra_dict,
+                    'Missing package "%s" in repo "%s".' % (pkg, repo.repoid))
+            if package.is_pkg_installed(pkg):
+                self.assertNotEqual(nevra_dict[pkg.nevra].InstallDate, None,
+                        "InstallDate property is set for installed and"
+                        " available package %s" % pkg)
+                installed_count += 1
+            else:
+                self.assertEqual(nevra_dict[pkg.nevra].InstallDate, None,
+                        "InstallDate property is unset for available package"
+                        " %s" % pkg)
+            del nevra_dict[pkg.nevra]
+        self.assertEqual(len(nevra_dict), 0,
+                "all packages from repository have been listed")
+        self.assertEqual(installed_count, 2)
+
+    @swbase.test_with_repos('stable')
+    def test_get_pkg_repository_name(self):
+        """
+        Try to get software identities associated with repository.
+        """
+        repo = self.get_repo('stable')
+        self.assertTrue(repo.status)
+        for pkg in repo.packages:
+            objpath = self.make_op(pkg, repo)
+            inst = objpath.ManagedElement.to_instance()
+            self.assertNotEqual(inst, None,
+                    "GetInstance() succeeds for package %s" % pkg)
+            refs = inst.associator_names(
                     AssocClass=self.CLASS_NAME,
                     Role="ManagedElement",
                     ResultRole="AvailableSAP",
                     ResultClass="LMI_SoftwareIdentityResource")
             self.assertEqual(1, len(refs),
-                    'No repo found for pkg "%s".' % pkg.get_nevra(newer=up,
-                        with_epoch="ALWAYS"))
+                    'No repo found for pkg "%s".' % pkg.nevra)
             ref = refs[0]
             self.assertEqual(ref.namespace, 'root/cimv2')
             self.assertEqual(ref.classname, "LMI_SoftwareIdentityResource")
-            self.assertEqual(sorted(ref.key_properties()),
-                    sorted(["SystemCreationClassName", "SystemName",
+            self.assertEqual(set(ref.key_properties()),
+                    set(["SystemCreationClassName", "SystemName",
                         "Name", "CreationClassName"]))
-            self.assertEqual(
-                    getattr(pkg, 'up_repo' if up else 'repo'),
-                    ref.Name, 'Repository name does not match for pkg "%s"'%
-                    pkg.get_nevra(newer=up, with_epoch="ALWAYS"))
+            self.assertEqual(ref.Name, pkg.repoid,
+                    'Repository name does not match for pkg "%s"'
+                    % pkg.nevra)
+
+    @swbase.test_with_repos('updates')
+    @swbase.test_with_packages(**{
+        'updates#pkg1' : True,
+        'updates#pkg2' : True,
+        'updates#pkg3' : False,
+        'updates#pkg4' : False
+    })
+    def test_get_pkg_repository(self):
+        """
+        Try to get repository for installed and not installed package.
+        """
+        repo = self.get_repo('updates')
+        self.assertTrue(repo.status)
+        for pkg in repo.packages:
+            objpath = self.make_op(pkg, repo)
+            inst = objpath.ManagedElement
+            self.assertNotEqual(inst, None,
+                    "GetInstance() succeeds for package %s" % pkg)
+            refs = inst.to_instance().associators(
+                    AssocClass=self.CLASS_NAME,
+                    Role="ManagedElement",
+                    ResultRole="AvailableSAP",
+                    ResultClass="LMI_SoftwareIdentityResource")
+            self.assertEqual(1, len(refs),
+                    'No repo found for pkg "%s".' % pkg.nevra)
+            ref = refs[0]
+            self.assertEqual(ref.namespace, 'root/cimv2')
+            self.assertEqual(ref.classname, "LMI_SoftwareIdentityResource")
+            self.assertEqual(set(ref.path.key_properties()),
+                    set(["SystemCreationClassName", "SystemName",
+                        "Name", "CreationClassName"]))
+            self.assertEqual(ref.Name, pkg.repoid,
+                    'Repository name does not match for pkg "%s"'
+                    % pkg.nevra)
+            self.assertEqual(ref.ElementName, pkg.repoid)
+            self.assertEqual(ref.EnabledState, ENABLED_STATE_ENABLED)
 
 def suite():
     """For unittest loaders."""

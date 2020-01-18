@@ -86,7 +86,7 @@ class Values(object):
         }
 
 @cmpi_logging.trace_function
-def job2model(job, pre=True):
+def job2model(env, job, pre=True):
     """
     Create post or pre indication instance used by clients to subscribe
     to job's state changes.
@@ -125,7 +125,7 @@ def job2model(job, pre=True):
     if not pre:
         inst["Error"] = pywbem.CIMProperty("Error", type="instance",
                 is_array=True, value=[])
-        error = Job.job2error(job)
+        error = Job.job2error(env, job)
         if error is not None:
             inst["Error"].append(error)
         inst["ReturnValueType"] = Values.ReturnValueType.uint32

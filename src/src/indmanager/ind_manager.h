@@ -131,10 +131,12 @@ struct _IMManager {
     IMFilterChecker f_checker;
     // filters container
     IMFilters *filters;
+    const char** f_allowed_classes;
     // others
     IMIndType type;
     bool running;
     bool polling;
+    bool cancelled;
     const CMPIBroker *broker;
     const CMPIContext *ctx_main; /* main thread */
     CMPIContext *ctx_manage; /* manage thread */
@@ -142,7 +144,6 @@ struct _IMManager {
     // threading
     pthread_t _t_manage;
     pthread_mutex_t _t_mutex;
-    pthread_mutexattr_t _t_mutex_attr;
     pthread_cond_t _t_cond;
     // passed data, used for communication between gather/watcher/etc.
     void *data;
@@ -163,6 +164,7 @@ typedef enum {
     IM_ERR_THREAD,           // some error on threading
     IM_ERR_CMPI_RC,          // CMPI status not OK
     IM_ERR_OP,               // bad or null object path
+    IM_ERR_CANCELLED,        // job has been cancelled
 } IMError;
 
 // Create manager with given properties and callbacks.
@@ -195,6 +197,12 @@ bool im_add_filter(IMManager *manager, CMPISelectExp *filter,
 // Return true when removed, false if not and appropriate IMError is set.
 bool im_remove_filter(IMManager *manager, const CMPISelectExp *filter,
                       const CMPIContext *ctx, IMError *err);
+
+// Register list of classes to be used with a default filter checker
+// when callback not given during im_create_manager()
+// The allowed_classes array should be kept accessible all the time
+bool im_register_filter_classes(IMManager *manager,
+                                const char** allowed_classes, IMError *err);
 
 // Start indications.
 // Return true when correctly started, false if not and

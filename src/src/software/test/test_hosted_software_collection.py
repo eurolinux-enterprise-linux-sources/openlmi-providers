@@ -19,30 +19,26 @@
 # Authors: Michal Minar <miminar@redhat.com>
 #
 """
-Unit tests for LMI_MemberOfSoftwareCollection provider.
+Unit tests for ``LMI_MemberOfSoftwareCollection`` provider.
 """
 
 import pywbem
 import unittest
 
-import base
+import swbase
 
-class TestHostedSoftwareCollection(base.SoftwareBaseTestCase):
+class TestHostedSoftwareCollection(swbase.SwTestCase):
     """
-    Basic cim operations test.
+    Basic cim operations test on ``LMI_HostedSoftwareCollection``.
     """
 
     CLASS_NAME = "LMI_HostedSoftwareCollection"
     KEYS = ("Antecedent", "Dependent")
 
-    @classmethod
-    def needs_pkgdb(cls):
-        return False
-
     def make_op(self):
         """
-        @param ses SoftwareElementState property value
-        @return object path of SoftwareIdentity
+        :returns Object path of ``LMI_HostedSoftwareCollection``.
+        :rtype: :py:class:`lmi.shell.LMIInstanceName`
         """
         return self.cim_class.new_instance_name({
             "Antecedent" : self.system_iname,
@@ -54,7 +50,7 @@ class TestHostedSoftwareCollection(base.SoftwareBaseTestCase):
 
     def test_get_instance(self):
         """
-        Tests GetInstance call on packages from our rpm cache.
+        Test ``GetInstance()`` call on ``LMI_HostedSoftwareCollection``.
         """
         objpath = self.make_op()
         inst = objpath.to_instance()
@@ -80,7 +76,7 @@ class TestHostedSoftwareCollection(base.SoftwareBaseTestCase):
 
     def test_enum_instances(self):
         """
-        Tests EnumInstances call on installed packages.
+        Test ``EnumInstances()`` call on ``LMI_HostedSoftwareCollection``.
         """
         objpath = self.make_op()
         insts = self.cim_class.instances()
@@ -93,16 +89,16 @@ class TestHostedSoftwareCollection(base.SoftwareBaseTestCase):
 
     def test_enum_instance_names(self):
         """
-        Tests EnumInstanceNames call on installed packages.
+        Test ``EnumInstanceNames`` call on ``LMI_HostedSoftwareCollection``.
         """
         objpath = self.make_op()
         inames = self.cim_class.instance_names()
         self.assertEqual(1, len(inames))
         self.assertCIMNameEqual(objpath, inames[0])
 
-    def test_get_antecedent_referents(self):
+    def test_get_computer_system_collections(self):
         """
-        Test ReferenceNames for ComputerSystem.
+        Try to get collection associated to computer system.
         """
         objpath = self.make_op()
         refs = objpath.Antecedent.to_instance().associator_names(
@@ -114,9 +110,9 @@ class TestHostedSoftwareCollection(base.SoftwareBaseTestCase):
         ref = refs[0]
         self.assertCIMNameEqual(objpath.Dependent, ref)
 
-    def test_get_dependent_referents(self):
+    def test_get_collection_computer_systems(self):
         """
-        Test ReferenceNames for SystemSoftwareCollection.
+        Try to get computer system associated to software collection.
         """
         objpath = self.make_op()
         refs = objpath.Dependent.to_instance().associator_names(

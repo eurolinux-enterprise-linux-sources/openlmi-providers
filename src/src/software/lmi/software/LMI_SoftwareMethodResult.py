@@ -80,7 +80,7 @@ class LMI_SoftwareMethodResult(CIMProvider2):
 
         """
         job = MethodResult.object_path2job(model.path)
-        return MethodResult.job2model(job, keys_only=False, model=model)
+        return MethodResult.job2model(env, job, keys_only=False, model=model)
 
     @cmpi_logging.trace_method
     def enum_instances(self, env, model, keys_only):
@@ -111,7 +111,8 @@ class LMI_SoftwareMethodResult(CIMProvider2):
         model.path.update({'InstanceID': None})
 
         for job in YumDB.get_instance().get_job_list():
-            yield MethodResult.job2model(job, keys_only=keys_only, model=model)
+            yield MethodResult.job2model(env, job,
+                    keys_only=keys_only, model=model)
 
     @cmpi_logging.trace_method
     def set_instance(self, env, instance, modify_existing):

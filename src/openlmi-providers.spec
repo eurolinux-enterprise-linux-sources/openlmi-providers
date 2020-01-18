@@ -2,7 +2,7 @@
 %global required_konkret_ver 0.9.0-2
 
 Name:           openlmi-providers
-Version:        0.4.1
+Version:        0.4.2
 Release:        1%{?dist}
 Summary:        Set of basic CIM providers
 
@@ -13,6 +13,29 @@ Source0:        http://fedorahosted.org/released/openlmi-providers/%{name}-%{ver
 # Upstream name has been changed from cura-providers to openlmi-providers
 Provides:       cura-providers = %{version}-%{release}
 Obsoletes:      cura-providers < 0.0.10-1
+
+# == Provider versions ==
+
+# Providers built from this package need to be strictly
+# matched, so that they are always upgraded together.
+%global hw_version %{version}-%{release}
+%global sw_version %{version}-%{release}
+%global pwmgmt_version %{version}-%{release}
+%global acct_version %{version}-%{release}
+%global svc_version %{version}-%{release}
+%global pcp_version %{version}-%{release}
+%global journald_version %{version}-%{release}
+%global realmd_version %{version}-%{release}
+
+# Storage and networking providers are built out of tree
+# We will require a minimum and maximum version of them
+# to ensure that they are tested together.
+%global storage_min_version 0.7.0
+%global storage_max_version 0.8
+
+%global nw_min_version 0.2.1
+%global nw_max_version 0.3
+
 
 BuildRequires:  cmake
 BuildRequires:  konkretcmpi-devel >= %{required_konkret_ver}
@@ -35,6 +58,8 @@ BuildRequires:  libselinux-devel
 Requires:       python2
 # for openlmi-journald
 BuildRequires:  systemd-devel
+# for openlmi-realmd:
+BuildRequires:  dbus-devel
 # sblim-sfcb or tog-pegasus
 # (required to be present during install/uninstall for registration)
 Requires:       cim-server
@@ -46,6 +71,8 @@ Requires(pre):  pywbem
 Requires(preun): pywbem
 Requires(post):  pywbem
 Requires:       cim-schema
+# for lmi.base.mofparse:
+Requires:       openlmi-python-base = %{version}-%{release}
 
 # XXX
 # Just because we have wired python's scripts
@@ -178,6 +205,17 @@ BuildArch:      noarch
 The openlmi-python-providers package contains library with common
 code for implementing CIM providers using cmpi-bindings-pywbem.
 
+%package -n openlmi-python-test
+Summary:        OpenLMI test utilities
+Requires:       %{name} = %{version}-%{release}
+Requires:       openlmi-python-base = %{version}-%{release}
+Requires:       openlmi-tools >= 0.9
+BuildArch:      noarch
+
+%description -n openlmi-python-test
+The openlmi-python-test package contains test utilities and base
+classes for provider test cases.
+
 %package -n openlmi-software
 Summary:        CIM providers for software management
 Requires:       %{name} = %{version}-%{release}
@@ -268,17 +306,35 @@ into strings on demand.
 
 %package -n openlmi
 Summary:        OpenLMI managed system software components
+Version:        1.0.0
 Requires:       %{name} = %{version}-%{release}
 BuildArch:      noarch
 Requires:       tog-pegasus
 # List of "safe" providers
-Requires:       openlmi-storage
-Requires:       openlmi-networking
-Requires:       openlmi-hardware
-Requires:       openlmi-software
-Requires:       openlmi-powermanagement
-Requires:       openlmi-account
-Requires:       openlmi-service
+Requires:       openlmi-hardware = %{hw_version}
+Requires:       openlmi-software = %{sw_version}
+Requires:       openlmi-powermanagement = %{pwmgmt_version}
+Requires:       openlmi-account = %{acct_version}
+Requires:       openlmi-service = %{svc_version}
+
+# Mandatory, out-of-tree providers
+Requires:       openlmi-storage >= %{storage_min_version}
+Conflicts:      openlmi-storage >= %{storage_max_version}
+Requires:       openlmi-networking >= %{nw_min_version}
+Conflicts:      openlmi-networking >= %{nw_max_version}
+
+# Optional Providers
+# This ensures that only the appropriate version is installed but does
+# not install it by default. If these packages are installed, this will
+# guarantee that they are updated to the appropriate version on upgrade.
+Conflicts:      openlmi-pcp > %{pcp_version}
+Conflicts:      openlmi-pcp < %{pcp_version}
+
+Conflicts:      openlmi-journald > %{journald_version}
+Conflicts:      openlmi-journald < %{journald_version}
+
+Conflicts:      openlmi-realmd > %{realmd_version}
+Conflicts:      openlmi-realmd < %{realmd_version}
 
 %description -n openlmi
 OpenLMI provides a common infrastructure for the management of Linux systems.
@@ -340,6 +396,11 @@ make install/fast DESTDIR=$RPM_BUILD_ROOT -C %{_target_platform}
 mkdir -p "$RPM_BUILD_ROOT/%{_localstatedir}/log"
 touch "$RPM_BUILD_ROOT/%logfile"
 
+# The registration database and directories
+mkdir -p "$RPM_BUILD_ROOT/%{_sharedstatedir}/openlmi-registration/mof"
+mkdir -p "$RPM_BUILD_ROOT/%{_sharedstatedir}/openlmi-registration/reg"
+touch "$RPM_BUILD_ROOT/%{_sharedstatedir}/openlmi-registration/regdb.sqlite"
+
 # XXX
 # Remove pythonies
 # Don't forget to remove this dirty hack in the future
@@ -363,7 +424,7 @@ cp mof/LMI_Software.reg $RPM_BUILD_ROOT/%{_datadir}/%{name}/
 pushd src/pcp
 %{__python} setup.py install -O1 --skip-build --root $RPM_BUILD_ROOT
 popd
-cp -p src/pcp/openlmi-pcp-generate $RPM_BUILD_ROOT/%{_bindir}/openlmi-pcp-generate
+cp -p %{_target_platform}/src/pcp/openlmi-pcp-generate $RPM_BUILD_ROOT/%{_bindir}/openlmi-pcp-generate
 mkdir -p $RPM_BUILD_ROOT/%{_sysconfdir}/cron.daily
 cp -p src/pcp/openlmi-pcp.cron $RPM_BUILD_ROOT/%{_sysconfdir}/cron.daily/openlmi-pcp
 sed -i -e 's,^_LOCALSTATEDIR=.*,_LOCALSTATEDIR="%{_localstatedir}",' \
@@ -404,6 +465,10 @@ cp -pr tools/openlmitheme/* $RPM_BUILD_ROOT/%{python_sitelib}/sphinx/themes/open
 %{_libdir}/libopenlmicommon.so.*
 %attr(755, root, root) %{_bindir}/openlmi-mof-register
 %ghost %logfile
+%dir %{_sharedstatedir}/openlmi-registration
+%dir %{_sharedstatedir}/openlmi-registration/mof
+%dir %{_sharedstatedir}/openlmi-registration/reg
+%ghost %{_sharedstatedir}/openlmi-registration/regdb.sqlite
 
 %files devel
 %doc README COPYING
@@ -488,6 +553,12 @@ cp -pr tools/openlmitheme/* $RPM_BUILD_ROOT/%{python_sitelib}/sphinx/themes/open
 %dir %{python2_sitelib}/lmi/providers
 %{python2_sitelib}/lmi/providers/*.py
 %{python2_sitelib}/lmi/providers/*.py[co]
+
+%files -n openlmi-python-test
+%doc README COPYING
+%dir %{python2_sitelib}/lmi/test
+%{python2_sitelib}/lmi/test/*.py
+%{python2_sitelib}/lmi/test/*.py[co]
 
 %files -n openlmi-software
 %doc README COPYING
@@ -771,14 +842,6 @@ if [ "$1" -ge 1 ]; then
         %{_datadir}/%{name}/90_LMI_Hardware_Profile_DMTF.mof || :;
 fi >> %logfile 2>&1
 
-%post -n openlmi-pcp
-if [ "$1" -ge 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} register \
-        %{_datadir}/%{name}/60_LMI_PCP.mof \
-        %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.mof \
-        %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.reg || :;
-fi >> %logfile 2>&1
-
 %post -n openlmi-journald
 if [ "$1" -ge 1 ]; then
     %{_bindir}/openlmi-mof-register -v %{version} register \
@@ -885,6 +948,19 @@ if [ "$1" -eq 0 ]; then
 fi >> %logfile 2>&1
 
 %changelog
+* Tue Jan  7 2014 Jan Safranek <jsafrane@redhat.com> 0.4.2-1
+- Version 0.4.2
+
+* Tue Dec 17 2013 Michal Minar <miminar@redhat.com> 0.4.1-5
+- Added new openlmi-python-test subpackage.
+
+* Mon Nov 25 2013 Stephen Gallagher <sgallagh@redhat.com> 0.4.1-5
+- Define OpenLMI 1.0.0
+- Set strict version dependencies for the meta-package
+
+* Tue Nov 12 2013 Tomas Smetana <tsmetana@redhat.com> 0.4.1-4
+- Fix the PCP provider registration
+
 * Mon Nov 04 2013 Radek Novacek <rnovacek@redhat.com> 0.4.1-3
 - Version 0.4.1
 - Add powermanagement and hardware providers documentation

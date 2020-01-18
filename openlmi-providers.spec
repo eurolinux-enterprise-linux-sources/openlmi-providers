@@ -3,8 +3,8 @@
 %global required_libuser_ver 0.60
 
 Name:           openlmi-providers
-Version:        0.4.1
-Release:        2%{?dist}
+Version:        0.4.2
+Release:        8%{?dist}
 Summary:        Set of basic CIM providers
 
 License:        LGPLv2+
@@ -14,6 +14,32 @@ Source0:        http://fedorahosted.org/released/openlmi-providers/%{name}-%{ver
 # Upstream name has been changed from cura-providers to openlmi-providers
 Provides:       cura-providers = %{version}-%{release}
 Obsoletes:      cura-providers < 0.0.10-1
+
+# == Provider versions ==
+
+# Don't use %%{version} and %%{release} later on, it will be overwritten by openlmi metapackage
+%global providers_version %{version}
+%global providers_release %{release}
+%global providers_version_release %{version}-%{release}
+# Providers built from this package need to be strictly
+# matched, so that they are always upgraded together.
+%global hw_version %{providers_version_release}
+%global sw_version %{providers_version_release}
+%global pwmgmt_version %{providers_version_release}
+%global acct_version %{providers_version_release}
+%global svc_version %{providers_version_release}
+%global pcp_version %{providers_version_release}
+%global journald_version %{providers_version_release}
+%global realmd_version %{providers_version_release}
+
+# Storage and networking providers are built out of tree
+# We will require a minimum and maximum version of them
+# to ensure that they are tested together.
+%global storage_min_version 0.7.1
+%global storage_max_version 0.8
+
+%global nw_min_version 0.2.2
+%global nw_max_version 0.3
 
 BuildRequires:  cmake
 BuildRequires:  konkretcmpi-devel >= %{required_konkret_ver}
@@ -47,6 +73,8 @@ Requires(pre):  pywbem
 Requires(preun): pywbem
 Requires(post):  pywbem
 Requires:       cim-schema
+# for lmi.base.mofparse:
+Requires:       openlmi-python-base = %{providers_version_release}
 
 # XXX
 # Just because we have wired python's scripts
@@ -54,8 +82,20 @@ Requires:       cim-schema
 BuildRequires:  python-setuptools
 
 # from upstream
-# https://bugzilla.redhat.com/show_bug.cgi?id=1027321
-Patch0:        openlmi-providers-0.4.2-require-libuser-0.60.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=1050841
+Patch0:        openlmi-providers-0.4.2-thread-unsafe.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=1042843
+Patch1:        openlmi-providers-0.4.2-dont-autofill-fsname-fsclassname.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=1049819
+Patch2:        openlmi-providers-0.4.2-proper-method-result.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=1049816
+Patch3:        openlmi-providers-0.4.2-methods-description.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=1031650
+Patch4:        openlmi-providers-0.4.2-fan-make-the-sprintf_chip_name-thread-safe.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=1062264
+Patch5:        openlmi-providers-0.4.2-logicalfile-socket-getinstance.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=1074419
+Patch6:        openlmi-providers-0.4.2-system_name_verification.patch
 
 %description
 %{name} is set of (usually) small CMPI providers (agents) for basic
@@ -64,9 +104,9 @@ Model (CIM).
 
 %package devel
 Summary:        Development files for %{name}
-Requires:       %{name}%{?_isa} = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{providers_version_release}
 Requires:       konkretcmpi-python >= %{required_konkret_ver}
-Provides:       cura-providers-devel = %{version}-%{release}
+Provides:       cura-providers-devel = %{providers_version_release}
 Obsoletes:      cura-providers-devel < 0.0.10-1
 
 %description devel
@@ -74,8 +114,8 @@ Obsoletes:      cura-providers-devel < 0.0.10-1
 
 %package -n openlmi-fan
 Summary:        CIM provider for controlling fans
-Requires:       %{name}%{?_isa} = %{version}-%{release}
-Provides:       cura-fan = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{providers_version_release}
+Provides:       cura-fan = %{providers_version_release}
 Obsoletes:      cura-fan < 0.0.10-1
 
 %description -n openlmi-fan
@@ -91,8 +131,8 @@ This package contains the documents for OpenLMI fan provider.
 
 %package -n openlmi-powermanagement
 Summary:        Power management CIM provider
-Requires:       %{name}%{?_isa} = %{version}-%{release}
-Provides:       cura-powermanagement = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{providers_version_release}
+Provides:       cura-powermanagement = %{providers_version_release}
 Obsoletes:      cura-powermanagement < 0.0.10-1
 
 %description -n openlmi-powermanagement
@@ -108,8 +148,8 @@ This package contains the documents for OpenLMI power management provider.
 
 %package -n openlmi-service
 Summary:        CIM provider for controlling system services
-Requires:       %{name}%{?_isa} = %{version}-%{release}
-Provides:       cura-service = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{providers_version_release}
+Provides:       cura-service = %{providers_version_release}
 Obsoletes:      cura-service < 0.0.10-1
 
 %description -n openlmi-service
@@ -125,10 +165,10 @@ This package contains the documents for OpenLMI service provider.
 
 %package -n openlmi-account
 Summary:        CIM provider for managing accounts on system
-Requires:       %{name}%{?_isa} = %{version}-%{release}
-Requires:       openlmi-indicationmanager-libs%{?_isa} = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{providers_version_release}
+Requires:       openlmi-indicationmanager-libs%{?_isa} = %{providers_version_release}
 Requires:       libuser >= %{required_libuser_ver}
-Provides:       cura-account = %{version}-%{release}
+Provides:       cura-account = %{providers_version_release}
 Obsoletes:      cura-account < 0.0.10-1
 
 %description -n openlmi-account
@@ -144,7 +184,7 @@ This package contains the documents for OpenLMI account provider.
 
 %package -n openlmi-hardware
 Summary:        CIM provider for hardware on system
-Requires:       %{name}%{?_isa} = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{providers_version_release}
 # For Hardware information
 %ifarch %{ix86} x86_64 ia64
 Requires:       dmidecode
@@ -168,7 +208,7 @@ Requires:       python-setuptools
 Requires:       cmpi-bindings-pywbem
 BuildArch:      noarch
 Obsoletes:      openlmi-python < 0.1.0-1
-Provides:       openlmi-python = %{version}-%{release}
+Provides:       openlmi-python = %{providers_version_release}
 
 %description -n openlmi-python-base
 The openlmi-python-base package contains python namespace package
@@ -176,19 +216,30 @@ for all OpenLMI related projects running on python.
 
 %package -n openlmi-python-providers
 Summary:        Python namespace package for pywbem providers
-Requires:       %{name} = %{version}-%{release}
-Requires:       openlmi-python-base = %{version}-%{release}
+Requires:       %{name} = %{providers_version_release}
+Requires:       openlmi-python-base = %{providers_version_release}
 BuildArch:      noarch
 
 %description -n openlmi-python-providers
 The openlmi-python-providers package contains library with common
 code for implementing CIM providers using cmpi-bindings-pywbem.
 
+%package -n openlmi-python-test
+Summary:        OpenLMI test utilities
+Requires:       %{name} = %{providers_version_release}
+Requires:       openlmi-python-base = %{providers_version_release}
+Requires:       openlmi-tools >= 0.9
+BuildArch:      noarch
+
+%description -n openlmi-python-test
+The openlmi-python-test package contains test utilities and base
+classes for provider test cases.
+
 %package -n openlmi-software
 Summary:        CIM providers for software management
-Requires:       %{name} = %{version}-%{release}
-Requires:       openlmi-python-providers = %{version}-%{release}
-Provides:       cura-software = %{version}-%{release}
+Requires:       %{name} = %{providers_version_release}
+Requires:       openlmi-python-providers = %{providers_version_release}
+Provides:       cura-software = %{providers_version_release}
 Obsoletes:      cura-software < 0.0.10-1
 BuildArch:      noarch
 
@@ -211,7 +262,7 @@ This package contains the documents for OpenLMI software provider.
 
 %package -n openlmi-logicalfile
 Summary:        CIM provider for reading files and directories
-Requires:       %{name}%{?_isa} = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{providers_version_release}
 
 %description -n openlmi-logicalfile
 %{summary}.
@@ -226,7 +277,7 @@ This package contains the documents for OpenLMI logicalfile provider.
 
 %package -n openlmi-realmd
 Summary:        CIM provider for Realmd
-Requires:       %{name}%{?_isa} = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{providers_version_release}
 Requires:       realmd
 
 %description -n openlmi-realmd
@@ -244,22 +295,22 @@ This package contains the documents for OpenLMI Realmd provider.
 
 %package -n openlmi-indicationmanager-libs
 Summary:        Libraries for CMPI indication manager
-Requires:       %{name}%{?_isa} = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{providers_version_release}
 
 %description -n openlmi-indicationmanager-libs
 %{summary}.
 
 %package -n openlmi-indicationmanager-libs-devel
 Summary:        Development files for openlmi-indicationmanager-libs
-Requires:       %{name}%{?_isa} = %{version}-%{release}
-Requires:       openlmi-indicationmanager-libs%{_isa} = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{providers_version_release}
+Requires:       openlmi-indicationmanager-libs%{_isa} = %{providers_version_release}
 
 %description -n openlmi-indicationmanager-libs-devel
 %{summary}.
 
 %package -n openlmi-pcp
 Summary:        pywbem providers for accessing PCP metrics
-Requires:       %{name} = %{version}-%{release}
+Requires:       %{name} = %{providers_version_release}
 BuildArch:      noarch
 Requires:       python-setuptools
 Requires:       cmpi-bindings-pywbem
@@ -274,17 +325,35 @@ into strings on demand.
 
 %package -n openlmi
 Summary:        OpenLMI managed system software components
-Requires:       %{name} = %{version}-%{release}
+Version:        1.0.1
+Requires:       %{name} = %{providers_version_release}
 BuildArch:      noarch
 Requires:       tog-pegasus
 # List of "safe" providers
-Requires:       openlmi-storage
-Requires:       openlmi-networking
-Requires:       openlmi-hardware
-Requires:       openlmi-software
-Requires:       openlmi-powermanagement
-Requires:       openlmi-account
-Requires:       openlmi-service
+Requires:       openlmi-hardware = %{hw_version}
+Requires:       openlmi-software = %{sw_version}
+Requires:       openlmi-powermanagement = %{pwmgmt_version}
+Requires:       openlmi-account = %{acct_version}
+Requires:       openlmi-service = %{svc_version}
+
+# Mandatory, out-of-tree providers
+Requires:       openlmi-storage >= %{storage_min_version}
+Conflicts:      openlmi-storage >= %{storage_max_version}
+Requires:       openlmi-networking >= %{nw_min_version}
+Conflicts:      openlmi-networking >= %{nw_max_version}
+
+# Optional Providers
+# This ensures that only the appropriate version is installed but does
+# not install it by default. If these packages are installed, this will
+# guarantee that they are updated to the appropriate version on upgrade.
+Conflicts:      openlmi-pcp > %{pcp_version}
+Conflicts:      openlmi-pcp < %{pcp_version}
+
+Conflicts:      openlmi-journald > %{journald_version}
+Conflicts:      openlmi-journald < %{journald_version}
+
+Conflicts:      openlmi-realmd > %{realmd_version}
+Conflicts:      openlmi-realmd < %{realmd_version}
 
 %description -n openlmi
 OpenLMI provides a common infrastructure for the management of Linux systems.
@@ -302,7 +371,13 @@ documentation.
 
 %prep
 %setup -q
-%patch0 -p1 -b .libuser-require
+%patch0 -p1
+%patch1 -p1
+%patch2 -p1
+%patch3 -p1
+%patch4 -p1
+%patch5 -p1
+%patch6 -p1
 
 %build
 mkdir -p %{_target_platform}
@@ -330,6 +405,11 @@ make install/fast DESTDIR=$RPM_BUILD_ROOT -C %{_target_platform}
 mkdir -p "$RPM_BUILD_ROOT/%{_localstatedir}/log"
 touch "$RPM_BUILD_ROOT/%logfile"
 
+# The registration database and directories
+mkdir -p "$RPM_BUILD_ROOT/%{_sharedstatedir}/openlmi-registration/mof"
+mkdir -p "$RPM_BUILD_ROOT/%{_sharedstatedir}/openlmi-registration/reg"
+touch "$RPM_BUILD_ROOT/%{_sharedstatedir}/openlmi-registration/regdb.sqlite"
+
 # XXX
 # Remove pythonies
 # Don't forget to remove this dirty hack in the future
@@ -353,7 +433,7 @@ cp mof/LMI_Software.reg $RPM_BUILD_ROOT/%{_datadir}/%{name}/
 pushd src/pcp
 %{__python} setup.py install -O1 --skip-build --root $RPM_BUILD_ROOT
 popd
-cp -p src/pcp/openlmi-pcp-generate $RPM_BUILD_ROOT/%{_bindir}/openlmi-pcp-generate
+cp -p %{_target_platform}/src/pcp/openlmi-pcp-generate $RPM_BUILD_ROOT/%{_bindir}/openlmi-pcp-generate
 mkdir -p $RPM_BUILD_ROOT/%{_sysconfdir}/cron.daily
 cp -p src/pcp/openlmi-pcp.cron $RPM_BUILD_ROOT/%{_sysconfdir}/cron.daily/openlmi-pcp
 sed -i -e 's,^_LOCALSTATEDIR=.*,_LOCALSTATEDIR="%{_localstatedir}",' \
@@ -396,6 +476,10 @@ rm $RPM_BUILD_ROOT/%{_datadir}/%{name}/60_LMI_Journald.mof
 %{_libdir}/libopenlmicommon.so.*
 %attr(755, root, root) %{_bindir}/openlmi-mof-register
 %ghost %logfile
+%dir %{_sharedstatedir}/openlmi-registration
+%dir %{_sharedstatedir}/openlmi-registration/mof
+%dir %{_sharedstatedir}/openlmi-registration/reg
+%ghost %{_sharedstatedir}/openlmi-registration/regdb.sqlite
 
 %files devel
 %doc README COPYING
@@ -480,6 +564,12 @@ rm $RPM_BUILD_ROOT/%{_datadir}/%{name}/60_LMI_Journald.mof
 %dir %{python2_sitelib}/lmi/providers
 %{python2_sitelib}/lmi/providers/*.py
 %{python2_sitelib}/lmi/providers/*.py[co]
+
+%files -n openlmi-python-test
+%doc README COPYING
+%dir %{python2_sitelib}/lmi/test
+%{python2_sitelib}/lmi/test/*.py
+%{python2_sitelib}/lmi/test/*.py[co]
 
 %files -n openlmi-software
 %doc README COPYING
@@ -580,7 +670,7 @@ fi >> %logfile 2>&1
 %pre -n openlmi-fan
 # If upgrading, deregister old version
 if [ "$1" -gt 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_Fan.mof \
         %{_datadir}/%{name}/60_LMI_Fan.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
@@ -589,7 +679,7 @@ fi >> %logfile 2>&1
 
 %pre -n openlmi-powermanagement
 if [ "$1" -gt 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_PowerManagement.mof \
         %{_datadir}/%{name}/60_LMI_PowerManagement.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
@@ -598,7 +688,7 @@ fi >> %logfile 2>&1
 
 %pre -n openlmi-service
 if [ "$1" -gt 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_Service.mof \
         %{_datadir}/%{name}/60_LMI_Service.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
@@ -607,7 +697,7 @@ fi >> %logfile 2>&1
 
 %pre -n openlmi-account
 if [ "$1" -gt 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_Account.mof \
         %{_datadir}/%{name}/60_LMI_Account.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
@@ -623,14 +713,14 @@ if [ "$1" -gt 1 ]; then
         %{_datadir}/%{name}/90_LMI_Software_Profile.mof || :;
     %{_bindir}/openlmi-mof-register --just-mofs -c tog-pegasus unregister \
         %{_datadir}/%{name}/60_LMI_Software_MethodParameters.mof || :;
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_Software.mof \
         %{_datadir}/%{name}/LMI_Software.reg || :;
 fi >> %logfile 2>&1
 
 %pre -n openlmi-logicalfile
 if [ "$1" -gt 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_LogicalFile.mof \
         %{_datadir}/%{name}/60_LMI_LogicalFile.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
@@ -639,7 +729,7 @@ fi >> %logfile 2>&1
 
 %pre -n openlmi-realmd
 if [ "$1" -gt 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_Realmd.mof \
         %{_datadir}/%{name}/60_LMI_Realmd.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
@@ -648,7 +738,7 @@ fi >> %logfile 2>&1
 
 %pre -n openlmi-hardware
 if [ "$1" -gt 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_Hardware.mof \
         %{_datadir}/%{name}/60_LMI_Hardware.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
@@ -658,16 +748,19 @@ fi >> %logfile 2>&1
 
 %pre -n openlmi-pcp
 if [ "$1" -gt 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
-        %{_datadir}/%{name}/60_LMI_PCP.mof \
-        %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.mof \
-        %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.reg || :;
+    # Only unregister when the provider was already registered
+    if [ -e %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.mof ]; then
+        %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
+            %{_datadir}/%{name}/60_LMI_PCP.mof \
+            %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.mof \
+            %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.reg || :;
+    fi
 fi >> %logfile 2>&1
 
 %post -n openlmi-fan
 # Register Schema and Provider
 if [ "$1" -ge 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} register \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} register \
         %{_datadir}/%{name}/60_LMI_Fan.mof \
         %{_datadir}/%{name}/60_LMI_Fan.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus register \
@@ -676,7 +769,7 @@ fi >> %logfile 2>&1
 
 %post -n openlmi-powermanagement
 if [ "$1" -ge 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} register \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} register \
         %{_datadir}/%{name}/60_LMI_PowerManagement.mof \
         %{_datadir}/%{name}/60_LMI_PowerManagement.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus register \
@@ -685,7 +778,7 @@ fi >> %logfile 2>&1
 
 %post -n openlmi-service
 if [ "$1" -ge 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} register \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} register \
         %{_datadir}/%{name}/60_LMI_Service.mof \
         %{_datadir}/%{name}/60_LMI_Service.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus register \
@@ -694,7 +787,7 @@ fi >> %logfile 2>&1
 
 %post -n openlmi-account
 if [ "$1" -ge 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} register \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} register \
         %{_datadir}/%{name}/60_LMI_Account.mof \
         %{_datadir}/%{name}/60_LMI_Account.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus register \
@@ -703,7 +796,7 @@ fi >> %logfile 2>&1
 
 %post -n openlmi-software
 if [ "$1" -ge 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} register \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} register \
         %{_datadir}/%{name}/60_LMI_Software.mof \
         %{_datadir}/%{name}/LMI_Software.reg || :;
     # install indication filters for sfcbd
@@ -717,7 +810,7 @@ fi >> %logfile 2>&1
 
 %post -n openlmi-logicalfile
 if [ "$1" -ge 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} register \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} register \
         %{_datadir}/%{name}/60_LMI_LogicalFile.mof \
         %{_datadir}/%{name}/60_LMI_LogicalFile.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus register \
@@ -726,7 +819,7 @@ fi >> %logfile 2>&1
 
 %post -n openlmi-realmd
 if [ "$1" -ge 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} register \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} register \
         %{_datadir}/%{name}/60_LMI_Realmd.mof \
         %{_datadir}/%{name}/60_LMI_Realmd.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus register \
@@ -735,7 +828,7 @@ fi >> %logfile 2>&1
 
 %post -n openlmi-hardware
 if [ "$1" -ge 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} register \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} register \
         %{_datadir}/%{name}/60_LMI_Hardware.mof \
         %{_datadir}/%{name}/60_LMI_Hardware.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus register \
@@ -743,18 +836,10 @@ if [ "$1" -ge 1 ]; then
         %{_datadir}/%{name}/90_LMI_Hardware_Profile_DMTF.mof || :;
 fi >> %logfile 2>&1
 
-%post -n openlmi-pcp
-if [ "$1" -ge 1 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} register \
-        %{_datadir}/%{name}/60_LMI_PCP.mof \
-        %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.mof \
-        %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.reg || :;
-fi >> %logfile 2>&1
-
 %preun -n openlmi-fan
 # Deregister only if not upgrading
 if [ "$1" -eq 0 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_Fan.mof \
         %{_datadir}/%{name}/60_LMI_Fan.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
@@ -763,7 +848,7 @@ fi >> %logfile 2>&1
 
 %preun -n openlmi-powermanagement
 if [ "$1" -eq 0 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_PowerManagement.mof \
         %{_datadir}/%{name}/60_LMI_PowerManagement.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
@@ -772,7 +857,7 @@ fi >> %logfile 2>&1
 
 %preun -n openlmi-service
 if [ "$1" -eq 0 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_Service.mof \
         %{_datadir}/%{name}/60_LMI_Service.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
@@ -781,7 +866,7 @@ fi >> %logfile 2>&1
 
 %preun -n openlmi-account
 if [ "$1" -eq 0 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_Account.mof \
         %{_datadir}/%{name}/60_LMI_Account.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
@@ -797,14 +882,14 @@ if [ "$1" -eq 0 ]; then
         %{_datadir}/%{name}/90_LMI_Software_Profile.mof || :;
     %{_bindir}/openlmi-mof-register --just-mofs -c tog-pegasus unregister \
         %{_datadir}/%{name}/60_LMI_Software_MethodParameters.mof || :;
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_Software.mof \
         %{_datadir}/%{name}/LMI_Software.reg || :;
 fi >> %logfile 2>&1
 
 %preun -n openlmi-logicalfile
 if [ "$1" -eq 0 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_LogicalFile.mof \
         %{_datadir}/%{name}/60_LMI_LogicalFile.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
@@ -813,7 +898,7 @@ fi >> %logfile 2>&1
 
 %preun -n openlmi-realmd
 if [ "$1" -eq 0 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_Realmd.mof \
         %{_datadir}/%{name}/60_LMI_Realmd.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
@@ -822,7 +907,7 @@ fi >> %logfile 2>&1
 
 %preun -n openlmi-hardware
 if [ "$1" -eq 0 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
         %{_datadir}/%{name}/60_LMI_Hardware.mof \
         %{_datadir}/%{name}/60_LMI_Hardware.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
@@ -832,13 +917,117 @@ fi >> %logfile 2>&1
 
 %preun -n openlmi-pcp
 if [ "$1" -eq 0 ]; then
-    %{_bindir}/openlmi-mof-register -v %{version} unregister \
-        %{_datadir}/%{name}/60_LMI_PCP.mof \
-        %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.mof \
-        %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.reg || :;
+    # Only unregister when the provider was already registered
+    if [ -e %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.mof ]; then
+        %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
+            %{_datadir}/%{name}/60_LMI_PCP.mof \
+            %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.mof \
+            %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.reg || :;
+    fi
 fi >> %logfile 2>&1
 
 %changelog
+* Mon Mar 10 2014 Michal Minar <miminar@redhat.com> 0.4.2-8
+- Fixed SysteName verification.
+- Resolves: rhbz#1074419
+
+* Tue Feb 11 2014 Jan Synáček <jsynacek@redhat.com> - 0.4.2-7
+- Fix GetInstance() on a socket file
+- Resolves: rhbz#1062264
+
+* Fri Jan 24 2014 Daniel Mach <dmach@redhat.com> - 0.4.2-6
+- Mass rebuild 2014-01-24
+
+* Wed Jan 22 2014 Radek Novacek <rnovacek@redhat.com> 0.4.2-5
+- Don't unregister pcp provider if not registered
+- Resolves: rhbz#1052144
+
+* Tue Jan 21 2014 Vitezslav Crhonek <vcrhonek@redhat.com> - 0.4.2-4
+- Fix service methods report success before the action is actually finished
+- Add description to service methods
+- Fan provider made thread-safe
+- Resolves: rhbz#1049819 rhbz#1049816 rhbz#1031650
+
+* Fri Jan 10 2014 Jan Synáček <jsynacek@redhat.com> - 0.4.2-3
+- Correctly fill FSCreationClassName and FSName
+- Replace thread-unsafe functions
+- Resolves: rhbz#1042843 rhbz#1050841
+
+* Fri Jan 10 2014 Radek Novacek <rnovacek@redhat.com> 0.4.2-2
+- Fix version mismatch caused by defining version of openlmi metapackage
+- Resolves: rhbz#1051008
+
+* Thu Jan  9 2014 Jan Safranek <jsafrane@redhat.com> - 0.4.2-1
+- New upstream release.
+- Removing lot of patches.
+
+* Wed Jan 08 2014 Michal Minar <miminar@redhat.com> 0.4.1-17
+- Applied one omitted patch.
+- Related: rhbz#1032590
+
+* Tue Jan 07 2014 Jan Safranek <jsafrane@redhat.com> - 0.4.1-16
+- Fixed openlmi-mof-register not to crash when CIMOM is down
+- Added another bunch of software bugfixes.
+- Resolves: rhbz#1039018 rhbz#1032590 rhbz#1043243
+- Resolves: rhbz#1045058 rhbz#1043161 rhbz#1049389
+
+* Fri Dec 27 2013 Daniel Mach <dmach@redhat.com> - 0.4.1-15
+- Mass rebuild 2013-12-27
+
+* Tue Dec 17 2013 Jan Synáček <jsynacek@redhat.com> - 0.4.1-14
+- Correctly fill FSCreationClassName and FSName
+- Rewrite description of PowerStatesSupported property (power provider)
+- Always init provider when starting (power provider)
+- Resolves: rhbz#1042843, rhbz#1042718, rhbz#1041310
+
+* Wed Dec 11 2013 Tomas Smetana <tsmetana@redhat.com> 0.4.1-13
+- Add "infinite" timeout to Realmd D-Bus calls
+- Resolves: rhbz#1013624
+
+* Mon Dec 02 2013 Michal Minar <miminar@redhat.com> 0.4.1-12
+- Added Software fixes.
+- Resolves: rhbz#1005803 rhbz#1028519 rhbz#1027681 rhbz#1030999 rhbz#1028535
+- Resolves: rhbz#1031132 rhbz#1032502 rhbz#1032480 rhbz#1030831 rhbz#1032590
+- Resolves: rhbz#1034615 rhbz#1034698 rhbz#1035328 rhbz#1036291
+
+* Thu Nov 28 2013 Jan Safranek <jsafrane@redhat.com> 0.4.1-11
+- Fixed openlmi-mof-register to parse "#pragma include" in mof files.
+- Resolves: rhbz#1030966
+
+* Thu Nov 21 2013 Radek Novacek <rnovacek@redhat.com> 0.4.1-10
+- Fix missing format strings
+- Add format string hardening
+- realmd: remove potentially unsecure octetstring_parse function
+- Resolves: rbhz#1031644, rhbz#1031655, rhbz#1031658
+
+* Thu Nov 21 2013 Tomas Smetana <tsmetana@redhat.com> 0.4.1-9
+- Fix the reregister feature of the registration script
+- Make openlmi-providers own the registration database and directories
+- Resolves: rhbz#1030972, rhbz#1029008
+
+* Mon Nov 18 2013 Jan Safranek <jsafrane@redhat.com> 0.4.1-8
+- Another fixes in association checking in LogicalFile provider
+- Resolves: #1029447
+
+* Fri Nov 15 2013 Tomas Bzatek <tbzatek@redhat.com> 0.4.1-7
+- Fixes account non-existent homedir deletion (#1027338)
+
+* Thu Nov 14 2013 Jan Safranek <jsafrane@redhat.com> 0.4.1-6
+- Additional fixes in association checking in LogicalFile provider
+- Resolves: #1029447
+
+* Wed Nov 13 2013 Jan Safranek <jsafrane@redhat.com> 0.4.1-5
+- Fix association checking in LogicalFile provider
+- Resolves: #1029447
+
+* Tue Nov 12 2013 Tomas Smetana <tsmetana@redhat.com> 0.4.1-4
+- Fix the PCP provider registration
+- Resolves: rhbz#1026515
+
+* Tue Nov 12 2013 Vitezslav Crhonek <vcrhonek@redhat.com> - 0.4.1-3
+- Remove maximum boundary for amount of services
+  Resolves: #999338
+
 * Wed Nov  6 2013 Tomas Bzatek <tbzatek@redhat.com> 0.4.1-2
 - Added explicit dependency on new libuser release (#1027321)
 

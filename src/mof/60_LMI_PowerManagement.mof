@@ -71,7 +71,28 @@ class LMI_AssociatedPowerManagementService: CIM_AssociatedPowerManagementService
   Version("0.2.0") ]
 class LMI_PowerManagementCapabilities: CIM_PowerManagementCapabilities
 {
-    [ Implemented(true) ]
+    [ Implemented(true), Description(
+        "An enumeration that indicates the power states supported "
+        "by a managed element. Because this is an array, multiple "
+        "values can be specified. The current values in the "
+        "enumeration are: \n"
+        "4 = Sleep - Deep, corresponding to ACPI state G1, S3, or D2.\n"
+        "5 = Power Cycle (Off - Soft), corresponding to ACPI state "
+        "G2, S5, or D3, but where the managed element is set to "
+        "return to power state \"On\". \n"
+        "7 = Hibernate (Off - Soft), corresponding to ACPI state "
+        "S4, where the state of the managed element is preserved "
+        "and will be recovered upon powering on. \n"
+        "8 = Off - Soft, corresponding to ACPI state G2, S5, or D3. \n"
+        "12 = Off - Soft  Graceful, equivalent to Off Soft but preceded by a "
+        "request to the managed element to perform an orderly shutdown. \n"
+        "15 = Power Cycle (Off - Soft Graceful), equivalent to "
+        "Power Cycle (Off - Soft) but preceded by a request to "
+        "the managed element to perform an orderly shutdown."),
+      ValueMap { "4", "5", "7", "8", "12", "15" },
+      Values { "Sleep - Deep", "Power Cycle (Off - Soft)",
+        "Hibernate (Off - Soft)", "Off - Soft",
+        "Off - Soft Graceful", "Power Cycle (Off - Soft Graceful)" } ]
     uint16 PowerStatesSupported[];
 };
 

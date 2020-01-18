@@ -243,3 +243,24 @@ The trace file is written to:
 More information about cimserver tracing can be found in the
 "OpenPegasus Tracing User Guide" PDF. Google the title to get a
 current URL.
+
+
+*******************************************************************************
+* Provider-specific Instructions                                              *
+*******************************************************************************
+
+PCP
+~~~
+
+Please note the PCP provider needs a different registration procedure since the
+PCP metrics classes are being generated automatically according to the PCP
+namespace.  There is a helper script provided in the openlmi-pcp package that
+generates the MOF and REG files according to the installed PCP components and
+registers the appropriate classes within the CIMOM. The script requires the pcmd
+daemon to be running.
+
+% openlmi-pcp-generate
+
+The openlmi-pcp package also installs a daily cronjob that runs the script
+automatically to ensure any changes made to the PCP namespace would be reflected
+in the system's CIM model.

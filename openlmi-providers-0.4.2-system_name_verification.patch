@@ -1,0 +1,18 @@
+diff --git a/src/python/lmi/providers/__init__.py b/src/python/lmi/providers/__init__.py
+index 9ee8376..b4d7050 100644
+--- a/src/python/lmi/providers/__init__.py
++++ b/src/python/lmi/providers/__init__.py
+@@ -53,5 +53,11 @@ def is_this_system(system_name):
+ 
+     :rtype: boolean
+     """
+-    return (  socket.gethostbyaddr(system_name)[0]
+-           == socket.gethostbyaddr(socket.gethostname())[0])
++    try:
++        return (  socket.gethostbyaddr(system_name)[0]
++               == socket.gethostbyaddr(socket.gethostname())[0])
++    except socket.gaierror:     # name resolution failed
++        if system_name == socket.gethostname():
++            # hostname can not be translated to IP
++            return True
++        return False

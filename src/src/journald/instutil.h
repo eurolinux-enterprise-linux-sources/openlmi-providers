@@ -28,6 +28,10 @@
 #include <ind_manager.h>
 #include "LMI_JournalLogRecord.h"
 
+static const char* journald_allowed_classes[] = {
+        LMI_JournalLogRecord_ClassName,
+        NULL};
+
 int create_LMI_JournalLogRecordRef(sd_journal *j, LMI_JournalLogRecordRef *ref, const CMPIBroker *_cb);
 int create_LMI_JournalLogRecord(sd_journal *j, LMI_JournalLogRecord *rec, const CMPIBroker *_cb);
 
@@ -35,7 +39,6 @@ int match_journal_record(sd_journal *j, const char *message, const char *code_fu
 
 void ind_init();
 bool ind_watcher(void **data);
-bool ind_filter_cb(const CMPISelectExp *filter);
 bool ind_gather(const IMManager *manager, CMPIInstance **old, CMPIInstance **new, void *data);
 void ind_destroy();
 

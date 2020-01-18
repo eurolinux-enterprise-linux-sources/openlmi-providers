@@ -243,6 +243,66 @@ class LMI_ResourceForSoftwareIdentity(CIMProvider2):
         raise pywbem.CIMError(pywbem.CIM_ERR_NOT_SUPPORTED)
 
     @cmpi_logging.trace_method
+    def MI_associators(self,
+            env,
+            objectName,
+            assocClassName,
+            resultClassName,
+            role,
+            resultRole,
+            propertyList):
+        """
+        Yield identities associated to ``LMI_SoftwareIdentityResource``
+        instances.
+
+        This overrides method of superclass for a very good reason. Original
+        method calls ``GetInstance()`` on every single object path returned by
+        :py:meth:`LMI_ResourceForSoftwareIdentity.references` which is very time
+        consuming operation on ``LMI_SoftwareIdentity`` class in particular.
+        On slow machine this could take several minutes. This method just
+        enumerates requested instances directly.
+        """
+        ns = util.Configuration.get_instance().namespace
+        ch = env.get_cimom_handle()
+        if (   (not role or role.lower() == "availablesap")
+           and (not resultRole or resultRole.lower() == "managedelement")
+           and ch.is_subclass(ns,
+               sub=objectName.classname,
+               super="LMI_SoftwareIdentityResource")):
+            try:
+                repo = IdentityResource.object_path2repo(
+                        env, objectName, 'all')
+            except pywbem.CIMError as e:
+                if e.args[0] != pywbem.CIM_ERR_NOT_FOUND:
+                    raise
+                raise pywbem.CIMError(pywbem.CIM_ERR_INVALID_PARAMETER,
+                        e.args[1])
+
+            model = pywbem.CIMInstance(classname='LMI_SoftwareIdentity')
+            model.path = util.new_instance_name("LMI_SoftwareIdentity")
+
+            with YumDB.get_instance() as ydb:
+                pkglist = ydb.get_package_list('available',
+                        allow_duplicates=True, sort=True,
+                        include_repos=repo.repoid,
+                        exclude_repos='*')
+                for pkg_info in pkglist:
+                    yield Identity.pkg2model(pkg_info, model=model,
+                            keys_only=False)
+
+        else:
+            # no need to optimize associators for SoftwareIdentity
+            for obj in CIMProvider2.MI_associators(self,
+                    env,
+                    objectName,
+                    assocClassName,
+                    resultClassName,
+                    role,
+                    resultRole,
+                    propertyList):
+                yield obj
+
+    @cmpi_logging.trace_method
     def references(self, env, object_name, model, result_class_name, role,
                    result_role, keys_only):
         """Instrument Associations.

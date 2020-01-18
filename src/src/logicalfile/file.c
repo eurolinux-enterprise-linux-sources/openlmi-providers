@@ -30,8 +30,12 @@ CMPIStatus lmi_check_required(
 {
     const char *prop;
 
+    CMPIStatus st;
+    CMPIData data;
     /* check computer system creation class name */
-    if (CMIsNullValue(CMGetKey(o, "CSCreationClassName", NULL))) {
+    data = CMGetKey(o, "CSCreationClassName", &st);
+    check_status(st);
+    if (CMIsNullValue(data)) {
         CMReturnWithChars(b, CMPI_RC_ERR_FAILED, "CSCreationClassName is empty");
     }
     prop = get_string_property_from_op(o, "CSCreationClassName");
@@ -40,7 +44,9 @@ CMPIStatus lmi_check_required(
     }
 
     /* check fqdn */
-    if (CMIsNullValue(CMGetKey(o, "CSName", NULL))) {
+    data = CMGetKey(o, "CSName", &st);
+    check_status(st);
+    if (CMIsNullValue(data)) {
         CMReturnWithChars(b, CMPI_RC_ERR_FAILED, "CSName is empty");
     }
     prop = get_string_property_from_op(o, "CSName");
@@ -77,7 +83,8 @@ int get_class_from_path(const char *path, char *fileclass)
     return rc;
 }
 
-CMPIStatus get_fsname_from_stat(const CMPIBroker *b, const struct stat *sb, char **fname)
+CMPIStatus get_fsinfo_from_stat(const CMPIBroker *b, const struct stat *sb, const char *path,
+                                char **fsclassname, char **fsname)
 {
     struct udev *udev_ctx;
     struct udev_device *udev_dev;
@@ -94,17 +101,20 @@ CMPIStatus get_fsname_from_stat(const CMPIBroker *b, const struct stat *sb, char
 
     udev_dev = udev_device_new_from_device_id(udev_ctx, dev_id);
     if ((dev_name = udev_device_get_property_value(udev_dev, "ID_FS_UUID_ENC"))) {
-        if (asprintf(fname, "UUID=%s", dev_name) < 0) {
+        if (asprintf(fsname, "UUID=%s", dev_name) < 0) {
             return_with_status(b, &st, ERR_FAILED, "asprintf failed");
         }
+        *fsclassname = FSCREATIONCLASSNAME_LOCAL;
     } else if ((dev_name = udev_device_get_property_value(udev_dev, "DEVNAME"))) {
-        if (asprintf(fname, "DEVICE=%s", dev_name) < 0) {
+        if (asprintf(fsname, "DEVICE=%s", dev_name) < 0) {
             return_with_status(b, &st, ERR_FAILED, "asprintf failed");
         }
+        *fsclassname = FSCREATIONCLASSNAME_LOCAL;
     } else {
-        if (asprintf(fname, "Unknown") < 0) {
+        if (asprintf(fsname, "PATH=%s", path) < 0) {
             return_with_status(b, &st, ERR_FAILED, "asprintf failed");
         }
+        *fsclassname = FSCREATIONCLASSNAME_TRANSIENT;
     }
     udev_device_unref(udev_dev);
     udev_unref(udev_ctx);
@@ -112,7 +122,7 @@ CMPIStatus get_fsname_from_stat(const CMPIBroker *b, const struct stat *sb, char
     return st;
 }
 
-CMPIStatus get_fsname_from_path(const CMPIBroker *b, const char *path, char **fsname)
+CMPIStatus get_fsinfo_from_path(const CMPIBroker *b, const char *path, char **fsclassname, char **fsname)
 {
     CMPIStatus st = {.rc = CMPI_RC_OK};
     struct stat sb;
@@ -121,7 +131,7 @@ CMPIStatus get_fsname_from_path(const CMPIBroker *b, const char *path, char **fs
         return_with_status(b, &st, ERR_FAILED, "lstat(2) failed");
     }
 
-    return get_fsname_from_stat(b, &sb, fsname);
+    return get_fsinfo_from_stat(b, &sb, path, fsclassname, fsname);
 }
 
 const char *get_string_property_from_op(const CMPIObjectPath *o, const char *prop)
@@ -166,6 +176,7 @@ CMPIStatus stat_logicalfile_and_fill(
     struct stat sb;
     char buf[BUFLEN];
     char *fsname = NULL;
+    char *fsclassname = NULL;
     const char *path = KChars(lf->lf.datafile.Name.value);
     CMPIStatus st = {.rc = CMPI_RC_OK};
 
@@ -176,19 +187,19 @@ CMPIStatus stat_logicalfile_and_fill(
 
     get_class_from_stat(&sb, buf);
 
-    st = get_fsname_from_stat(b, &sb, &fsname);
+    st = get_fsinfo_from_stat(b, &sb, path, &fsclassname, &fsname);
     check_status(st);
 
     switch(mode) {
     case S_IFREG:
-        fill_basic(b, DataFile, &lf->lf.datafile, buf, fsname, sb);
+        fill_basic(b, DataFile, &lf->lf.datafile, buf, fsclassname, fsname, sb);
         break;
     case S_IFCHR:
         /* FALLTHROUGH */
     case S_IFBLK:
-        fill_basic(b, UnixDeviceFile, &lf->lf.unixdevicefile, buf, fsname, sb);
+        fill_basic(b, UnixDeviceFile, &lf->lf.unixdevicefile, buf, fsclassname, fsname, sb);
         /* device-specific stuff */
-        char tmp[16];
+        char tmp[21];
         sprintf(tmp, "%lu", sb.st_rdev);
         LMI_UnixDeviceFile_Set_DeviceId(&lf->lf.unixdevicefile, tmp);
         sprintf(tmp, "%u",  major(sb.st_rdev));
@@ -202,13 +213,13 @@ CMPIStatus stat_logicalfile_and_fill(
         }
         break;
     case S_IFDIR:
-        fill_basic(b, UnixDirectory, &lf->lf.unixdirectory, buf, fsname, sb);
+        fill_basic(b, UnixDirectory, &lf->lf.unixdirectory, buf, fsclassname, fsname, sb);
         break;
     case S_IFIFO:
-        fill_basic(b, FIFOPipeFile, &lf->lf.fifopipefile, buf, fsname, sb);
+        fill_basic(b, FIFOPipeFile, &lf->lf.fifopipefile, buf, fsclassname, fsname, sb);
         break;
     case S_IFLNK:
-        fill_basic(b, SymbolicLink, &lf->lf.symboliclink, buf, fsname, sb);
+        fill_basic(b, SymbolicLink, &lf->lf.symboliclink, buf, fsclassname, fsname, sb);
         /* symlink-specific stuff */
         char rpath[PATH_MAX];
         const char *path;

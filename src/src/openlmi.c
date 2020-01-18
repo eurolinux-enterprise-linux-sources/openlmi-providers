@@ -81,9 +81,10 @@ static bool get_computer_system(const CMPIBroker *cb, const CMPIContext *ctx)
     }
 
     const char *class_name = lmi_get_system_creation_class_name();
-    const char *namespace = lmi_read_config("CIM", "Namespace");
+    char *namespace = lmi_read_config("CIM", "Namespace");
     CMPIStatus rc = { 0, NULL };
     CMPIObjectPath *op = CMNewObjectPath(cb, namespace, class_name, &rc);
+    g_free (namespace);
     if (rc.rc != CMPI_RC_OK) {
         lmi_error("Unable to create object path: %s", rc.msg);
         return false;
@@ -199,6 +200,7 @@ GKeyFile *parse_config(const char *provider_name, const ConfigEntry *provider_co
     if ((providerKeyFile = g_key_file_new()) == NULL) {
         lmi_error("Memory allocation failed");
         g_key_file_free(masterKeyFile);
+        free(providerconf);
         return NULL;
     }
     if (!g_key_file_load_from_file(providerKeyFile, providerconf, G_KEY_FILE_NONE, &error)) {
@@ -255,6 +257,7 @@ GKeyFile *parse_config(const char *provider_name, const ConfigEntry *provider_co
                                  _toplevel_config_defaults[i].value);
         }
     }
+    free(providerconf);
     return masterKeyFile;
 }
 

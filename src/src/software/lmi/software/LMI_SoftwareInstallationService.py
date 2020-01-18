@@ -84,7 +84,7 @@ class LMI_SoftwareInstallationService(CIMProvider2):
         model['EnabledDefault'] = self.values.EnabledDefault.Not_Applicable
         model['EnabledState'] = self.values.EnabledState.Not_Applicable
         model['HealthState'] = self.values.HealthState.OK
-        model['InstanceID'] = 'LMI:LMI_InstallationService'
+        model['InstanceID'] = 'LMI:LMI_SoftwareInstallationService'
         model['OperatingStatus'] = self.values.OperatingStatus.Servicing
         model['OperationalStatus'] = [self.values.OperationalStatus.OK]
         model['PrimaryStatus'] = self.values.PrimaryStatus.OK

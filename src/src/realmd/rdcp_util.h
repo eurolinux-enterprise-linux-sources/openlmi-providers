@@ -33,44 +33,6 @@ const ConfigEntry *provider_config_defaults;
     }                                           \
 }
 
-/**
- * octetstring_parse
- * @octetstring Pointer to octetstring data
- * @data_len_return Pointer to uint32 value which receives the number
- * of octets in the octetstring buffer.
- *
- * Given an octetstring, extract it's length and set the pointer to
- * the data.
- *
- * When specified on elements of type array of uint8, the OctetString
- * qualifier indicates that the entire array represents a single octet
- * string. The first four array entries shall represent a length
- * field, and any subsequent entries shall represent the octets in the
- * octet string. The four uint8 values in the length field shall be
- * interpreted as a 32-bit unsigned number where the first array entry
- * is the most significant byte.  The number represented by the length
- * field shall be the number of octets in the octet string plus
- * four. For example, the empty octet string is represented as { 0x00,
- * 0x00, 0x00, 0x04 }.
-
- *
- */
-
-KINLINE unsigned char *octetstring_parse(unsigned char *octetstring, CMPIUint32 *data_len)
-{
-    unsigned char *data = NULL;
-    *data_len = 0;
-    if (octetstring) {
-        *data_len = (octetstring[0] << 24) |
-                    (octetstring[1] << 16) |
-                    (octetstring[2] <<  8) |
-                    (octetstring[3]);
-        *data_len -= 4;
-        data = octetstring + 4;
-    }
-    return data;
-}
-
 #define LMI_InitRealmdServiceKeys(klass, obj, name_space, host_name)    \
 {                                                                       \
     klass##_Init(obj, _cb, name_space);                                 \

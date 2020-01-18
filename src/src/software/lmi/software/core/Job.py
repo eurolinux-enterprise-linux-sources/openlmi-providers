@@ -443,13 +443,6 @@ def get_verification_out_params(job):
         }
         # update local instance
         job.update(metadata=metadata)
-        if YumDB.RUNNING_UNDER_CIMOM_PROCESS:
-            # update instance on server
-            YumDB.get_instance().update_job(job.jobid, metadata=metadata)
-        # else: we are called from YumWorker process;
-        #       (update on server already occured)
-        # moreover YumWorker blocks on us - we can not wait for another job
-        # to finish
     return job.metadata.get('output_params', [])
 
 @cmpi_logging.trace_function
@@ -764,7 +757,7 @@ def modify_instance(instance):
     return job2model(job, keys_only=False, model=instance)
 
 @cmpi_logging.trace_function
-def job2error(job):
+def job2error(env, job):
     """
     @return instance of CIM_Error if job is in EXCEPTION state,
     None otherwise
@@ -787,5 +780,5 @@ def job2error(job):
                     CIMStatusCode.CIM_ERR_ALREADY_EXISTS
         kwargs['message'] = getattr(errortup[1], 'message',
                 str(errortup[1]))
-        value = Error.make_instance(**kwargs)
+        value = Error.make_instance(env, **kwargs)
         return value

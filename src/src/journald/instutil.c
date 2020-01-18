@@ -377,37 +377,6 @@ bool ind_gather(const IMManager *manager, CMPIInstance **old, CMPIInstance **new
     return true;
 }
 
-bool ind_filter_cb(const CMPISelectExp *filter)
-{
-    /* TODO: copied from account/indication_common.c, may require generalization */
-
-    /*
-     * Support only simple conditions and only on allowed_classes
-     * and type of `sourceinstance ISA allowed_class'
-     */
-    CMPIStatus st;
-    CMPISelectCond *sec = CMGetDoc(filter, &st);
-    if (!sec) return false;
-    CMPICount count = CMGetSubCondCountAndType(sec, NULL, &st);
-    if (count != 1) return false;
-    CMPISubCond *sub = CMGetSubCondAt(sec, 0, &st);
-    if (!sub) return false;
-    count = CMGetPredicateCount(sub, &st);
-    if (count != 1) return false;
-    CMPIPredicate *pred = CMGetPredicateAt(sub, 0, &st);
-    if (!pred) return false;
-    CMPIType type;
-    CMPIPredOp op;
-    CMPIString *lhs = NULL;
-    CMPIString *rhs = NULL;
-    st = CMGetPredicateData(pred, &type, &op, &lhs, &rhs);
-    if (st.rc != CMPI_RC_OK || op != CMPI_PredOp_Isa) return false;
-    const char *rhs_str = CMGetCharsPtr(rhs, &st);
-    if (!rhs_str) return false;
-    if (strcasecmp(rhs_str, LMI_JournalLogRecord_ClassName) == 0) return true;
-    return false;
-}
-
 /* --------------------------------------------------------------------------- */
 
 /* TODO: count references to the journal struct -- someone may cancel the iteration

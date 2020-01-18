@@ -24,6 +24,8 @@ Common utilities meant to be used only be ``yumdb`` subpackage.
 """
 
 import logging
+import yum
+
 from lmi.providers import cmpi_logging
 from lmi.software.util import Configuration
 
@@ -102,9 +104,28 @@ def setup_logging():
                 defaults["root"]["level"] = level
                 logging.config.dictConfig(defaults)
                 logging_setup = True
+                # re-enable function tracing logger which has been disabled by
+                # dictConfig() call
+                logging.getLogger(cmpi_logging.__name__
+                        + '.trace_function_or_method').disabled = False
             except Exception:
                 pass
     if logging_setup is False:
         # disable logging completely
         logging.config.dictConfig(DISABLED_LOGGING_CONFIG)
 
+def is_pkg_installed(pkg, rpmdb):
+    """
+    Returns ``True`` if the package is installed.
+
+    :param pkg: Yum package object.
+    :type pkg: :py:class:`yum.packages.PackageObject`
+    :param rpmdb: Installed package sack.
+    :type rpmdb: :py:class:`yum.rpmsack.RPMDBPackageSack`
+    :returns: Whether the package is installed or not.
+    :rtype: boolean
+    """
+    if not isinstance(pkg, yum.packages.PackageObject):
+        raise TypeError("pkg must be a PackageObject")
+    return (  isinstance(pkg, yum.rpmsack.RPMInstalledPackage)
+           or pkg.pkgtup in rpmdb._tup2pkg)

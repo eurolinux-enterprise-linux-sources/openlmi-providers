@@ -45,8 +45,9 @@ static bool deletion_watcher(void **data)
 static void LMI_AccountInstanceDeletionIndicationInitialize(const CMPIContext *ctx)
 {
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
-    im = im_create_manager(NULL, filter_checker, true, deletion_watcher,
+    im = im_create_manager(NULL, NULL, true, deletion_watcher,
                            IM_IND_DELETION, _cb, &im_err);
+    im_register_filter_classes(im, &account_allowed_classes[0], &im_err);
 }
 
 static CMPIStatus LMI_AccountInstanceDeletionIndicationIndicationCleanup(
@@ -117,8 +118,10 @@ static CMPIStatus LMI_AccountInstanceDeletionIndicationEnableIndications(
     CMPIIndicationMI* mi,
     const CMPIContext* cc)
 {
-    if (!watcher_init(&ai) ||
-        !im_start_ind(im, cc, &im_err)) {
+    if (!watcher_init(&ai))
+        CMReturn(CMPI_RC_ERR_FAILED);
+    if (!im_start_ind(im, cc, &im_err)) {
+        watcher_destroy(&ai);
         CMReturn(CMPI_RC_ERR_FAILED);
     }
     CMReturn(CMPI_RC_OK);
@@ -128,10 +131,10 @@ static CMPIStatus LMI_AccountInstanceDeletionIndicationDisableIndications(
     CMPIIndicationMI* mi,
     const CMPIContext* cc)
 {
-    watcher_destroy(&ai);
     if (!im_stop_ind(im, cc, &im_err)) {
         CMReturn(CMPI_RC_ERR_FAILED);
     }
+    watcher_destroy(&ai);
     CMReturn(CMPI_RC_OK);
 }
 

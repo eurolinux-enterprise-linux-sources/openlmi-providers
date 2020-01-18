@@ -19,33 +19,28 @@
 # Authors: Michal Minar <miminar@redhat.com>
 #
 """
-Unit tests for LMI_HostedSoftwareIdentityResource provider.
+Unit tests for ``LMI_HostedSoftwareIdentityResource`` provider.
 """
 
-import pywbem
 import unittest
 
-import base
+import swbase
 
-class TestHostedSoftwareIdentityResource(base.SoftwareBaseTestCase):
+ENABLED_STATE_DISABLED = 3
+ENABLED_STATE_ENABLED = 2
+
+class TestHostedSoftwareIdentityResource(swbase.SwTestCase):
     """
-    Basic cim operations test.
+    Basic cim operations test on ``LMI_HostedSoftwareIdentityResource.``
     """
 
     CLASS_NAME = "LMI_HostedSoftwareIdentityResource"
     KEYS = ("Antecedent", "Dependent")
 
-    @classmethod
-    def needs_pkgdb(cls):
-        return False
-
-    @classmethod
-    def needs_repodb(cls):
-        return True
-
     def make_op(self, repo):
         """
-        @return object path of HostedSoftwareIdentityResource association
+        :returns Object path of ``LMI_HostedSoftwareIdentityResource``.
+        :rtype: :py:class:`lmi.shell.LMIInstanceName`
         """
         return self.cim_class.new_instance_name({
             "Antecedent" : self.system_iname,
@@ -58,19 +53,25 @@ class TestHostedSoftwareIdentityResource(base.SoftwareBaseTestCase):
                 })
             })
 
+    @swbase.test_with_repos(**{
+        'stable'          : True,
+        'updates'         : True,
+        'updates-testing' : False,
+        'misc'            : False
+    })
     def test_get_instance(self):
         """
-        Tests GetInstance call on repositories from our rpm cache.
+        Test ``GetInstance()`` call on ``LMI_HostedSoftwareIdentityResource``.
         """
-        for repo in self.repodb:
+        for repo in self.repodb.values():
             objpath = self.make_op(repo)
             inst = objpath.to_instance()
+            self.assertNotEqual(inst, None,
+                    "GetInstance succeeds for repo %s" % repo.repoid)
             self.assertCIMNameEqual(objpath, inst.path,
                     "Object paths should match for repo %s" % repo.repoid)
+            self.assertEqual(set(inst.path.key_properties()), set(self.KEYS))
             for key in self.KEYS:
-                self.assertIn(key, inst.properties(),
-                    'OP is missing \"%s\" key for repo "%s".' %
-                    (key, repo.repoid))
                 self.assertCIMNameEqual(
                         getattr(inst, key), getattr(inst.path, key),
                         'Key property "%s" does not match for repo "%s"!' %
@@ -78,63 +79,158 @@ class TestHostedSoftwareIdentityResource(base.SoftwareBaseTestCase):
 
     def test_enum_instance_names(self):
         """
-        Tests EnumInstanceNames call on repositories from our cache.
+        Test ``EnumInstanceNames()`` call on
+        ``LMI_HostedSoftwareIdentityResource``.
         """
         inames = self.cim_class.instance_names()
-        repos = { r.repoid: r for r in self.repodb }
-        self.assertEqual(len(repos), len(inames))
+        repos = set(r for r in self.repodb)
+        repos.update([r for r in self.other_repos])
+        self.assertEqual(len(inames), len(repos))
         for iname in inames:
             self.assertIn(iname.Dependent.Name, repos)
-            objpath = self.make_op(repos[iname.Dependent.Name])
-            self.assertCIMNameEqual(objpath, iname)
+            repoid = iname.Dependent.Name
+            if repoid in self.repodb:
+                repo = self.repodb[repoid]
+            else:
+                repo = self.other_repos[repoid]
+            objpath = self.make_op(repo)
+            self.assertCIMNameEqual(iname, objpath)
+            self.assertEqual(set(iname.key_properties()), set(self.KEYS))
+            repos.remove(iname.Dependent.Name)
+        self.assertEqual(len(repos), 0)
 
     def test_enum_instances(self):
         """
-        Tests EnumInstanceNames call on repositories from our cache.
+        Test ``EnumInstanceNames()`` call on
+        ``LMI_HostedSoftwareIdentityResource``.
         """
-        inames = self.cim_class.instances()
-        repos = { r.repoid: r for r in self.repodb }
-        self.assertEqual(len(repos), len(inames))
-        for inst in inames:
+        insts = self.cim_class.instances()
+        repos = set(r for r in self.repodb)
+        repos.update([r for r in self.other_repos])
+        self.assertEqual(len(insts), len(repos))
+        for inst in insts:
             repoid = inst.Dependent.Name
             self.assertIn(repoid, repos)
-            objpath = self.make_op(repos[repoid])
-            self.assertCIMNameEqual(objpath, inst.path)
+            if repoid in self.repodb:
+                repo = self.repodb[repoid]
+            else:
+                repo = self.other_repos[repoid]
+            objpath = self.make_op(repo)
+            self.assertCIMNameEqual(inst.path, objpath)
+            self.assertEqual(set(inst.path.key_properties()), set(self.KEYS))
             for key in self.KEYS:
-                self.assertIn(key, inst.properties(),
-                    'OP is missing \"%s\" key for repo "%s".' % (key, repoid))
                 self.assertCIMNameEqual(
                         getattr(inst, key), getattr(inst.path, key),
                         'Key property "%s" does not match for repo "%s"!' %
                         (key, repoid))
+            repos.remove(repoid)
+        self.assertEqual(len(repos), 0)
 
-    def test_get_antecedent_referents(self):
+    @swbase.test_with_repos(**{
+        'stable' : True,
+        'updates' : True,
+        'updates-testing' : False,
+        'misc' : False
+    })
+    def test_get_computer_system_repositories(self):
         """
-        Test ReferenceNames for ComputerSystem.
+        Try to get repositories associated with computer system.
         """
-        if not self.repodb:
-            return
-        repo = self.repodb[0]
-        objpath = self.make_op(repo)
+        objpath = self.make_op(self.get_repo('stable'))
+        refs = objpath.Antecedent.to_instance().associators(
+                AssocClass=self.CLASS_NAME,
+                Role="Antecedent",
+                ResultRole="Dependent",
+                ResultClass="LMI_SoftwareIdentityResource")
+        repos = set(r for r in self.repodb)
+        repos.update(self.other_repos.keys())
+        self.assertEqual(len(refs), len(repos))
+        for ref in refs:
+            self.assertEqual(ref.path.namespace, 'root/cimv2')
+            self.assertEqual(ref.classname, "LMI_SoftwareIdentityResource")
+            repoid = ref.Name
+            if repoid in self.repodb:
+                repo = self.repodb[repoid]
+            else:
+                repo = self.other_repos[repoid]
+            objpath = self.make_op(repo)
+            self.assertCIMNameEqual(ref.path, objpath.Dependent)
+            self.assertEqual(set(ref.path.key_properties()),
+                    set(["CreationClassName", "Name",
+                          "SystemCreationClassName", "SystemName"]))
+            if repo.status:
+                self.assertEqual(ref.EnabledState, ENABLED_STATE_ENABLED,
+                        "EnabledState does not match for repo %s" % repo.repoid)
+            else:
+                self.assertEqual(ref.EnabledState, ENABLED_STATE_DISABLED,
+                        "EnabledState does not match for repo %s" % repo.repoid)
+            repos.remove(ref.Name)
+        self.assertEqual(len(repos), 0)
+
+    @swbase.test_with_repos(**{
+        'stable' : True,
+        'updates' : True,
+        'updates-testing' : False,
+        'misc' : False
+    })
+    def test_get_computer_system_repository_names(self):
+        """
+        Try to get repository names associated with computer system.
+        """
+        objpath = self.make_op(self.get_repo('stable'))
         refs = objpath.Antecedent.to_instance().associator_names(
                 AssocClass=self.CLASS_NAME,
                 Role="Antecedent",
                 ResultRole="Dependent",
                 ResultClass="LMI_SoftwareIdentityResource")
-        repos = {r.repoid: r for r in self.repodb}
+        repos = set(r for r in self.repodb)
+        repos.update(self.other_repos.keys())
+        self.assertEqual(len(refs), len(repos))
         for ref in refs:
-            self.assertEqual(ref.namespace, 'root/cimv2')
-            self.assertEqual(ref.classname, "LMI_SoftwareIdentityResource")
-            objpath = self.make_op(repos[ref.Name])
+            repoid = ref.Name
+            if repoid in self.repodb:
+                repo = self.repodb[repoid]
+            else:
+                repo = self.other_repos[repoid]
+            objpath = self.make_op(repo)
             self.assertCIMNameEqual(objpath.Dependent, ref)
-            del repos[ref.Name]
-        self.assertEqual(0, len(repos))
+            self.assertEqual(set(ref.key_properties()),
+                    set(["CreationClassName", "Name",
+                          "SystemCreationClassName", "SystemName"]))
+            repos.remove(ref.Name)
+        self.assertEqual(len(repos), 0)
 
-    def test_get_dependent_referents(self):
+    @swbase.test_with_repos(**{
+        'stable' : True,
+        'updates' : True,
+        'updates-testing' : False,
+        'misc' : False
+    })
+    def test_get_repository_computer_systems(self):
         """
-        Test ReferenceNames for repository.
+        Try to get computer system associated with repository.
         """
-        for repo in self.repodb:
+        for repo in self.repodb.values():
+            objpath = self.make_op(repo=repo)
+            refs = objpath.Dependent.to_instance().associators(
+                    AssocClass=self.CLASS_NAME,
+                    Role="Dependent",
+                    ResultRole="Antecedent",
+                    ResultClass=self.system_cs_name)
+            self.assertEqual(len(refs), 1)
+            self.assertCIMNameEqual(refs[0].path, objpath.Antecedent)
+
+    @swbase.test_with_repos(**{
+        'stable' : True,
+        'updates' : True,
+        'updates-testing' : False,
+        'misc' : False
+    })
+    def test_get_repository_computer_system_names(self):
+        """
+        Try to get computer system names associated with repository.
+        """
+        for repo in self.repodb.values():
             objpath = self.make_op(repo=repo)
             refs = objpath.Dependent.to_instance().associator_names(
                     AssocClass=self.CLASS_NAME,
@@ -142,7 +238,7 @@ class TestHostedSoftwareIdentityResource(base.SoftwareBaseTestCase):
                     ResultRole="Antecedent",
                     ResultClass=self.system_cs_name)
             self.assertEqual(len(refs), 1)
-            self.assertCIMNameEqual(objpath.Antecedent, refs[0])
+            self.assertCIMNameEqual(refs[0], objpath.Antecedent)
 
 def suite():
     """For unittest loaders."""

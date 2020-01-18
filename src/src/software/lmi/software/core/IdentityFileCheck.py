@@ -571,8 +571,13 @@ class FileCheck(object):
 
     @property
     def device(self):
-        """:rtype: (``tuple``) Pair of (installed, original)."""
-        return (self.getstat('dev'), self._pkg_file.device)
+        """
+        :returns: Pair of (installed, original). Where both are raw device
+            numbers. ``os.major()`` and ``os.minor()`` function can be used
+            on them.
+        :rtype: tuple
+        """
+        return (self.getstat('rdev'), self._pkg_file.device)
 
     @property
     def link_target(self):
@@ -664,7 +669,7 @@ def compute_checksums(checksum_type, file_path):
         LOG().error("could not open file \"%s\" for reading: %s",
                 file_path, exc)
         return None, None
-    return (rslts[0], rslts[1] if len(rslts) > 1 else rslts[0]*2)
+    return (rslts[0], rslts[1] if len(rslts) > 1 else rslts[0])
 
 @cmpi_logging.trace_function
 def checksumtype_num2hash(csumt):
@@ -799,7 +804,7 @@ def object_path2file_check(objpath):
                 "Could not find package matching SoftwareElementID \"%s\"" %
                 objpath["SoftwareElementID"])
         except errors.FileNotFound as exc:
-            raise pywbem.CIMError(pywbem.CIM_ERR_NOT_FOUND, exc.args[1])
+            raise pywbem.CIMError(pywbem.CIM_ERR_NOT_FOUND, exc.message)
 
     # last check for file path
     if objpath["Name"] not in pkg_check:

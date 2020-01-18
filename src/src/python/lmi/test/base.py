@@ -41,6 +41,8 @@ def render_iname(iname, indent=2):
     :returns: *iname* nicely rendered.
     :rtype: string
     """
+    if not isinstance(iname, pywbem.CIMInstanceName):
+        return repr(iname)
     lines = [ "%s" % iname.classname
             , " "*indent + "namespace: %s" % iname.namespace
             , " "*indent + "keys:"]

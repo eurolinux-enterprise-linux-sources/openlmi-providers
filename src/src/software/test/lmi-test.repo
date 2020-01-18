@@ -1,0 +1,5 @@
+[lmi-test]
+name=OpenLMI Test
+baseurl=file:///dev/usr/bin/false
+enabled=0
+gpgcheck=0

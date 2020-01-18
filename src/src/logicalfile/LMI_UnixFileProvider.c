@@ -120,6 +120,7 @@ static CMPIStatus LMI_UnixFileGetInstance(
     char aux[BUFLEN];
     const char *path;
     char *fsname;
+    char *fsclassname;
 
     st = lmi_check_required(_cb, cc, cop);
     if (st.rc != CMPI_RC_OK) {
@@ -134,9 +135,9 @@ static CMPIStatus LMI_UnixFileGetInstance(
         CMReturnWithChars(_cb, CMPI_RC_ERR_NOT_FOUND, aux);
     }
     /* set ignored stuff */
-    LMI_UnixFile_Set_FSCreationClassName(&lmi_file, FSCREATIONCLASSNAME);
-    st = get_fsname_from_stat(_cb, &sb, &fsname);
+    st = get_fsinfo_from_stat(_cb, &sb, path, &fsclassname, &fsname);
     check_status(st);
+    LMI_UnixFile_Set_FSCreationClassName(&lmi_file, fsclassname);
     LMI_UnixFile_Set_FSName(&lmi_file, fsname);
     free(fsname);
     get_class_from_stat(&sb, aux);

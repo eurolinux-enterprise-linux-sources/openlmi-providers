@@ -18,13 +18,22 @@
  * Authors: Roman Rakus <rrakus@redhat.com>
  */
 
+#include "LMI_Account.h"
+#include "LMI_Group.h"
+#include "LMI_Identity.h"
+
 typedef struct {
-    int wd_pwd, wd_grp;
+    int wd;
     int inotify_fd;
     struct timespec last_pwd, last_grp;
 } AccountIndication;
 
-bool filter_checker(const CMPISelectExp *filter);
+static const char* account_allowed_classes[] = {
+    LMI_Account_ClassName,
+    LMI_Group_ClassName,
+    LMI_Identity_ClassName,
+    NULL};
+
 bool watcher_init(AccountIndication *ind);
 bool watcher(AccountIndication *ind, void **data);
 void watcher_destroy(AccountIndication *ind);

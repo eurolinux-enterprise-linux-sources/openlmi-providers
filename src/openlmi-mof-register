@@ -30,6 +30,7 @@ import re
 import sqlite3
 from tempfile import NamedTemporaryFile
 from shutil import copyfile
+from lmi.base.mofparse import MOFParser
 
 global PEGASUS_REPOSITORY
 global DEFAULT_NAMESPACE
@@ -307,6 +308,11 @@ def db_get_registrations(cursor, mofs, reg):
     ret = cursor.fetchall()
     return ret
 
+def parse_includes(mofs, namespace):
+    # Get list of all files included from mofs, including the original mofs
+    parser = MOFParser()
+    return parser.parse_includes(mofs)
+
 def db_register(mofs, reg, version, namespace, cimom):
     db = db_init()
     dbc = db.cursor()
@@ -326,17 +332,19 @@ def db_register(mofs, reg, version, namespace, cimom):
         log_msg("ERROR: Cannot update multiple registrations")
         db_close(db)
         return
-    for moffile in mofs:
+    for moffile in parse_includes(mofs, namespace):
         # backup the mof file and create the database record
         bmof = os.path.basename(moffile)
         copyfile(moffile, REG_DB_PATH + "/mof/" + bmof)
         dbc.execute("INSERT INTO mof (fname, registration_id) VALUES (?, ?)",
                 (bmof, reg_id))
+        log_msg("%s added to database" % (bmof,))
     if reg:
         # backup the reg file and create the database record
         copyfile(reg, REG_DB_PATH + "/reg/" + os.path.basename(reg))
         dbc.execute("INSERT INTO reg (fname, registration_id) VALUES (?, ?)",
                 (os.path.basename(reg), reg_id))
+        log_msg("%s added to database" % (reg,))
     if cimom['sfcbd']:
         dbc.execute("INSERT INTO cimom_opts (cimom, registration_id, namespace, version) \
                 VALUES (?, ?, ?, ?)", ('sfcbd', reg_id, namespace, version))
@@ -356,6 +364,7 @@ def db_unregister(mofs, reg, version, namespace, cimom):
         for bmof in dbc.execute("SELECT fname FROM mof WHERE (registration_id = ?)", (reg_id,)):
             try:
                 os.unlink(REG_DB_PATH + "/mof/" + bmof[0])
+                log_msg("%s removed from database" % (bmof[0]))
             except OSError as e:
                 log_msg("Error deleting " + bmof[0] + ": " + e.strerror)
         dbc.execute("SELECT fname FROM reg WHERE registration_id = ?", (reg_id,))
@@ -363,6 +372,7 @@ def db_unregister(mofs, reg, version, namespace, cimom):
         if breg:
             try:
                 os.unlink(REG_DB_PATH + "/reg/" + breg[0])
+                log_msg("%s removed from database" % (breg[0]))
             except OSError as e:
                 log_msg("Error deleting " + breg[0] + ": " + e.strerror)
         dbc.execute("DELETE FROM registration WHERE (id = ?)", (reg_id,))
@@ -377,6 +387,9 @@ def db_get_cimom_opts(cursor, cimom, reg_id):
     cur = cursor.execute("SELECT namespace, version FROM cimom_opts \
             WHERE (cimom = ? and registration_id = ?)", (cimom, reg_id))
     row = cur.fetchone()
+    if not row:
+        # No registration for this CIMOM
+        return (None, None)
     namespace = row[0]
     version = row[1]
     return (namespace, version)
@@ -480,7 +493,7 @@ def main():
     cmd = args[0]
     if cmd == "register" or cmd == "unregister":
         if (just_mofs and (len(args) < 2)) or ((not just_mofs) and (len(args) < 3)):
-            sys.stderr.write("Not enough parameters.\n" )
+            sys.stderr.write("Not enough parameters.\n")
             usage()
             sys.exit(1)
         if (not just_mofs) and (version is None):

@@ -48,7 +48,8 @@
 const ConfigEntry *provider_config_defaults;
 const char *provider_name;
 
-#define FSCREATIONCLASSNAME "LMI_LocalFileSystem"
+#define FSCREATIONCLASSNAME_LOCAL "LMI_LocalFileSystem"
+#define FSCREATIONCLASSNAME_TRANSIENT "LMI_TransientFileSystem"
 #define GROUP_COMPONENT "GroupComponent"
 #define PART_COMPONENT "PartComponent"
 #define SAME_ELEMENT "SameElement"
@@ -77,17 +78,17 @@ const char *provider_name;
 )
 #define stoms(t) ((t)*1000000)
 
-#define fill_logicalfile(type, obj, name, fsname, creation_class)             \
+#define fill_logicalfile(type, obj, name, fsclassname, fsname, creation_class) \
     type##_Set_Name((obj), (name));                                           \
     type##_Set_CSCreationClassName((obj), get_system_creation_class_name());  \
     type##_Set_CSName((obj), get_system_name());                              \
-    type##_Set_FSCreationClassName((obj), FSCREATIONCLASSNAME);               \
+    type##_Set_FSCreationClassName((obj), fsclassname);                       \
     type##_Set_FSName((obj), (fsname));                                       \
     type##_Set_CreationClassName((obj), (creation_class));
 
-#define fill_basic(b, cmpitype, lmi_file, creation_class_name, fsname, sb)    \
+#define fill_basic(b, cmpitype, lmi_file, creation_class_name, fsclassname, fsname, sb) \
     LMI_##cmpitype##_Set_CreationClassName(lmi_file, creation_class_name);    \
-    LMI_##cmpitype##_Set_FSCreationClassName(lmi_file, FSCREATIONCLASSNAME);  \
+    LMI_##cmpitype##_Set_FSCreationClassName(lmi_file, fsclassname);          \
     LMI_##cmpitype##_Set_FSName(lmi_file, fsname);                            \
     LMI_##cmpitype##_Set_Readable(lmi_file, sb_isreadable(sb));               \
     LMI_##cmpitype##_Set_Writeable(lmi_file, sb_iswriteable(sb));             \
@@ -125,8 +126,8 @@ typedef struct {
 CMPIStatus lmi_check_required(const CMPIBroker *, const CMPIContext *, const CMPIObjectPath *);
 void get_class_from_stat(const struct stat *, char *);
 int get_class_from_path(const char *, char *);
-CMPIStatus get_fsname_from_stat(const CMPIBroker *, const struct stat *, char **);
-CMPIStatus get_fsname_from_path(const CMPIBroker *, const char *, char **);
+CMPIStatus get_fsinfo_from_stat(const CMPIBroker *, const struct stat *, const char *, char **, char **);
+CMPIStatus get_fsinfo_from_path(const CMPIBroker *, const char *, char **, char **);
 const char *get_string_property_from_op(const CMPIObjectPath *, const char *);
 CMPIStatus check_assoc_class(const CMPIBroker *, const char *, const char *, const char *);
 CMPIStatus stat_logicalfile_and_fill(const CMPIBroker *, logicalfile_t *, mode_t, const char *);

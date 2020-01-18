@@ -60,6 +60,10 @@ if (WITH-JOURNALD)
     add_subdirectory(journald)
 endif (WITH-JOURNALD)
 
+if (WITH-PCP)
+    add_subdirectory(pcp)
+endif (WITH-PCP)
+
 file(GLOB INIT_SKELS "*/lmi/*/__init__.skel")
 foreach(SKEL ${INIT_SKELS})
     #TODO: find a way how to do it in cmake

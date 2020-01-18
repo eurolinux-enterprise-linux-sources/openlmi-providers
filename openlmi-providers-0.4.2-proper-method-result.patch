@@ -1,0 +1,159 @@
+diff -up openlmi-providers-0.4.2/src/service-dbus/util/serviceutil.c.orig openlmi-providers-0.4.2/src/service-dbus/util/serviceutil.c
+--- openlmi-providers-0.4.2/src/service-dbus/util/serviceutil.c.orig	2014-01-08 10:04:52.000000000 +0100
++++ openlmi-providers-0.4.2/src/service-dbus/util/serviceutil.c	2014-01-21 15:17:24.215165276 +0100
+@@ -283,6 +283,29 @@ error:
+     return -1;
+ }
+ 
++char *job_result = NULL;
++GMainLoop *loop = NULL;
++
++static void on_manager_signal(
++    GDBusProxy *proxy,
++    gchar *sender_name,
++    gchar *signal_name,
++    GVariant *parameters,
++    gpointer user_data)
++{
++    gchar *result, *job;
++
++    if (g_strcmp0(signal_name, "JobRemoved") == 0) {
++
++        g_variant_get(parameters, "(u&os&s)", NULL, &job, NULL, &result);
++
++        if (g_strcmp0((gchar *) user_data, job) == 0) {
++            job_result = strdup(result);
++            g_main_loop_quit(loop);
++        }
++    }
++}
++
+ unsigned int service_operation(
+     const char *service,
+     const char *method,
+@@ -292,6 +315,9 @@ unsigned int service_operation(
+     GDBusProxy *manager_proxy = NULL;
+     GError *error = NULL;
+     GVariantBuilder *builder;
++    GMainContext *context;
++    GVariant *result = NULL;
++    gchar *job = NULL;
+ 
+     if (!service) {
+         strncpy(output, "Invalid service name", output_len);
+@@ -307,16 +333,22 @@ unsigned int service_operation(
+     g_type_init();
+ #endif
+ 
++    context = g_main_context_new();
++
++    g_main_context_push_thread_default(context);
++
+     manager_proxy = g_dbus_proxy_new_for_bus_sync(G_BUS_TYPE_SYSTEM, G_DBUS_PROXY_FLAGS_NONE,
+         NULL, MANAGER_NAME, MANAGER_OP, MANAGER_INTERFACE, NULL, &error);
+     if (!manager_proxy) {
+         strncpy(output, error->message, output_len);
+         g_error_free(error);
++        g_main_context_unref(context);
+         return -1;
+     }
+ 
+     error = NULL;
+     if (!strcasecmp(method, "EnableUnitFiles") || !strcasecmp(method, "DisableUnitFiles")) {
++        /* these two methods don't return job - always success, don't wait for signal etc. */
+         builder = g_variant_builder_new(G_VARIANT_TYPE ("as"));
+         g_variant_builder_add(builder, "s", service);
+         if (!strcasecmp(method, "EnableUnitFiles")) {
+@@ -326,23 +358,69 @@ unsigned int service_operation(
+             g_dbus_proxy_call_sync(manager_proxy, method, g_variant_new("(asb)", builder, FALSE),
+                 G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+         }
++        g_object_unref(manager_proxy);
++        g_main_context_pop_thread_default(context);
++        g_main_context_unref(context);
+         if (error) {
+             strncpy(output, error->message, output_len);
+             g_error_free(error);
+-            g_object_unref(manager_proxy);
+-            return -1;
+-        }
+-    } else {
+-        g_dbus_proxy_call_sync(manager_proxy, method, g_variant_new("(ss)", service, "replace"),
+-            G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+-        if (error) {
+-            strncpy(output, error->message, output_len);
+-            g_error_free(error);
+-            g_object_unref(manager_proxy);
+             return -1;
+         }
++        return 0;
++    }
++
++    g_dbus_proxy_call_sync(manager_proxy, "Subscribe", NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
++    if (error) {
++        strncpy(output, error->message, output_len);
++        g_error_free(error);
++        g_object_unref(manager_proxy);
++        g_main_context_unref(context);
++        return -1;
++    }
++
++    g_main_context_pop_thread_default(context);
++
++    loop = g_main_loop_new(context, FALSE);
++
++    error = NULL;
++    result = g_dbus_proxy_call_sync(manager_proxy, method, g_variant_new("(ss)", service, "replace"),
++        G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
++    if (error) {
++        strncpy(output, error->message, output_len);
++        g_error_free(error);
++        g_dbus_proxy_call_sync(manager_proxy, "Unsubscribe", NULL,
++            G_DBUS_CALL_FLAGS_NONE, -1,  NULL, NULL);
++        g_object_unref(manager_proxy);
++        g_main_loop_unref(loop);
++        g_main_context_unref(context);
++        return -1;
++    }
++
++    g_variant_get(result, "(&o)", &job);
++
++    g_signal_connect(manager_proxy, "g-signal", G_CALLBACK(on_manager_signal), job);
++
++    g_main_loop_run(loop);
++
++    lmi_debug("job_result: %s", job_result);
++    strncpy(output, job_result, output_len);
++
++    g_dbus_proxy_call_sync(manager_proxy, "Unsubscribe", NULL,
++        G_DBUS_CALL_FLAGS_NONE, -1,  NULL, &error);
++    if (error) {
++        lmi_debug("Unsubscribe error: %s", error->message);
++        g_error_free(error);
+     }
+ 
+     g_object_unref(manager_proxy);
++    g_main_loop_unref(loop);
++    g_main_context_unref(context);
++
++    if (strcmp(job_result, JR_DONE) != 0) {
++        free(job_result);
++        return -1;
++    }
++
++    free(job_result);
+     return 0;
+ }
+diff -up openlmi-providers-0.4.2/src/service-dbus/util/serviceutil.h.orig openlmi-providers-0.4.2/src/service-dbus/util/serviceutil.h
+--- openlmi-providers-0.4.2/src/service-dbus/util/serviceutil.h.orig	2014-01-08 10:04:52.000000000 +0100
++++ openlmi-providers-0.4.2/src/service-dbus/util/serviceutil.h	2014-01-21 15:17:24.215165276 +0100
+@@ -27,6 +27,9 @@
+ 
+ #define ARRAY_SIZE(name) (sizeof(name) / sizeof(name[0]))
+ 
++/* systemd job result string */
++#define JR_DONE "done"
++
+ const char *provider_name;
+ const ConfigEntry *provider_config_defaults;
+ 

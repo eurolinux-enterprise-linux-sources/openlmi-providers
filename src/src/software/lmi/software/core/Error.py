@@ -418,6 +418,7 @@ class Values(object):
 
 @cmpi_logging.trace_function
 def make_instance(
+        env,
         status_code=Values.CIMStatusCode.CIM_ERR_FAILED,
         error_type=Values.ErrorType.Software_Error,
         probable_cause=Values.ErrorType.Unknown,

@@ -32,25 +32,25 @@ from lmi.software.core import MethodResult
 from lmi.software.yumdb import YumDB
 
 @cmpi_logging.trace_function
-def generate_job_referents(_env, object_name, model, _keys_only):
+def generate_job_referents(env, object_name, model, _keys_only):
     """
     Handler for referents enumeration request.
     """
     job = Job.object_path2job(object_name)
 
     model["Job"] = Job.job2model(job)
-    model["JobParameters"] = MethodResult.job2model(job)
+    model["JobParameters"] = MethodResult.job2model(env, job)
     yield model
 
 @cmpi_logging.trace_function
-def generate_result_referents(_env, object_name, model, _keys_only):
+def generate_result_referents(env, object_name, model, _keys_only):
     """
     Handler for referents enumeration request.
     """
     job = MethodResult.object_path2job(object_name)
 
     model["Job"] = Job.job2model(job)
-    model["JobParameters"] = MethodResult.job2model(job)
+    model["JobParameters"] = MethodResult.job2model(env, job)
     yield model
 
 class LMI_AssociatedSoftwareJobMethodResult(CIMProvider2):
@@ -95,7 +95,7 @@ class LMI_AssociatedSoftwareJobMethodResult(CIMProvider2):
                     "Job id of Job(%d) does not match JobParameters(%d)." %
                     (job.jobid, jobid))
         model["Job"] = Job.job2model(job)
-        model["JobParameters"] = MethodResult.job2model(job)
+        model["JobParameters"] = MethodResult.job2model(env, job)
         return model
 
     @cmpi_logging.trace_method
@@ -124,7 +124,7 @@ class LMI_AssociatedSoftwareJobMethodResult(CIMProvider2):
 
         for job in YumDB.get_instance().get_job_list():
             model['Job'] = Job.job2model(job)
-            model['JobParameters'] = MethodResult.job2model(job)
+            model['JobParameters'] = MethodResult.job2model(env, job)
             yield model
 
     @cmpi_logging.trace_method

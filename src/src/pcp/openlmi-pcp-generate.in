@@ -43,6 +43,7 @@ STAMPFILE=$MOFREGDIR/stamp
 MOFFILE=$MOFREGDIR/60_LMI_PCP_PMNS.mof
 REGFILE=$MOFREGDIR/60_LMI_PCP_PMNS.reg
 PROVIDER=$PYTHON2_SITELIB/lmi/pcp/metric.py
+VERSION=@OPENLMI_VERSION@
 
 if [ ! -f $PROVIDER ]; then
     echo "Cannot find $PROVIDER" 1>&2
@@ -61,7 +62,7 @@ if [ -s $PCP_PMNS -a $PCP_PMNS -nt $STAMPFILE ]; then
         echo Unregistering $BASEMOFFILE
         echo Unregistering previous $MOFFILE
         echo Unregistering previous $REGFILE
-        openlmi-mof-register unregister $BASEMOFFILE $MOFFILE $REGFILE || :
+        openlmi-mof-register unregister -v $VERSION $BASEMOFFILE $MOFFILE $REGFILE || :
     fi
 
     echo Generating $MOFFILE
@@ -81,7 +82,7 @@ if [ -s $PCP_PMNS -a $PCP_PMNS -nt $STAMPFILE ]; then
     echo Registering $BASEMOFFILE
     echo Registering new $MOFFILE
     echo Registering new $REGFILE
-    openlmi-mof-register register $BASEMOFFILE $MOFFILE $REGFILE 2>&1 | # filter out two noise diagnostics
+    openlmi-mof-register register -v $VERSION $BASEMOFFILE $MOFFILE $REGFILE 2>&1 | # filter out two noise diagnostics
     egrep -v 'Warning: the instance already exists.|In this implementation, that means it cannot be changed.' || :
     touch $STAMPFILE
 else

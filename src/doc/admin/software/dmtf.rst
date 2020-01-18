@@ -25,12 +25,12 @@ managed system.
 Not implemented optional features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This implementation does not support:
- 
+
     Representing a Software Bundle
         Software bundle is represented by LMI_SoftwareIndentity instance
         having ``"Software Bundle"`` value present in its ``Classifications``
         property. It shall prepresent software groups. It extends the profile
-        for subclasses of ``CIM_OrderedComponent``. 
+        for subclasses of ``CIM_OrderedComponent``.
 
     Representing Installation Dependencies
         Dependencies between software packages are also unimplemented. This
@@ -72,7 +72,7 @@ This implementetion composes ``VersionString`` in following way: ::
     <Epoch>:<Version>-<Release>.<Architecture>
 
 The algorithm for comparing two RPM packages version is following:
-    
+
     1. Compare the ``Epoch`` (which is a number) of both packages. The one
        with higher epoch is newer. If they match, continue to point 2.
     2. Compare their ``Version`` attributes with `rpmvercmp`_ algorithm.
@@ -106,10 +106,11 @@ representing RPM packages. It's composed of following strings: ::
 
     LMI:LMI_SoftwareIdentity:<Name>-<Epoch>:<Version>-<Release>.<Architecture>
 
-Where the prefix ``"LMI:LMI_SoftwareIdentity:"`` is compared case-insensitively.
-The rest is also known as a *NEVRA*. When calling ``GetInstance()`` on this
-class, the ``"<Epoch>:"`` part can be omitted in the ``InstanceID`` key property
-of passed ``InstanceName``.
+Where the prefix ``"LMI:LMI_SoftwareIdentity:"`` is compared
+case-insensitively. The rest is also known as a *NEVRA*. When calling
+``GetInstance()`` on this class, the ``"<Epoch>:"`` part can be omitted in the
+``InstanceID`` key property of passed ``InstanceName`` in case the epoch is
+zero.
 
 Example
 ^^^^^^^
@@ -142,7 +143,7 @@ List of additional attributes of ``LMI_SoftwareIdentity``:
 
 List of additional attributes of ``LMI_SoftwareIdentityResource``:
 
-    ``Cost`` : sint32 
+    ``Cost`` : sint32
         Relative cost of accessing this repository.
     ``GPGCheck`` : boolean
         Whether the GPG signature check should be performed.
@@ -152,28 +153,28 @@ List of additional attributes of ``LMI_SoftwareIdentityResource``:
 Class overview
 ~~~~~~~~~~~~~~
 
-    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+ 
-    | Class-name                                                                    | Parent_class                                                        | Type             | 
-    +===============================================================================+=====================================================================+==================+ 
-    | :ref:`LMI_SoftwareIdentity<LMI-SoftwareIdentity>`                             | :ref:`CIM_SoftwareIdentity<CIM-SoftwareIdentity>`                   | Plain            | 
-    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+ 
-    | :ref:`LMI_SystemSoftwareCollection<LMI-SystemSoftwareCollection>`             | :ref:`CIM_SystemSpecificCollection<CIM-SystemSpecificCollection>`   | Plain            | 
-    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+ 
-    | :ref:`LMI_SoftwareIdentityResource<LMI-SoftwareIdentityResource>`             | :ref:`CIM_SoftwareIdentityResource<CIM-SoftwareIdentityResource>`   | Plain            | 
-    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+ 
-    | :ref:`LMI_HostedSoftwareCollection<LMI-HostedSoftwareCollection>`             | :ref:`CIM_HostedCollection<CIM-HostedCollection>`                   | Association      | 
-    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+ 
-    | :ref:`LMI_InstalledSoftwareIdentity<LMI-InstalledSoftwareIdentity>`           | :ref:`CIM_InstalledSoftwareIdentity<CIM-InstalledSoftwareIdentity>` | Association      | 
-    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+ 
-    | :ref:`LMI_HostedSoftwareIdentityResource<LMI-HostedSoftwareIdentityResource>` | :ref:`CIM_HostedAccessPoint<CIM-HostedAccessPoint>`                 | Association      | 
-    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+ 
-    | :ref:`LMI_ResourceForSoftwareIdentity<LMI-ResourceForSoftwareIdentity>`       | :ref:`CIM_SAPAvailableForElement<CIM-SAPAvailableForElement>`       | Association      | 
-    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+ 
-    | :ref:`LMI_MemberOfSoftwareCollection<LMI-MemberOfSoftwareCollection>`         | :ref:`CIM_MemberOfCollection<CIM-MemberOfCollection>`               | Aggregation      | 
-    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+ 
+    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+
+    | Class-name                                                                    | Parent_class                                                        | Type             |
+    +===============================================================================+=====================================================================+==================+
+    | :ref:`LMI_SoftwareIdentity<LMI-SoftwareIdentity>`                             | :ref:`CIM_SoftwareIdentity<CIM-SoftwareIdentity>`                   | Plain            |
+    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+
+    | :ref:`LMI_SystemSoftwareCollection<LMI-SystemSoftwareCollection>`             | :ref:`CIM_SystemSpecificCollection<CIM-SystemSpecificCollection>`   | Plain            |
+    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+
+    | :ref:`LMI_SoftwareIdentityResource<LMI-SoftwareIdentityResource>`             | :ref:`CIM_SoftwareIdentityResource<CIM-SoftwareIdentityResource>`   | Plain            |
+    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+
+    | :ref:`LMI_HostedSoftwareCollection<LMI-HostedSoftwareCollection>`             | :ref:`CIM_HostedCollection<CIM-HostedCollection>`                   | Association      |
+    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+
+    | :ref:`LMI_InstalledSoftwareIdentity<LMI-InstalledSoftwareIdentity>`           | :ref:`CIM_InstalledSoftwareIdentity<CIM-InstalledSoftwareIdentity>` | Association      |
+    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+
+    | :ref:`LMI_HostedSoftwareIdentityResource<LMI-HostedSoftwareIdentityResource>` | :ref:`CIM_HostedAccessPoint<CIM-HostedAccessPoint>`                 | Association      |
+    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+
+    | :ref:`LMI_ResourceForSoftwareIdentity<LMI-ResourceForSoftwareIdentity>`       | :ref:`CIM_SAPAvailableForElement<CIM-SAPAvailableForElement>`       | Association      |
+    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+
+    | :ref:`LMI_MemberOfSoftwareCollection<LMI-MemberOfSoftwareCollection>`         | :ref:`CIM_MemberOfCollection<CIM-MemberOfCollection>`               | Aggregation      |
+    +-------------------------------------------------------------------------------+---------------------------------------------------------------------+------------------+
 
     .. seealso::
-	Class model in :ref:`introduction` where above classes are coloured blue.
+        Class model in :ref:`introduction` where above classes are coloured blue.
 
 .. _software_update_profile:
 
@@ -256,36 +257,36 @@ allowing to create complex queries on package database.
 Class overview
 ~~~~~~~~~~~~~~
 
-    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+ 
-    | Class-name                                                                                          | Parent_class                                                            | Type               | 
-    +=====================================================================================================+=========================================================================+====================+ 
-    | :ref:`LMI_SoftwareInstallationService<LMI-SoftwareInstallationService>`                             | :ref:`CIM_SoftwareInstallationService<CIM-SoftwareInstallationService>` | Plain              | 
-    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+ 
-    | :ref:`LMI_SoftwareJob<LMI-SoftwareJob>`                                                             | :ref:`LMI_ConcreteJob<LMI-ConcreteJob>`                                 | Plain              | 
-    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+ 
-    | :ref:`LMI_SoftwareInstallationJob<LMI-SoftwareInstallationJob>`                                     | :ref:`LMI_SoftwareJob<LMI-SoftwareJob>`                                 | Plain              | 
-    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+ 
-    | :ref:`LMI_SoftwareVerificationJob<LMI-SoftwareVerificationJob>`                                     | :ref:`LMI_SoftwareJob<LMI-SoftwareJob>`                                 | Association        | 
-    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+ 
-    | :ref:`LMI_SoftwareMethodResult<LMI-SoftwareMethodResult>`                                           | :ref:`LMI_MethodResult<LMI-MethodResult>`                               | Association        | 
-    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+ 
-    | :ref:`LMI_SoftwareIdentityFileCheck<LMI-SoftwareIdentityFileCheck>`                                 | :ref:`CIM_FileSpecification<CIM-FileSpecification>`                     | Association        | 
-    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+ 
-    | :ref:`LMI_SoftwareInstallationServiceAffectsElement<LMI-SoftwareInstallationServiceAffectsElement>` | :ref:`CIM_ServiceAffectsElement<CIM-ServiceAffectsElement>`             | Association        | 
-    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+ 
-    | :ref:`LMI_SoftwareIdentityChecks<LMI-SoftwareIdentityChecks>`                                       |                                                                         | Aggregation        | 
-    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+ 
-    | :ref:`LMI_HostedSoftwareInstallationService<LMI-HostedSoftwareInstallationService>`                 | :ref:`CIM_HostedService<CIM-HostedService>`                             | Plain              | 
-    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+ 
-    | :ref:`LMI_AffectedSoftwareJobElement<LMI-AffectedSoftwareJobElement>`                               | :ref:`CIM_AffectedJobElement<CIM-AffectedJobElement>`                   | Plain              | 
-    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+ 
-    | :ref:`LMI_OwningSoftwareJobElement<LMI-OwningSoftwareJobElement>`                                   | :ref:`LMI_OwningJobElement<LMI-OwningJobElement>`                       | Plain              | 
-    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+ 
-    | :ref:`LMI_AssociatedSoftwareJobMethodResult<LMI-AssociatedSoftwareJobMethodResult>`                 | :ref:`LMI_AssociatedJobMethodResult<LMI-AssociatedJobMethodResult>`     | Plain              | 
-    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+ 
+    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+
+    | Class-name                                                                                          | Parent_class                                                            | Type               |
+    +=====================================================================================================+=========================================================================+====================+
+    | :ref:`LMI_SoftwareInstallationService<LMI-SoftwareInstallationService>`                             | :ref:`CIM_SoftwareInstallationService<CIM-SoftwareInstallationService>` | Plain              |
+    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+
+    | :ref:`LMI_SoftwareJob<LMI-SoftwareJob>`                                                             | :ref:`LMI_ConcreteJob<LMI-ConcreteJob>`                                 | Plain              |
+    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+
+    | :ref:`LMI_SoftwareInstallationJob<LMI-SoftwareInstallationJob>`                                     | :ref:`LMI_SoftwareJob<LMI-SoftwareJob>`                                 | Plain              |
+    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+
+    | :ref:`LMI_SoftwareVerificationJob<LMI-SoftwareVerificationJob>`                                     | :ref:`LMI_SoftwareJob<LMI-SoftwareJob>`                                 | Association        |
+    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+
+    | :ref:`LMI_SoftwareMethodResult<LMI-SoftwareMethodResult>`                                           | :ref:`LMI_MethodResult<LMI-MethodResult>`                               | Association        |
+    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+
+    | :ref:`LMI_SoftwareIdentityFileCheck<LMI-SoftwareIdentityFileCheck>`                                 | :ref:`CIM_FileSpecification<CIM-FileSpecification>`                     | Association        |
+    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+
+    | :ref:`LMI_SoftwareInstallationServiceAffectsElement<LMI-SoftwareInstallationServiceAffectsElement>` | :ref:`CIM_ServiceAffectsElement<CIM-ServiceAffectsElement>`             | Association        |
+    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+
+    | :ref:`LMI_SoftwareIdentityChecks<LMI-SoftwareIdentityChecks>`                                       |                                                                         | Aggregation        |
+    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+
+    | :ref:`LMI_HostedSoftwareInstallationService<LMI-HostedSoftwareInstallationService>`                 | :ref:`CIM_HostedService<CIM-HostedService>`                             | Plain              |
+    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+
+    | :ref:`LMI_AffectedSoftwareJobElement<LMI-AffectedSoftwareJobElement>`                               | :ref:`CIM_AffectedJobElement<CIM-AffectedJobElement>`                   | Plain              |
+    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+
+    | :ref:`LMI_OwningSoftwareJobElement<LMI-OwningSoftwareJobElement>`                                   | :ref:`LMI_OwningJobElement<LMI-OwningJobElement>`                       | Plain              |
+    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+
+    | :ref:`LMI_AssociatedSoftwareJobMethodResult<LMI-AssociatedSoftwareJobMethodResult>`                 | :ref:`LMI_AssociatedJobMethodResult<LMI-AssociatedJobMethodResult>`     | Plain              |
+    +-----------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------------+
 
     .. seealso::
-	Class model in :ref:`introduction` where above classes are coloured blue.
+        Class model in :ref:`introduction` where above classes are coloured blue.
 
 ..
     ***************************************************************************
@@ -295,6 +296,7 @@ Class overview
 
 ------------------------------------------------------------------------------
 
-.. [1] Precisely they must match following regular expression `r"[\w.+{}]+"`.
+.. [1] Precisely ``Release`` must match following regular expression ``r"[\\w.+{}]+"``.
+       ``Version`` allows also tilde character: ``r"[~\\w.+{}]+"``.
 .. [2] Because internally the query is executed upon the list obtained by
        enumeration of instances.

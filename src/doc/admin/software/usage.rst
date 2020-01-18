@@ -5,6 +5,9 @@ appropriate, an example for ``lmi`` meta-command, which is a part of
 *OpenLMI-Scripts* project, is added. Please refer to its `documentation`_
 for installation notes and usage.
 
+.. note::
+    Examples below are written for ``openlmi-tools`` version ``0.9``.
+
 Listing installed packages
 --------------------------
 Simple
@@ -37,14 +40,14 @@ get information from its key properties. ::
 
         c = connect("host", "user", "pass")
         for iname in c.root.cimv2.LMI_InstalledSoftwareIdentity.instance_names():
-            print(iname.path["InstalledSoftware"]["InstanceID"]
+            print(iname.InstalledSoftware.InstanceID
                     [len("LMI:LMI_SoftwareIdentity:"):])
 
 .. note::
     Whole instance is not available. To get it from association instance name,
     you need to add: ::
 
-        iname.path["InstalledSoftware"].to_instance()
+        iname.InstalledSoftware.to_instance()
 
 
 ``lmi`` meta-command
@@ -61,7 +64,7 @@ lmishell
 
     c = connect("host", "user", "pass")
     for repo in c.root.cimv2.LMI_SoftwareIdentityResource.instance_names():
-        print(repo.path["Name"])
+        print(repo.Name)
 
 .. seealso::
     :ref:`LMI_SoftwareIdentityResource<LMI-SoftwareIdentityResource>`
@@ -92,8 +95,7 @@ enumerate them for particular repository represented by
                 Role="AvailableSAP",
                 ResultRole="ManagedElement",
                 ResultClass="LMI_SoftwareIdentity"):
-            print("  " + identity.path["InstanceID"]
-                    [len("LMI:LMI_SoftwareIdentity:"):])
+            print("  " + identity.InstanceID[len("LMI:LMI_SoftwareIdentity:"):])
 
 .. note::
     This is not the same as running: ::
@@ -132,7 +134,7 @@ See example under `Searching for packages`_. ::
             Role="Element",
             ResultRole="Check",
             ResultClass="LMI_SoftwareIdentityFileCheck"):
-        print("%s" % filecheck.path["Name"])
+        print("%s" % filecheck.Name)
 
 .. seealso::
     :ref:`LMI_SoftwareIdentityFileCheck<LMI-SoftwareIdentityFileCheck>`
@@ -153,13 +155,13 @@ we may query package database in the following way.
 ::
 
     c = connect("host", "user", "pass")
-    service = LMI_SoftwareInstallationService.first_instance()
+    service = c.root.cimv2.LMI_SoftwareInstallationService.first_instance()
     # let's find all packages with "openlmi" in Name or Summary without
     # architecture specific code
     ret = service.FindIdentity(Name="openlmi", Architecture="noarch")
     for identity in ret.rparams["Matches"]:
         # we've got only references to instances
-        print identity.path["Name"][len("LMI:LMI_SoftwareIdentity:"):]
+        print identity.Name[len("LMI:LMI_SoftwareIdentity:"):]
 
 .. seealso::
     :ref:`FindIdentity()<LMI-SoftwareInstallationService-FindIdentity>` method
@@ -199,8 +201,8 @@ with a reference to some available software identity. ::
     cs = c.root.cimv2.PG_ComputerSystem.first_instance_name()
     installed_assoc = c.root.cimv2.LMI_InstalledSoftwareIdentity.create_instance(
         properties={
-                "InstalledSoftware" : identity.path,
-                "System"            : cs.path
+                "InstalledSoftware" : identity,
+                "System"            : cs
     })
 
 If the package is already installed, this operation will fail with
@@ -223,8 +225,8 @@ at background. Please refer to `Asynchronous Jobs`_ for more details.
             {"InstanceID" : "LMI:LMI_SoftwareIdentity:sblim-sfcb-0:1.3.16-5.fc19.x86_64"})
     cs = c.root.cimv2.PG_ComputerSystem.first_instance_name()
     ret = service.InstallFromSoftwareIdentity(
-            Source=identity.path,
-            Target=cs.path,
+            Source=identity,
+            Target=cs,
             # these options request to install available, not installed package
             InstallOptions=[4]     # [Install]
             # this will force installation if package is already installed
@@ -272,8 +274,8 @@ code). It's done like this: ::
 
     # note the use of "Sync" prefix
     ret = service.SyncInstallFromSoftwareIdentity(
-            Source=identity.path,
-            Target=cs.path,
+            Source=identity,
+            Target=cs,
             # these options request to install available, not installed package
             InstallOptions=[4]     # [Install]
             # this will force installation if package is already installed
@@ -298,7 +300,7 @@ This is also possible with: ::
     cs = c.root.cimv2.PG_ComputerSystem.first_instance_name()
     ret = service.to_instance().InstallFromSoftwareURI(
             Source="http://someserver.com/fedora/repo/package.rpm",
-            Target=cs.path,
+            Target=cs,
             InstallOptions=[4])  # [Install]
 
 Supported *URI* schemes are:
@@ -346,7 +348,7 @@ deleted here. ::
     if len(installed_assocs) > 0:
         for assoc in installed_assocs:
             assoc.to_instance().delete()
-            print("deleted %s" % assoc.path["InstalledSoftware"]["InstanceID"])
+            print("deleted %s" % assoc.InstalledSoftware.InstanceID)
     else:
         print("no package removed")
 
@@ -360,8 +362,8 @@ Asynchronous removal
             {"InstanceID" : "LMI:LMI_SoftwareIdentity:sblim-sfcb-0:1.3.16-5.fc19.x86_64"})
     cs = c.root.cimv2.PG_ComputerSystem.first_instance_name()
     ret = service.InstallFromSoftwareIdentity(
-            Source=identity.path,
-            Target=cs.path,
+            Source=identity,
+            Target=cs,
             InstallOptions=[9])  # [Uninstall]
 
 Again please refer to `Asynchronous installation`_ for examples on how to
@@ -390,8 +392,8 @@ Example below shows the synchronous invocation of asynchronous method. ::
             {"InstanceID" : "LMI:LMI_SoftwareIdentity:sblim-sfcb-0:1.3.16-5.fc19.x86_64"})
     cs = c.root.cimv2.PG_ComputerSystem.first_instance_name()
     ret = service.SyncInstallFromSoftwareIdentity(
-            Source=identity.path,
-            Target=cs.path,
+            Source=identity,
+            Target=cs,
             InstallOptions=[5]       # [Update]
             # to force update, when package is not installed
             #InstallOptions=[4, 5]   # [Install, Update]
@@ -432,15 +434,14 @@ if we want to be able to list failed files.
 ::
 
     c = connect("host", "user", "pass")
-    service = ns.LMI_SoftwareInstallationService.first_instance()
+    service = c.root.cimv2.LMI_SoftwareInstallationService.first_instance()
     identity = c.root.cimv2.LMI_SoftwareIdentity.new_instance_name(
             {"InstanceID" : "LMI:LMI_SoftwareIdentity:sblim-sfcb-0:1.3.16-5.fc19.x86_64"})
     results = service.VerifyInstalledIdentity(
-            Source=identity.path,
-            Target=ns.PG_ComputerSystem.first_instance().path)
-    nevra = (    identity.path['InstanceId']
-            if   isinstance(identity, LMIInstanceName)
-            else identity.InstanceId)[len('LMI:LMI_SoftwareIdentity:'):]
+            Source=identity,
+            Target=ns.PG_ComputerSystem.first_instance_name())
+    nevra = (    identity.ElementName if isinstance(identity, LMIInstance)
+            else identity.InstanceID[len('LMI:LMI_SoftwareIdentity:'):])
     if results.rval != 4096:
         msg = 'failed to verify identity "%s (rval=%d)"' % (nevra, results.rval)
         if results.errorstr:
@@ -587,7 +588,7 @@ Registered under filter name ``"LMI:LMI_SoftwareInstallationJob:Failed"``.
 
 New Job
 ~~~~~~~
-This event occurs when the new instance of 
+This event occurs when the new instance of
 :ref:`LMI_SoftwareJob<LMI-SoftwareJob>` is created.
 
 ::

@@ -27,6 +27,7 @@ from datetime import datetime
 import yum
 
 from lmi.software import util
+from lmi.software.yumdb.util import is_pkg_installed
 
 class PackageInfo(object):
     """
@@ -161,18 +162,27 @@ class PackageInfo(object):
                and (  (self.repoid is None or other.repoid is None)
                    or (self.repoid == other.repoid)))
 
-def make_package_from_db(pkg):
+def make_package_from_db(pkg, rpmdb):
     """
-    Create instance of PackageInfo from instance of
-    yum.packages.YumAvailablePackage.
-    @return instance of PackageInfo
+    Create instance of :py:class:`PackageInfo` from instance of
+    :py:class:`yum.packages.PackageObject`.
+
+    :param pkg: Yum package object.
+    :type pkg: :py:class:`yum.packages.PackageObject`
+    :param rpmdb: Installed package sack.
+    :type rpmdb: :py:class:`yum.rpmsack.RPMDBPackageSack`
+    :rtype: :py:class:`PackageInfo`
     """
     metadata = dict((k, getattr(pkg, k)) for k in (
         'summary', 'description', 'license', 'group', 'vendor', 'size',
         'repoid'))
-    if isinstance(pkg, yum.rpmsack.RPMInstalledPackage):
+    if is_pkg_installed(pkg, rpmdb):
         metadata['installed'] = True
-        metadata['install_time'] = datetime.fromtimestamp(pkg.installtime)
+        if isinstance(pkg, yum.sqlitesack.YumAvailablePackageSqlite):
+            metadata['install_time'] = datetime.fromtimestamp(
+                    rpmdb._tup2pkg[pkg.pkgtup].installtime)
+        else:
+            metadata['install_time'] = datetime.fromtimestamp(pkg.installtime)
     else:
         metadata['installed'] = False
     res = PackageInfo(id(pkg), pkg.name, pkg.epoch, pkg.version, pkg.release,

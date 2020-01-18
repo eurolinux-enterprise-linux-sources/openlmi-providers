@@ -19,17 +19,16 @@
 # Authors: Michal Minar <miminar@redhat.com>
 #
 """
-Unit tests for LMI_SoftwareIdentity provider.
+Unit tests for ``LMI_SystemSoftwareCollection`` provider.
 """
 
 import unittest
 
-import base
+import swbase
 
-class TestSystemSoftwareCollection(
-        base.SoftwareBaseTestCase): #pylint: disable=R0904
+class TestSystemSoftwareCollection(swbase.SwTestCase):
     """
-    Basic cim operations test.
+    Basic cim operations test on ``LMI_SystemSoftwareCollection``.
     """
 
     CLASS_NAME = "LMI_SystemSoftwareCollection"
@@ -37,8 +36,8 @@ class TestSystemSoftwareCollection(
 
     def make_op(self):
         """
-        @param ses SoftwareElementState property value
-        @return object path of SoftwareIdentity
+        :returns Object path of ``LMI_SystemSoftwareCollection``.
+        :rtype: :py:class:`lmi.shell.LMIInstanceName`
         """
         return self.cim_class.new_instance_name({
             "InstanceID" : "LMI:LMI_SystemSoftwareCollection"
@@ -46,7 +45,7 @@ class TestSystemSoftwareCollection(
 
     def test_get_instance(self):
         """
-        Tests GetInstance call on packages from our rpm cache.
+        Test ``GetInstance()`` call on ``LMI_SystemSoftwareCollection``.
         """
         objpath = self.make_op()
         inst = objpath.to_instance()
@@ -58,7 +57,7 @@ class TestSystemSoftwareCollection(
 
     def test_enum_instance_names(self):
         """
-        Tests EnumInstanceNames call on installed packages.
+        Test ``EnumInstanceNames()`` call on ``LMI_SystemSoftwareCollection``.
         """
         inames = self.cim_class.instance_names()
         self.assertEqual(len(inames), 1)
@@ -67,7 +66,7 @@ class TestSystemSoftwareCollection(
 
     def test_enum_instances(self):
         """
-        Tests EnumInstances call on installed packages.
+        Test ``EnumInstances()`` call on ``LMI_SystemSoftwareCollection``.
         """
         insts = self.cim_class.instances()
         self.assertEqual(len(insts), 1)

@@ -2,38 +2,47 @@ Testing
 =======
 Tests must be run as root on machine with cimom broker.
 There are number of environment variables, that affect test running:
-  LMI_CIMOM_USERNAME
-  LMI_CIMOM_PASSWORD
-  LMI_CIMOM_BROKER
-  LMI_CIMOM_URL
-  LMI_RUN_DANGEROUS      - valid values: 0, 1
-  LMI_SOFTWARE_USE_CACHE - valid values: 0, 1
-    - says, whether to use cache to download rpm packages, which will
-      be used to speed up testing
-  LMI_SOFTWARE_CACHE_DIR 
-    - directory, where to store rpm packages and other information
-    - if not set and LMI_SOFTWARE_USE_CACHE == '1', a temporary
-      directory will be created and deleted, when tests are
-      complete
+  ``LMI_CIMOM_USERNAME``
+  ``LMI_CIMOM_PASSWORD``
+  ``LMI_CIMOM_BROKER``
+  ``LMI_CIMOM_URL``
+  ``LMI_RUN_DANGEROUS``      - valid values: 0, 1
+  ``LMI_RUN_TEDIOUS``        - valid values: 0, 1
+  ``LMI_SOFTWARE_DB_CACHE``
+        Where to store the file with information about generated testing
+        database. If not set, temporary file will be created and whole cache
+        will be removed after tests are complete. If set and the file does not
+        yet exist its created and user may choose if he wants to preserve
+        generated cache for another run (with ``LMI_SOFTWARE_CLEANUP_CACHE``).
+        If set and the file exists, database is reused, which speeds up the
+        intialization.
+  ``LMI_SOFTWARE_CLEANUP_CACHE`` - valid values: 0, 1
+        Whether to preserve generated reposities and database file (cache) for
+        next runs to speed them up. Defaults to False.
+        ``LMI_SOFTWARE_DB_CACHE`` must be set for this to have any effect.
+
+Dependencies
+------------
+ * @development-tools (rpmbuild, createrepo, yum-utils, etc.)
 
 Preparation
 -----------
-Tests are installed together with source in single python egg. They are
-accessible from ``lmi.test.software`` package.
+``lmi.test`` module must be on python path. The easiest way to get it there is
+to export ``PYTHONPATH`` environment variable like this: ::
+
+    export PYTHONPATH="${PATH_TO_GIT_ROOT}/src/python"
 
 Running tests
 -------------
-They can be run with a script ``lmi-test-software``.
-
 Each test module can be run as a stand-alone script or with run.py script: ::
 
-    ./run.py -c --cache-dir=/var/tmp
+    ./run.py
 
 To pass any arguments to underlying ``unittest.main()`` function, append them
 after "--" swith like this: ::
 
-    ./run.py -c --cache-dir=/var/tmp -- -v TestSoftwarePackage
+    ./run.py -- -v TestSoftwarePackage
 
 All environment variables defined above can be overriden by command-line
-arguments.
+arguments. See help message of ``run.py`` script.
 

@@ -34,8 +34,9 @@ static IMError im_err = IM_ERR_OK;
 static void LMI_JournalLogRecordInstanceCreationIndicationInitialize(const CMPIContext *ctx)
 {
     lmi_init(JOURNAL_CIM_LOG_NAME, _cb, ctx, provider_config_defaults);
-    im = im_create_manager(ind_gather, ind_filter_cb, false, ind_watcher,
+    im = im_create_manager(ind_gather, NULL, false, ind_watcher,
                            IM_IND_CREATION, _cb, &im_err);
+    im_register_filter_classes(im, &journald_allowed_classes[0], &im_err);
 }
 
 static CMPIStatus LMI_JournalLogRecordInstanceCreationIndicationIndicationCleanup(

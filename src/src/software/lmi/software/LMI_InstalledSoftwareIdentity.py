@@ -232,6 +232,60 @@ class LMI_InstalledSoftwareIdentity(CIMProvider2):
             LOG().info('package "%s" removed' % pkg_info)
 
     @cmpi_logging.trace_method
+    def MI_associators(self,
+            env,
+            objectName,
+            assocClassName,
+            resultClassName,
+            role,
+            resultRole,
+            propertyList):
+        """
+        Yield instance names associated to ``ComputerSystem`` instance.
+
+        This overrides method of superclass for a very good reason. Original
+        method calls ``GetInstance()`` on every single object path returned by
+        :py:meth:`LMI_InstalledSoftwareIdentity.references` which is very time
+        consuming operation on ``LMI_SoftwareIdentity`` class in particular.
+        On slow machine this could take several minutes. This method just
+        enumerates requested instances directly.
+        """
+        ns = util.Configuration.get_instance().namespace
+        ch = env.get_cimom_handle()
+        if (   (not role or role.lower() == "system")
+           and (not resultRole or resultRole.lower() == "installedsoftware")
+           and ch.is_subclass(ns,
+               sub=objectName.classname,
+               super="CIM_ComputerSystem")):
+            try:
+                ComputerSystem.check_path(env, objectName, 'ObjectName')
+            except pywbem.CIMError as e:
+                if e.args[0] != pywbem.CIM_ERR_NOT_FOUND:
+                    raise
+                raise pywbem.CIMError(pywbem.CIM_ERR_INVALID_PARAMETER,
+                        e.args[1])
+
+            model = pywbem.CIMInstance(classname='LMI_SoftwareIdentity')
+            model.path = util.new_instance_name('LMI_SoftwareIdentity')
+            with YumDB.get_instance() as ydb:
+                pkglist = ydb.get_package_list('installed', sort=True)
+                for pkg_info in pkglist:
+                    yield Identity.pkg2model(pkg_info,
+                            keys_only=False, model=model)
+
+        else:
+            # no need to optimize associators for SoftwareIdentity
+            for obj in CIMProvider2.MI_associators(self,
+                    env,
+                    objectName,
+                    assocClassName,
+                    resultClassName,
+                    role,
+                    resultRole,
+                    propertyList):
+                yield obj
+
+    @cmpi_logging.trace_method
     def references(self, env, object_name, model, result_class_name, role,
                    result_role, keys_only):
         """Instrument Associations.

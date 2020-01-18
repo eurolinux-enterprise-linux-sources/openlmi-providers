@@ -50,6 +50,10 @@ class TransactionExecutionFailed(TransactionError):
     """Raised, when YumBase.doTransaction() method fails."""
     pass
 
+class TerminatingError(TransactionError):
+    """Raised when job can not be completed due to provider's termination."""
+    pass
+
 class PackageError(YumDBError):
     """Generic exception for error concerning package handling."""
     pass

@@ -32,28 +32,17 @@ YumDB is a context manager supposed to be used by any provider as the
 only accessor to yum api.
 """
 
-import errno
 from functools import wraps
 import inspect
-import os
-import re
-import time
-from multiprocessing import Process, Queue #pylint: disable=W0404
-from pywbem.cim_provider2 import CIMProvider2
-import Queue as TQueue   # T as threaded
 import threading
-import yum
 
 from lmi.base import singletonmixin
 from lmi.providers import cmpi_logging
-from lmi.providers.IndicationManager import IndicationManager
-from lmi.software.util import Configuration
-from lmi.software.util import get_signal_name
 from lmi.software.yumdb import jobs
+from lmi.software.yumdb.jobmanager import JobManager
 from lmi.software.yumdb.packagecheck import PackageCheck
 from lmi.software.yumdb.packagecheck import PackageFile
 from lmi.software.yumdb.packageinfo import PackageInfo
-from lmi.software.yumdb.process import YumWorker
 from lmi.software.yumdb.repository import Repository
 
 LOG = cmpi_logging.get_logger(__name__)
@@ -61,30 +50,6 @@ LOG = cmpi_logging.get_logger(__name__)
 # *****************************************************************************
 # Utilities
 # *****************************************************************************
-def log_reply_error(job, reply):
-    """
-    Raises an exception in case of error occured in worker process
-    while processing job.
-    """
-    if isinstance(reply, (int, long)):
-        # asynchronous job
-        return
-    if not isinstance(reply, jobs.YumJob):
-        raise TypeError('expected instance of jobs.YumJob for reply, not "%s"'
-                % reply.__class__.__name__)
-    if reply.result == jobs.YumJob.RESULT_ERROR:
-        LOG().error("%s failed with error %s: %s",
-                job, reply.result_data[0].__name__, str(reply.result_data[1]))
-        LOG().trace_warn("%s exception traceback:\n%s%s: %s",
-                job, "".join(reply.result_data[2]),
-                reply.result_data[0].__name__, str(reply.result_data[1]))
-        reply.result_data[1].tb_printed = True
-        raise reply.result_data[1]
-    elif reply.result == jobs.YumJob.RESULT_TERMINATED:
-        LOG().warn('%s terminated', job)
-    else:
-        LOG().debug('%s completed with success', job)
-
 def _make_async_job(jobcls, *args, **kwargs):
     """Creates asynchronous job, filling it wih some metadata."""
     if not issubclass(jobcls, jobs.YumAsyncJob):
@@ -165,163 +130,25 @@ class YumDB(singletonmixin.Singleton):
     # this is to inform Singleton, that __init__ should be called only once
     ignoreSubsequent = True
 
-    # This serves to all code base as a global variable used to check,
-    # whether YumDB instance is running under cimom broker or under worker
-    # process. This is important for code used in callback functions passed
-    # to worker responsible for creating instances of ConcreteJob. This code
-    # must avoid using calls to YumDB while running under worker. This
-    #
-    # Worker process must set this to False before starting its event handling
-    # loop.
-    RUNNING_UNDER_CIMOM_PROCESS = True
-
     @cmpi_logging.trace_method
-    def __init__(self, **kwargs):   #pylint: disable=W0231
+    def __init__(self):   #pylint: disable=W0231
         """
         All arguments are passed to yum.YumBase constructor.
         """
-        self._process = None
-        if kwargs is None:
-            kwargs = {}
-        self._yum_kwargs = kwargs
-
-        self._session_lock = threading.RLock()
-        self._session_level = 0
-
-        # used to guard access to _expected list and _process
-        self._reply_lock = threading.Lock()
-        # used to wait for job to be processed and received
-        self._reply_cond = threading.Condition(self._reply_lock)
-        # ids of all expected jobs -- those to be processed by YumWorker
-        self._expected = []
-        # {job_id : reply, ... }
-        self._replies = {}
+        self._access_lock = threading.RLock()
+        self._jobmgr = None
         LOG().trace_info('YumDB initialized')
 
     # *************************************************************************
     # Private methods
     # *************************************************************************
-    @cmpi_logging.trace_method
-    def _handle_reply_timeout(self, job):
-        """
-        This is called when timeout occurs while waiting on downlink queue for
-        reply. Delay can be caused by worker process's early termination (bug).
-        This handler tries to recover from such an situation.
-        """
-        if not self._worker.is_alive():
-            if self._worker.exitcode < 0:
-                LOG().error("[jobid=%d] worker"
-                    " process(pid=%d) killed by signal %s", job.jobid,
-                    self._worker.pid, get_signal_name(-self._process.exitcode))
-            else:
-                LOG().error("[jobid=%d] worker"
-                    " process(pid=%d) is dead - exit code: %d",
-                    job.jobid, self._process.pid, self._worker.exitcode)
-            with self._reply_lock:
-                self._process = None
-                LOG().error("[jobid=%d] starting new worker process", job.jobid)
-                self._expected = []
-                if not isinstance(job, jobs.YumBeginSession):
-                    with self._session_lock:
-                        if self._session_level > 0:
-                            LOG().info('restoring session level=%d',
-                                    self._session_level)
-                            new_session_job = jobs.YumBeginSession()
-                            self._worker.uplink.put(new_session_job)
-                            reply = self._worker.downlink.get()
-                            log_reply_error(new_session_job, reply)
-                self._worker.uplink.put(job)
-                self._expected.append(job.jobid)
-                # other waiting processes need to resend their requests
-                self._reply_cond.notifyAll()
-        else:
-            LOG().info("[jobid=%d] process is running, waiting some more",
-                    job.jobid)
-
-    @cmpi_logging.trace_method
-    def _receive_reply(self, job):
-        """
-        Block on downlink queue to receive expected replies from worker
-        process. Only one thread can be executing this code at any time.
-
-        Only one thread can block on downlink channel to obtain reply. If
-        it's reply for him, he takes it and leaves, otherwise he adds it to
-        _replies dictionary and notifies other threads. This thread is the
-        one, whose job appears as first in _expected list.
-
-        In case, that worker process terminated due to some error. Restart it
-        and resend all the job requests again.
-        """
-        timeout = Configuration.get_instance().get_safe(
-                'Jobs', 'WaitCompleteTimeout', float)
-        while True:
-            LOG().debug("[jobid=%d] blocking on downlink queue", job.jobid)
-            try:
-                jobout = self._worker.downlink.get(block=True, timeout=timeout)
-                if jobout.jobid == job.jobid:
-                    LOG().debug("[jobid=%d] received desired reply", job.jobid)
-                    with self._reply_lock:
-                        self._expected.remove(job.jobid)
-                        self._reply_cond.notifyAll()
-                        return jobout
-                else:
-                    LOG().info("[jobid=%d] received reply for another thread"
-                            " (jobid=%d)", job.jobid, jobout.jobid)
-                    with self._reply_lock:
-                        self._replies[jobout.jobid] = jobout
-                        self._reply_cond.notifyAll()
-            except TQueue.Empty:
-                LOG().warn("[jobid=%d] wait for job reply timeout"
-                        "(%d seconds) occured", job.jobid, timeout)
-                self._handle_reply_timeout(job)
-
-    @cmpi_logging.trace_method
-    def _send_and_receive(self, job):
-        """
-        Sends a request to server and blocks until job is processed by
-        YumWorker and reply is received.
-
-        Only one thread can block on downlink channel to obtain reply. This
-        thread is the one, whose job appears as first in _expected list. Server
-        processes input jobs sequentially. That's why it's safe to presume,
-        that jobs are received in the same order as they were send. Thanks to
-        that we don't have to care about receiving replies for the other
-        waiting threads.
-
-        @return result of job
-        """
-        with self._reply_lock:
-            self._worker.uplink.put(job)
-            if getattr(job, 'async', False) is True:
-                return job.jobid
-            self._expected.append(job.jobid)
-            while True:
-                if job.jobid in self._replies:
-                    LOG().debug("[jobid=%d] desired reply already received",
-                            job.jobid)
-                    try:
-                        self._expected.remove(job.jobid)
-                    except ValueError:
-                        LOG().warn("[jobid=%d] reply not in expected list",
-                                job.jobid)
-                    self._reply_cond.notifyAll()
-                    return self._replies.pop(job.jobid)
-                elif job.jobid not in self._expected:
-                    # process terminated, resending job
-                    LOG().warn("[jobid=%d] job removed from expected list,"
-                            " sending request again", job.jobid)
-                    self._worker.uplink.put(job)
-                    self._expected.append(job.jobid)
-                elif job.jobid == self._expected[0]:
-                    # now it's our turn to block on downlink
-                    break
-                else:   # another thread blocks on downlink -> let's sleep
-                    LOG().debug("[jobid=%d] another %d threads expecting reply,"
-                        " suspending...", job.jobid, len(self._expected) - 1)
-                    self._reply_cond.wait()
-                    LOG().debug("[jobid=%d] received reply, waking up",
-                            job.jobid)
-        return self._receive_reply(job)
+    @property
+    def jobmgr(self):
+        with self._access_lock:
+            if self._jobmgr is None:
+                self._jobmgr = JobManager()
+                self._jobmgr.start()
+            return self._jobmgr
 
     def _do_job(self, job):
         """
@@ -332,49 +159,26 @@ class YumDB(singletonmixin.Singleton):
         @return reply
         """
         LOG().trace_verbose("doing %s", job)
-        reply = self._send_and_receive(job)
-        log_reply_error(job, reply)
+        reply = self.jobmgr.process(job)
+        jobs.log_reply_error(job, reply)
         LOG().trace_verbose("job %s done", job.jobid)
         return reply
-
-    @property
-    def _worker(self):
-        """
-        YumWorker process accessor. It's created upon first need.
-        """
-        if self._process is None:
-            LOG().trace_info("starting YumWorker")
-            uplink = Queue()
-            downlink = Queue()
-            self._process = YumWorker(uplink, downlink,
-                    indication_manager=IndicationManager.get_instance(),
-                    yum_kwargs=self._yum_kwargs)
-            self._process.start()
-            LOG().trace_info("YumWorker started with pid=%s", self._process.pid)
-        return self._process
 
     # *************************************************************************
     # Special methods
     # *************************************************************************
     @cmpi_logging.trace_method
     def __enter__(self):
-        with self._session_lock:
-            if self._session_level == 0:
-                self._do_job(jobs.YumBeginSession())
-                LOG().trace_info('new session started')
-            self._session_level += 1
-            LOG().trace_info('nested to session level=%d', self._session_level)
-            return self
+        """ Start a new session. """
+        with self._access_lock:
+            self.jobmgr.begin_session()
+        return self
 
     @cmpi_logging.trace_method
     def __exit__(self, exc_type, exc_value, traceback):
-        with self._session_lock:
-            if self._session_level == 1:
-                self._do_job(jobs.YumEndSession())
-                LOG().trace_info('session ended')
-            LOG().trace_info('emerged from session level=%d',
-                    self._session_level)
-            self._session_level = max(self._session_level - 1, 0)
+        """ End active session. """
+        with self._access_lock:
+            self.jobmgr.end_session()
 
     # *************************************************************************
     # Public methods
@@ -382,17 +186,16 @@ class YumDB(singletonmixin.Singleton):
     @cmpi_logging.trace_method
     def clean_up(self):
         """
-        Shut down the YumWorker process.
+        Shut down job manager and all the other threads and processes it has
+        created.
         """
-        with self._reply_lock:
-            if self._process is not None:
-                LOG().info('terminating YumWorker')
-                self._process.uplink.put(None)  # terminating command
-                self._process.join()
-                LOG().info('YumWorker terminated')
-                self._process = None
+        with self._access_lock:
+            if self._jobmgr is not None:
+                self._do_job(jobs.YumShutDown())
+                self._jobmgr.join()
+                self._jobmgr = None
             else:
-                LOG().warn("clean_up called, when process not initialized!")
+                LOG().warn("clean_up called with JobManager not initialized")
 
     # *************************************************************************
     # Jobs with simple results

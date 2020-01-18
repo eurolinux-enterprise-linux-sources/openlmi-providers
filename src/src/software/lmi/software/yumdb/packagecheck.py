@@ -32,6 +32,7 @@ import pwd
 import rpm
 import yum
 
+from lmi.providers import cmpi_logging
 from lmi.software.yumdb import errors
 
 CHECKSUMTYPE_STR2NUM = dict((val.lower(), k) for (k, val) in
@@ -49,6 +50,24 @@ CHECKSUMTYPE_STR2NUM = dict((val.lower(), k) for (k, val) in
 FILE_TYPE_NAMES = ( 'unknown', 'file', 'directory', 'symlink', 'fifo'
                   , 'character device', 'block device')
 
+DEFAULT_FILE_DIGEST_ALGO = 'md5'
+#: Rpm package header contains information about files encoded in tuples.
+#: This is an index to such a tuple pointing to a digest string.
+DIGEST_POS_IN_FILE_TUPLE = 12
+
+#: This maps length of digest string encoded in hexadecimal format to
+#: corresponding algorithm name.
+DIGEST_LENGTH_TO_NAME = {
+    32  : 'md5',
+    40  : 'sha1',
+    64  : 'sha256',
+    96  : 'sha384',
+    128 : 'sha512',
+    56  : 'sha224'
+}
+
+LOG = cmpi_logging.get_logger(__name__)
+
 class PackageFile(object):
     """
     Metadata related to particular file on filesystem belonging to RPM package.
@@ -60,7 +79,7 @@ class PackageFile(object):
       ``uid``       - (``int``) User ID.
       ``gid``       - (``int``) Group ID.
       ``mode``      - (``int``) Raw file mode.
-      ``device``    - (``int``) Device number.
+      ``device``    - (``int``) Raw device number (st_rdev of stat object).
       ``mtime``     - (``int``) Last modification time in seconds.
       ``size``      - (``long``) File size as a number of bytes.
       ``link_target`` - (``str``) Link target of symlink. None if ``file_type``
@@ -186,13 +205,56 @@ class PackageCheck(object):
 
 def pkg_checksum_type(pkg):
     """
-    @return integer representation of checksum type
+    This returns digest algorithm code used to generate file digests stored in
+    rpm package. It is not a constant number for whole distribution. It may
+    vary package to package
+
+    There are several ways how to get checksum type out of installed package.
+
+        1. Usually it's obtainable from package header under
+           ``RPMTAG_FILEDIGESTALGO`` but sometimes it may not be set.
+        2. In that case it can be deduced from digest length of any file
+           present in package.
+        3. If no regular file is present. Try to query package's ``yumdb_info``
+            attribute which contain preferred digest algorithm used in this
+            distribution.
+        4. Unfortunately this ``yumdb_info`` attribute is present just
+           occasionally. In case it's not set, fallback to default digest
+           algorithm which is 'md5'.
+
+    I just love yum API -- just kidding.
+
+    ..
+        I'd love to point to some documentation, where this is explained. If
+        only such documentation existed.
+
+        Find out how to ensure that ``yumdb_info`` is set without running
+        package verification.
+
+    :returns: Code of digest algorithm used for package files.
+    :rtype: int
     """
-    if not isinstance(pkg, yum.packages.YumAvailablePackage):
+    if not isinstance(pkg, yum.packages.PackageObject):
         raise TypeError("pkg must be an instance of YumAvailablePackage")
     if isinstance(pkg, yum.rpmsack.RPMInstalledPackage):
-        return pkg.hdr[rpm.RPMTAG_FILEDIGESTALGO]
-    return CHECKSUMTYPE_STR2NUM[pkg.yumdb_info.checksum_type.lower()]
+        # in certain cases this may be None
+        checksum = pkg.hdr[rpm.RPMTAG_FILEDIGESTALGO]
+        if checksum is not None:
+            return checksum
+    if hasattr(pkg, 'hdr'):
+        for filetuple in pkg.hdr.fiFromHeader():
+            digest = filetuple[DIGEST_POS_IN_FILE_TUPLE]
+            if not digest:
+                continue    # not a regular file
+            length = len(digest)
+            if not length in DIGEST_LENGTH_TO_NAME:
+                LOG().warn('unexpected length of digest: %d not in {%s}',
+                        length, ", ".join(DIGEST_LENGTH_TO_NAME.keys()))
+                continue
+            return CHECKSUMTYPE_STR2NUM[DIGEST_LENGTH_TO_NAME[length]]
+    LOG().warn('no digest algorithm found in header of package "%s"', pkg.nevra)
+    cst_str = getattr(pkg.yumdb_info, 'checksum_type', '').lower()
+    return CHECKSUMTYPE_STR2NUM.get(cst_str, CHECKSUMTYPE_STR2NUM['md5'])
 
 def make_package_check_from_db(vpkg, file_name=None):
     """

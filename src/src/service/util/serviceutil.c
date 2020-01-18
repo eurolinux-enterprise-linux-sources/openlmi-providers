@@ -155,7 +155,7 @@ Service_Next_Enum(void *handle, Service* svc, const char *service)
       }
       else
       {
-        state = sscanf(result,"%d %s", &pid, svname);
+        state = sscanf(result,"%d %255s", &pid, svname);
         svc->pid = pid;
         if (state) ret = 1;
       }

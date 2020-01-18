@@ -1228,7 +1228,8 @@ get_dbus_string_property(DBusConnection *bus, const char *object_path,
         return FALSE;
     }
 
-    if ((reply = dbus_connection_send_with_reply_and_block(bus, msg, -1, &dbus_error)) == NULL) {
+    if ((reply = dbus_connection_send_with_reply_and_block(bus, msg,
+                    DBUS_TIMEOUT_INFINITE, &dbus_error)) == NULL) {
         dbus_message_unref(msg);
         RETURN_DBUS_ERROR(g_error, dbus_error);
     }
@@ -1327,7 +1328,8 @@ get_dbus_properties(DBusConnection *bus, const char *object_path,
         return FALSE;
     }
 
-    if ((reply = dbus_connection_send_with_reply_and_block(bus, msg, -1, &dbus_error)) == NULL) {
+    if ((reply = dbus_connection_send_with_reply_and_block(bus, msg,
+                    DBUS_TIMEOUT_INFINITE, &dbus_error)) == NULL) {
         dbus_message_unref(msg);
         RETURN_DBUS_ERROR(g_error, dbus_error);
     }
@@ -1474,7 +1476,8 @@ dbus_discover_call(DBusConnection *bus, const char *target, GVariant *options,
         RETURN_DBUS_ERROR(g_error, dbus_error);
     }
 
-    if ((reply = dbus_connection_send_with_reply_and_block(bus, msg, -1, &dbus_error)) == NULL) {
+    if ((reply = dbus_connection_send_with_reply_and_block(bus, msg,
+                    DBUS_TIMEOUT_INFINITE, &dbus_error)) == NULL) {
         dbus_message_unref(msg);
         RETURN_DBUS_ERROR(g_error, dbus_error);
     }
@@ -1626,7 +1629,8 @@ dbus_change_login_policy_call(DBusConnection *bus, const gchar *dbus_path, const
         RETURN_DBUS_ERROR(g_error, dbus_error);
     }
 
-    if ((reply = dbus_connection_send_with_reply_and_block(bus, msg, -1, &dbus_error)) == NULL) {
+    if ((reply = dbus_connection_send_with_reply_and_block(bus, msg,
+                    DBUS_TIMEOUT_INFINITE, &dbus_error)) == NULL) {
         dbus_message_unref(msg);
         RETURN_DBUS_ERROR(g_error, dbus_error);
     }
@@ -1764,7 +1768,8 @@ dbus_join_leave_call(const char *method, DBusConnection *bus, const gchar *dbus_
         RETURN_DBUS_ERROR(g_error, dbus_error);
     }
 
-    if ((reply = dbus_connection_send_with_reply_and_block(bus, msg, -1, &dbus_error)) == NULL) {
+    if ((reply = dbus_connection_send_with_reply_and_block(bus, msg,
+                    DBUS_TIMEOUT_INFINITE, &dbus_error)) == NULL) {
         dbus_message_unref(msg);
         RETURN_DBUS_ERROR(g_error, dbus_error);
     }
