@@ -4,7 +4,7 @@
 
 Name:           openlmi-providers
 Version:        0.5.0
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Set of basic CIM providers
 
 License:        LGPLv2+
@@ -13,6 +13,8 @@ Source0:        http://fedorahosted.org/released/openlmi-providers/%{name}-%{ver
 
 # Fix traceback when provider info is not found in the registration database
 Patch0:         openlmi-providers-0.5.0-fix-mof-register-traceback.patch
+# Add support for instantiable services
+Patch1:         openlmi-providers-0.5.0-instantiable-services.patch
 
 # Upstream name has been changed from cura-providers to openlmi-providers
 Provides:       cura-providers = %{version}-%{release}
@@ -380,6 +382,7 @@ This package contains the documents for OpenLMI Journald provider.
 %prep
 %setup -q
 %patch0 -p1
+%patch1 -p1
 
 %build
 mkdir -p %{_target_platform}
@@ -979,6 +982,10 @@ if [ "$1" -eq 0 ]; then
 fi >> %logfile 2>&1
 
 %changelog
+* Wed Apr 13 2016 Vitezslav Crhonek <vcrhonek@redhat.com> - 0.5.0-4
+- Add support for instantiable services
+- Resolves: rhbz#1020441
+
 * Mon Jan 19 2015 Radek Novacek <rnovacek@redhat.com> 0.5.0-3
 - Fix traceback when provider registration is not found
 - Resolves: rhbz#1182100

@@ -1,0 +1,494 @@
+commit 3bb8d59f7a9008bb3fe118c96ea6d1fd82aa5329
+Author: Vitezslav Crhonek <vcrhonek@redhat.com>
+Date:   Thu Sep 11 13:32:14 2014 +0200
+
+    Service: Support instantiable services
+
+diff --git a/src/service-dbus/util/serviceutil.c b/src/service-dbus/util/serviceutil.c
+index bca196e..93bb29f 100644
+--- a/src/service-dbus/util/serviceutil.c
++++ b/src/service-dbus/util/serviceutil.c
+@@ -98,16 +98,6 @@ SList *service_find_all(
+         return NULL;
+     }
+ 
+-    error = NULL;
+-    result = g_dbus_proxy_call_sync(manager_proxy, "ListUnitFiles", NULL,
+-        G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+-    if (error) {
+-        strncpy(output, error->message, output_len);
+-        g_error_free(error);
+-        g_object_unref(manager_proxy);
+-        return NULL;
+-    }
+-
+     slist = malloc(sizeof(SList));
+     if (!slist) {
+         strncpy(output, "Insufficient memory", output_len);
+@@ -123,37 +113,65 @@ SList *service_find_all(
+     }
+     slist->cnt = 0;
+ 
+-    g_variant_get(result, "(a(ss))", &arr);
+-    while (g_variant_iter_loop(arr, "(ss)", &primary_unit_name, NULL)) {
+-        /* Ignore instantiable units (containing '@') until we find out how to properly present them */
+-        if (strstr(primary_unit_name, ".service") && strchr(primary_unit_name, '@') == NULL) {
+-            if (slist->cnt >= slist->nalloc) {
+-                char **tmpp = NULL;
+-                slist->nalloc *= 2;
+-                tmpp = realloc(slist->name, slist->nalloc * sizeof(char *));
+-                if (!tmpp) {
+-                    g_variant_iter_free(arr);
+-                    free(slist);
+-                    g_object_unref(manager_proxy);
+-                    strncpy(output, "Insufficient memory", output_len);
+-                    return NULL;
+-                }
+-                slist->name = tmpp;
+-            }
+-            tmps = strdup(primary_unit_name);
+-            if (!tmps)
+-                continue;
+-            slist->name[slist->cnt] = strndup(basename(tmps), strlen(basename(tmps)));
+-            if (!slist->name[slist->cnt]) {
+-                free(tmps);
+-                continue;
+-            }
+-            free(tmps);
+-            slist->cnt++;
+-        }
+-    }
++/*
++ * INST - are we looking for instanciated services?
++ * METHOD - systemd dbus method to be called
++ * FMT_GET - format string for g_variant_get
++ * FMT_LOOP - format string for g_variant_iter_loop
++ * ... - unfilled variables in g_variant_iter_loop
++ */
++#define GET_NAMES(INST, METHOD, FMT_GET, FMT_LOOP, ...) \
++\
++    error = NULL; \
++    result = g_dbus_proxy_call_sync(manager_proxy, (METHOD), NULL, \
++        G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error); \
++    if (error) { \
++        strncpy(output, error->message, output_len); \
++        g_error_free(error); \
++        g_object_unref(manager_proxy); \
++        free(slist); \
++        return NULL; \
++    } \
++\
++    g_variant_get(result, (FMT_GET), &arr); \
++    while (g_variant_iter_loop(arr, (FMT_LOOP), &primary_unit_name, __VA_ARGS__)) { \
++        if (strstr(primary_unit_name, ".service") && \
++           (((strchr(primary_unit_name, '@') != NULL) && (INST)) || \
++           ((strchr(primary_unit_name, '@') == NULL) && !(INST)))) { \
++            if (slist->cnt >= slist->nalloc) { \
++                char **tmpp = NULL; \
++                slist->nalloc *= 2; \
++                tmpp = realloc(slist->name, slist->nalloc * sizeof(char *)); \
++                if (!tmpp) { \
++                    g_variant_iter_free(arr); \
++                    service_free_slist(slist); \
++                    g_object_unref(manager_proxy); \
++                    strncpy(output, "Insufficient memory", output_len); \
++                    return NULL; \
++                } \
++                slist->name = tmpp; \
++            } \
++            tmps = strdup(primary_unit_name); \
++            if (!tmps) \
++                continue; \
++            slist->name[slist->cnt] = strndup(basename(tmps), strlen(basename(tmps))); \
++            if (!slist->name[slist->cnt]) { \
++                free(tmps); \
++                continue; \
++            } \
++            free(tmps); \
++            slist->cnt++; \
++        } \
++    } \
+     g_variant_iter_free(arr);
+ 
++    /* get names of all non-instantiated services */
++    GET_NAMES(0, "ListUnitFiles", "(a(ss))", "(ss)", NULL)
++
++    /* get names of all instantiated services */
++    GET_NAMES(1, "ListUnits", "(a(ssssssouso))", "(ssssssouso)", \
++        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
++
+     g_object_unref(manager_proxy);
+     return slist;
+ }
+@@ -168,7 +186,7 @@ AllServices *service_get_properties_all(
+     GVariant *result = NULL;
+     GVariant *result2 = NULL;
+     GError *error = NULL;
+-    gchar *primary_unit_name = NULL, *unit_file_state = NULL;
++    gchar *primary_unit_name = NULL;
+     gchar *unit, *value_str;
+     AllServices *svcs = NULL;
+     char *tmps = NULL;
+@@ -195,131 +213,157 @@ AllServices *service_get_properties_all(
+         NULL, MANAGER_NAME, MANAGER_OP, MANAGER_INTERFACE, NULL, &error);
+     if (!manager_proxy) goto err;
+ 
+-    error = NULL;
+-    result = g_dbus_proxy_call_sync(manager_proxy, "ListUnitFiles", NULL,
+-        G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+-    if (error) goto err;
+-
+-    g_variant_get(result, "(a(ss))", &arr);
+-    while (g_variant_iter_loop(arr, "(ss)", &primary_unit_name, &unit_file_state)) {
+-        /* Ignore instantiable units (containing '@') until we find out how to properly present them */
+-        if (strstr(primary_unit_name, ".service") && strchr(primary_unit_name, '@') == NULL) {
+-
+-            /* Realloc we are out of space */
+-            if (svcs->cnt >= svcs->nalloc) {
+-                Service **tmpp = NULL;
+-                svcs->nalloc *= 2;
+-                tmpp = realloc(svcs->svc, svcs->nalloc * sizeof(Service *));
+-                if (!tmpp) {
+-                    g_variant_iter_free(arr);
+-                    service_free_all_services(svcs);
+-                    g_object_unref(manager_proxy);
+-                    strncpy(output, "Insufficient memory", output_len);
+-                    return NULL;
+-                }
+-                svcs->svc = tmpp;
+-            }
+-
+-            svcs->svc[svcs->cnt] = malloc(sizeof(Service));
+-
+-            /* Fill svName */
+-            tmps = strdup(primary_unit_name);
+-            if (!tmps) {
+-                g_variant_iter_free(arr);
+-                service_free_all_services(svcs);
+-                g_object_unref(manager_proxy);
+-                strncpy(output, "Insufficient memory", output_len);
+-                return NULL;
+-            }
+-            svcs->svc[svcs->cnt]->svName = strndup(basename(tmps), strlen(basename(tmps)));
+-            if (!svcs->svc[svcs->cnt]->svName) {
+-                free(tmps);
+-                g_variant_iter_free(arr);
+-                service_free_all_services(svcs);
+-                g_object_unref(manager_proxy);
+-                strncpy(output, "Insufficient memory", output_len);
+-                return NULL;
+-            }
+-            free(tmps);
+-
+-            /* Fill svEnabledDefault */
+-            svcs->svc[svcs->cnt]->svEnabledDefault = NOT_APPLICABLE;
+-            if (strncmp(unit_file_state, "enabled", 7) == 0)
+-                svcs->svc[svcs->cnt]->svEnabledDefault = ENABLED;
+-            if (strncmp(unit_file_state, "disabled", 8) == 0)
+-                svcs->svc[svcs->cnt]->svEnabledDefault = DISABLED;
+-
+-            error = NULL;
+-            result = g_dbus_proxy_call_sync(manager_proxy, "LoadUnit", g_variant_new("(s)", svcs->svc[svcs->cnt]->svName),
+-                G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+-            if (error) goto err;
+-
+-            g_variant_get(result, "(o)", &unit);
+-
+-            proxy = g_dbus_proxy_new_for_bus_sync(G_BUS_TYPE_SYSTEM, G_DBUS_PROXY_FLAGS_NONE,
+-                NULL, MANAGER_NAME, unit, PROPERTY_INTERFACE, NULL, &error);
+-            if (!proxy) goto err;
+-
+-            error = NULL;
+-            result = g_dbus_proxy_call_sync(proxy, "Get", g_variant_new("(ss)", UNIT_INTERFACE, "Description"),
+-                G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+-            if (error) goto err;
+ 
+-            /* Fill svCaption */
+-            g_variant_get(result, "(v)", &result2);
+-            g_variant_get(result2, "s", &value_str);
+-            svcs->svc[svcs->cnt]->svCaption = strdup(value_str);
+-            if (!svcs->svc[svcs->cnt]->svCaption) goto err;
+ 
+-            error = NULL;
+-            result = g_dbus_proxy_call_sync(proxy, "Get", g_variant_new("(ss)", UNIT_INTERFACE, "ActiveState"),
+-                G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+-            if (error) goto err;
+-
+-            /* Fill svOperationalStatus, svStarted, svStatus */
+-            g_variant_get(result, "(v)", &result2);
+-            g_variant_get(result2, "s", &value_str);
+-
+-            if (strcmp(value_str, "active") == 0) {
+-                svcs->svc[svcs->cnt]->svOperationalStatus[0] = OS_OK;
+-                svcs->svc[svcs->cnt]->svOperationalStatusCnt = 1;
+-                svcs->svc[svcs->cnt]->svStarted = 1;
+-                svcs->svc[svcs->cnt]->svStatus = strdup("OK");
+-            }
+-            else if (strcmp(value_str, "inactive") == 0) {
+-                svcs->svc[svcs->cnt]->svOperationalStatus[0] = OS_COMPLETED;
+-                svcs->svc[svcs->cnt]->svOperationalStatus[1] = OS_OK;
+-                svcs->svc[svcs->cnt]->svOperationalStatusCnt = 2;
+-                svcs->svc[svcs->cnt]->svStarted = 0;
+-                svcs->svc[svcs->cnt]->svStatus = strdup("Stopped");
+-            }
+-            else if (strcmp(value_str, "failed") == 0) {
+-                svcs->svc[svcs->cnt]->svOperationalStatus[0] = OS_COMPLETED;
+-                svcs->svc[svcs->cnt]->svOperationalStatus[1] = OS_ERROR;
+-                svcs->svc[svcs->cnt]->svOperationalStatusCnt = 2;
+-                svcs->svc[svcs->cnt]->svStarted = 0;
+-                svcs->svc[svcs->cnt]->svStatus = strdup("Stopped");
+-            }
+-            else if (strcmp(value_str, "activating") == 0) {
+-                svcs->svc[svcs->cnt]->svOperationalStatus[0] = OS_STARTING;
+-                svcs->svc[svcs->cnt]->svOperationalStatusCnt = 1;
+-                svcs->svc[svcs->cnt]->svStarted = 0;
+-                svcs->svc[svcs->cnt]->svStatus = strdup("Stopped");
+-            }
+-            else if (strcmp(value_str, "deactivating") == 0) {
+-                svcs->svc[svcs->cnt]->svOperationalStatus[0] = OS_STOPPING;
+-                svcs->svc[svcs->cnt]->svOperationalStatusCnt = 1;
+-                svcs->svc[svcs->cnt]->svStarted = 1;
+-                svcs->svc[svcs->cnt]->svStatus = strdup("OK");
+-            }
+-            if (!svcs->svc[svcs->cnt]->svStatus) goto err;
+-
+-            g_object_unref(proxy);
+-            svcs->cnt++;
+-        }
+-    }
+-    g_variant_iter_free(arr);
+-    arr = NULL;
++/*
++ * INST - are we looking for instanciated services?
++ * METHOD - systemd dbus method to be called
++ * FMT_GET - format string for g_variant_get
++ * FMT_LOOP - format string for g_variant_iter_loop
++ * ... - unfilled variables in g_variant_iter_loop
++ */
++#define GET_PROPERTIES(INST, METHOD, FMT_GET, FMT_LOOP, ...) \
++\
++    error = NULL; \
++    result = g_dbus_proxy_call_sync(manager_proxy, (METHOD), NULL, \
++        G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error); \
++    if (error) goto err; \
++\
++    g_variant_get(result, (FMT_GET), &arr); \
++    while (g_variant_iter_loop(arr, (FMT_LOOP), &primary_unit_name, __VA_ARGS__)) { \
++        if (strstr(primary_unit_name, ".service") && \
++           (((strchr(primary_unit_name, '@') != NULL) && (INST)) || \
++           ((strchr(primary_unit_name, '@') == NULL) && !(INST)))) { \
++\
++            /* Realloc we are out of space */ \
++            if (svcs->cnt >= svcs->nalloc) { \
++                Service **tmpp = NULL; \
++                svcs->nalloc *= 2; \
++                tmpp = realloc(svcs->svc, svcs->nalloc * sizeof(Service *)); \
++                if (!tmpp) { \
++                    g_variant_iter_free(arr); \
++                    service_free_all_services(svcs); \
++                    g_object_unref(manager_proxy); \
++                    strncpy(output, "Insufficient memory", output_len); \
++                    return NULL; \
++                } \
++                svcs->svc = tmpp; \
++            } \
++\
++            svcs->svc[svcs->cnt] = malloc(sizeof(Service)); \
++\
++            /* Fill svName */ \
++            tmps = strdup(primary_unit_name); \
++            if (!tmps) { \
++                g_variant_iter_free(arr); \
++                service_free_all_services(svcs); \
++                g_object_unref(manager_proxy); \
++                strncpy(output, "Insufficient memory", output_len); \
++                return NULL; \
++            } \
++            svcs->svc[svcs->cnt]->svName = strndup(basename(tmps), strlen(basename(tmps))); \
++            if (!svcs->svc[svcs->cnt]->svName) { \
++                free(tmps); \
++                g_variant_iter_free(arr); \
++                service_free_all_services(svcs); \
++                g_object_unref(manager_proxy); \
++                strncpy(output, "Insufficient memory", output_len); \
++                return NULL; \
++            } \
++            free(tmps); \
++\
++            error = NULL; \
++            result = g_dbus_proxy_call_sync(manager_proxy, "LoadUnit", g_variant_new("(s)", svcs->svc[svcs->cnt]->svName), \
++                G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error); \
++            if (error) goto err; \
++\
++            g_variant_get(result, "(o)", &unit); \
++\
++            proxy = g_dbus_proxy_new_for_bus_sync(G_BUS_TYPE_SYSTEM, G_DBUS_PROXY_FLAGS_NONE, \
++                NULL, MANAGER_NAME, unit, PROPERTY_INTERFACE, NULL, &error); \
++            if (!proxy) goto err; \
++\
++            error = NULL; \
++            result = g_dbus_proxy_call_sync(proxy, "Get", g_variant_new("(ss)", UNIT_INTERFACE, "Description"), \
++                G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error); \
++            if (error) goto err; \
++\
++            /* Fill svCaption */ \
++            g_variant_get(result, "(v)", &result2); \
++            g_variant_get(result2, "s", &value_str); \
++            svcs->svc[svcs->cnt]->svCaption = strdup(value_str); \
++            if (!svcs->svc[svcs->cnt]->svCaption) goto err; \
++\
++            error = NULL; \
++            result = g_dbus_proxy_call_sync(proxy, "Get", g_variant_new("(ss)", UNIT_INTERFACE, "UnitFileState"), \
++                G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error); \
++            if (error) goto err; \
++\
++            /* Fill svEnabledDefault */ \
++            svcs->svc[svcs->cnt]->svEnabledDefault = NOT_APPLICABLE; \
++            g_variant_get(result, "(v)", &result2); \
++            g_variant_get(result2, "s", &value_str); \
++            if (strncmp(value_str, "enabled", 7) == 0) \
++                svcs->svc[svcs->cnt]->svEnabledDefault = ENABLED; \
++            if (strncmp(value_str, "disabled", 8) == 0) \
++                svcs->svc[svcs->cnt]->svEnabledDefault = DISABLED; \
++\
++            error = NULL; \
++            result = g_dbus_proxy_call_sync(proxy, "Get", g_variant_new("(ss)", UNIT_INTERFACE, "ActiveState"), \
++                G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error); \
++            if (error) goto err; \
++\
++            /* Fill svOperationalStatus, svStarted, svStatus */ \
++            g_variant_get(result, "(v)", &result2); \
++            g_variant_get(result2, "s", &value_str); \
++\
++            if (strcmp(value_str, "active") == 0) { \
++                svcs->svc[svcs->cnt]->svOperationalStatus[0] = OS_OK; \
++                svcs->svc[svcs->cnt]->svOperationalStatusCnt = 1; \
++                svcs->svc[svcs->cnt]->svStarted = 1; \
++                svcs->svc[svcs->cnt]->svStatus = strdup("OK"); \
++            } \
++            else if (strcmp(value_str, "inactive") == 0) { \
++                svcs->svc[svcs->cnt]->svOperationalStatus[0] = OS_COMPLETED; \
++                svcs->svc[svcs->cnt]->svOperationalStatus[1] = OS_OK; \
++                svcs->svc[svcs->cnt]->svOperationalStatusCnt = 2; \
++                svcs->svc[svcs->cnt]->svStarted = 0; \
++                svcs->svc[svcs->cnt]->svStatus = strdup("Stopped"); \
++            } \
++            else if (strcmp(value_str, "failed") == 0) { \
++                svcs->svc[svcs->cnt]->svOperationalStatus[0] = OS_COMPLETED; \
++                svcs->svc[svcs->cnt]->svOperationalStatus[1] = OS_ERROR; \
++                svcs->svc[svcs->cnt]->svOperationalStatusCnt = 2; \
++                svcs->svc[svcs->cnt]->svStarted = 0; \
++                svcs->svc[svcs->cnt]->svStatus = strdup("Stopped"); \
++            } \
++            else if (strcmp(value_str, "activating") == 0) { \
++                svcs->svc[svcs->cnt]->svOperationalStatus[0] = OS_STARTING; \
++                svcs->svc[svcs->cnt]->svOperationalStatusCnt = 1; \
++                svcs->svc[svcs->cnt]->svStarted = 0; \
++                svcs->svc[svcs->cnt]->svStatus = strdup("Stopped"); \
++            } \
++            else if (strcmp(value_str, "deactivating") == 0) { \
++                svcs->svc[svcs->cnt]->svOperationalStatus[0] = OS_STOPPING; \
++                svcs->svc[svcs->cnt]->svOperationalStatusCnt = 1; \
++                svcs->svc[svcs->cnt]->svStarted = 1; \
++                svcs->svc[svcs->cnt]->svStatus = strdup("OK"); \
++            } \
++            if (!svcs->svc[svcs->cnt]->svStatus) goto err; \
++\
++            g_object_unref(proxy); \
++            svcs->cnt++; \
++        } \
++    } \
++    g_variant_iter_free(arr); \
++    arr = NULL; \
++
++    /* get properties of all non-instantiated services */
++    GET_PROPERTIES(0, "ListUnitFiles", "(a(ss))", "(ss)", NULL)
++
++    /* get properties of all instantiated services */
++    GET_PROPERTIES(1, "ListUnits", "(a(ssssssouso))", "(ssssssouso)", \
++        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+ 
+     g_object_unref(manager_proxy);
+     manager_proxy = NULL;
+@@ -352,7 +396,7 @@ int service_get_properties(
+     GVariant *result = NULL;
+     GVariant *result2 = NULL;
+     GError *error = NULL;
+-    gchar *fragment_path = NULL, *unit_file_state = NULL;
++    gchar *fragment_path = NULL;
+     gchar *unit, *value_str;
+     char found = 0;
+ 
+@@ -375,24 +419,37 @@ int service_get_properties(
+         NULL, MANAGER_NAME, MANAGER_OP, MANAGER_INTERFACE, NULL, &error);
+     if (!manager_proxy) goto error;
+ 
+-    error = NULL;
+-    result = g_dbus_proxy_call_sync(manager_proxy, "ListUnitFiles", NULL,
+-        G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+-    if (error) goto error;
+-
+     svc->svEnabledDefault = NOT_APPLICABLE;
+-    g_variant_get(result, "(a(ss))", &arr);
+-    while (g_variant_iter_loop(arr, "(ss)", &fragment_path, &unit_file_state)) {
+-        if (strstr(fragment_path, service) && strcmp(strstr(fragment_path, service), service) == 0) {
+-            found = 1;
+-            if (strncmp(unit_file_state, "enabled", 7) == 0)
+-                svc->svEnabledDefault = ENABLED;
+-            if (strncmp(unit_file_state, "disabled", 8) == 0)
+-                svc->svEnabledDefault = DISABLED;
+-        }
++
++/*
++ * METHOD - systemd dbus method to be called
++ * FMT_GET - format string for g_variant_get
++ * FMT_LOOP - format string for g_variant_iter_loop
++ * ... - unfilled variables in g_variant_iter_loop
++ */
++#define GET_SERVICE(METHOD, FMT_GET, FMT_LOOP, ...) \
++\
++    error = NULL; \
++    result = g_dbus_proxy_call_sync(manager_proxy, (METHOD), NULL, \
++        G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error); \
++    if (error) goto error; \
++\
++    g_variant_get(result, (FMT_GET), &arr); \
++    while (g_variant_iter_loop(arr, (FMT_LOOP), &fragment_path,  __VA_ARGS__)) { \
++        if (strstr(fragment_path, service) && strcmp(strstr(fragment_path, service), service) == 0) { \
++            found = 1; \
++        } \
++    } \
++    g_variant_iter_free(arr); \
++    arr = NULL; \
++
++    GET_SERVICE("ListUnitFiles", "(a(ss))", "(ss)", NULL)
++
++    /* not found, isn't it an instantiable service? */
++    if (!found) {
++        GET_SERVICE("ListUnits", "(a(ssssssouso))", "(ssssssouso)", \
++            NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+     }
+-    g_variant_iter_free(arr);
+-    arr = NULL;
+ 
+     if (!found) {
+         free(svc->svName);
+@@ -424,6 +481,18 @@ int service_get_properties(
+     if (!svc->svCaption) goto error;
+ 
+     error = NULL;
++    result = g_dbus_proxy_call_sync(proxy, "Get", g_variant_new("(ss)", UNIT_INTERFACE, "UnitFileState"),
++        G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
++    if (error) goto error;
++
++    g_variant_get(result, "(v)", &result2);
++    g_variant_get(result2, "s", &value_str);
++    if (strncmp(value_str, "enabled", 7) == 0)
++        svc->svEnabledDefault = ENABLED;
++    if (strncmp(value_str, "disabled", 8) == 0)
++        svc->svEnabledDefault = DISABLED;
++
++    error = NULL;
+     result = g_dbus_proxy_call_sync(proxy, "Get", g_variant_new("(ss)", UNIT_INTERFACE, "ActiveState"),
+         G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+     if (error) goto error;
