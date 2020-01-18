@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_ProcessorChipContainer.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 static const CMPIBroker* _cb;
@@ -31,15 +30,15 @@ static void LMI_ProcessorChipContainerInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_ProcessorChipContainerCleanup( 
+static CMPIStatus LMI_ProcessorChipContainerCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_ProcessorChipContainerEnumInstanceNames( 
+static CMPIStatus LMI_ProcessorChipContainerEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -49,12 +48,12 @@ static CMPIStatus LMI_ProcessorChipContainerEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_ProcessorChipContainerEnumInstances( 
+static CMPIStatus LMI_ProcessorChipContainerEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_ProcessorChipContainer lmi_cpu_chip_container;
     LMI_ProcessorChipRef lmi_cpu_chip;
@@ -74,7 +73,7 @@ static CMPIStatus LMI_ProcessorChipContainerEnumInstances(
 
     LMI_ChassisRef_Init(&lmi_chassis, _cb, ns);
     LMI_ChassisRef_Set_CreationClassName(&lmi_chassis,
-            ORGID "_" CHASSIS_CLASS_NAME);
+            LMI_Chassis_ClassName);
     LMI_ChassisRef_Set_Tag(&lmi_chassis, dmi_get_chassis_tag(&dmi_chassis));
 
     for (i = 0; i < dmi_cpus_nb; i++) {
@@ -82,7 +81,7 @@ static CMPIStatus LMI_ProcessorChipContainerEnumInstances(
 
         LMI_ProcessorChipRef_Init(&lmi_cpu_chip, _cb, ns);
         LMI_ProcessorChipRef_Set_CreationClassName(&lmi_cpu_chip,
-                ORGID "_" CPU_CHIP_CLASS_NAME);
+                LMI_ProcessorChip_ClassName);
         LMI_ProcessorChipRef_Set_Tag(&lmi_cpu_chip, dmi_cpus[i].id);
 
         LMI_ProcessorChipContainer_Set_GroupComponent(&lmi_cpu_chip_container,
@@ -100,62 +99,62 @@ done:
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_ProcessorChipContainerGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_ProcessorChipContainerGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_ProcessorChipContainerCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_ProcessorChipContainerModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_ProcessorChipContainerCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_ProcessorChipContainerDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_ProcessorChipContainerModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_ProcessorChipContainerDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_ProcessorChipContainerExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_ProcessorChipContainerAssociationCleanup( 
+static CMPIStatus LMI_ProcessorChipContainerAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -248,13 +247,13 @@ static CMPIStatus LMI_ProcessorChipContainerReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_ProcessorChipContainer,
     LMI_ProcessorChipContainer,
     _cb,
     LMI_ProcessorChipContainerInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_ProcessorChipContainer,
     LMI_ProcessorChipContainer,
     _cb,

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,9 +20,8 @@
 
 #include <konkret/konkret.h>
 #include "LMI_PCIDeviceSystemDevice.h"
-#include "LMI_Hardware.h"
+#include "utils.h"
 #include "PCIDev.h"
-#include "globals.h"
 
 static const CMPIBroker* _cb;
 
@@ -33,14 +32,14 @@ static void LMI_PCIDeviceSystemDeviceInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 
     if (init_pci_access(&acc_system_dev, PCI_FILL_CLASS) != 0) {
-        error("Failed to access the PCI bus.");
+        lmi_error("Failed to access the PCI bus.");
         abort();
     }
 }
 
-static CMPIStatus LMI_PCIDeviceSystemDeviceCleanup( 
+static CMPIStatus LMI_PCIDeviceSystemDeviceCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     cleanup_pci_access(&acc_system_dev);
@@ -48,7 +47,7 @@ static CMPIStatus LMI_PCIDeviceSystemDeviceCleanup(
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_PCIDeviceSystemDeviceEnumInstanceNames( 
+static CMPIStatus LMI_PCIDeviceSystemDeviceEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -58,18 +57,18 @@ static CMPIStatus LMI_PCIDeviceSystemDeviceEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_PCIDeviceSystemDeviceEnumInstances( 
+static CMPIStatus LMI_PCIDeviceSystemDeviceEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_PCIDeviceSystemDevice lmi_pci_sys_device;
     LMI_PCIDeviceRef lmi_dev;
     const char *ns = KNameSpace(cop);
     struct pci_dev *dev;
-    char device_id_str[PCI_DEVID_STR_SIZE];
+    char device_id_str[BUFLEN];
 
     for (dev = acc_system_dev->devices; dev; dev = dev->next) {
         /* Ignore PCI Bridges */
@@ -80,19 +79,19 @@ static CMPIStatus LMI_PCIDeviceSystemDeviceEnumInstances(
 
         LMI_PCIDeviceSystemDevice_Init(&lmi_pci_sys_device, _cb, ns);
 
-        snprintf(device_id_str, PCI_DEVID_STR_SIZE, "%02x:%02x.%u",
+        snprintf(device_id_str, BUFLEN, "%02x:%02x.%u",
                 dev->bus, dev->dev, dev->func);
 
         LMI_PCIDeviceRef_Init(&lmi_dev, _cb, ns);
         LMI_PCIDeviceRef_Set_SystemCreationClassName(&lmi_dev,
-                get_system_creation_class_name());
-        LMI_PCIDeviceRef_Set_SystemName(&lmi_dev, get_system_name());
+                lmi_get_system_creation_class_name());
+        LMI_PCIDeviceRef_Set_SystemName(&lmi_dev, lmi_get_system_name_safe(cc));
         LMI_PCIDeviceRef_Set_CreationClassName(&lmi_dev,
-                ORGID "_" PCI_DEVICE_CLASS_NAME);
+                LMI_PCIDevice_ClassName);
         LMI_PCIDeviceRef_Set_DeviceID(&lmi_dev, device_id_str);
 
         LMI_PCIDeviceSystemDevice_SetObjectPath_GroupComponent(
-                &lmi_pci_sys_device, lmi_get_computer_system());
+                &lmi_pci_sys_device, lmi_get_computer_system_safe(cc));
         LMI_PCIDeviceSystemDevice_Set_PartComponent(&lmi_pci_sys_device,
                 &lmi_dev);
 
@@ -102,62 +101,62 @@ static CMPIStatus LMI_PCIDeviceSystemDeviceEnumInstances(
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_PCIDeviceSystemDeviceGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_PCIDeviceSystemDeviceGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_PCIDeviceSystemDeviceCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_PCIDeviceSystemDeviceModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_PCIDeviceSystemDeviceCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_PCIDeviceSystemDeviceDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_PCIDeviceSystemDeviceModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_PCIDeviceSystemDeviceDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_PCIDeviceSystemDeviceExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_PCIDeviceSystemDeviceAssociationCleanup( 
+static CMPIStatus LMI_PCIDeviceSystemDeviceAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -250,13 +249,13 @@ static CMPIStatus LMI_PCIDeviceSystemDeviceReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_PCIDeviceSystemDevice,
     LMI_PCIDeviceSystemDevice,
     _cb,
     LMI_PCIDeviceSystemDeviceInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_PCIDeviceSystemDevice,
     LMI_PCIDeviceSystemDevice,
     _cb,

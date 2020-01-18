@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -22,7 +22,7 @@
 Unit tests for ``LMI_MemberOfSoftwareCollection`` provider.
 """
 
-import unittest
+from lmi.test import unittest
 
 import swbase
 
@@ -228,6 +228,7 @@ class TestMemberOfSoftwareCollection(swbase.SwTestCase):
                 nevra_set.remove(pkg.nevra)
         self.assertEqual(len(nevra_set), 0)
 
+    @swbase.run_for_backends('yum')
     @swbase.test_with_repos(**{
         'stable' : True,
         'updates' : False,

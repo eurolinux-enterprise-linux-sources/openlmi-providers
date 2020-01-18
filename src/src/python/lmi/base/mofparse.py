@@ -133,7 +133,7 @@ class MOFParser:
 
     def __init__(self, **kwargs):
         self.lexer = MOFLexer()
-        self.parser = yacc.yacc(module=self, **kwargs)
+        self.parser = yacc.yacc(module=self, debug=0, write_tables=0, **kwargs)
         self.files = []
 
     def p_error(self, p):

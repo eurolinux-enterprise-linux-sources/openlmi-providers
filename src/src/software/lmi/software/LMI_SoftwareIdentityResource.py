@@ -1,6 +1,6 @@
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -240,9 +240,9 @@ class LMI_SoftwareIdentityResource(CIMProvider2):
             return ( self.values.RequestStateChange. \
                         Use_of_Timeout_Parameter_Not_Supported
                    , out_params)
-        if param_requestedstate not in {
+        if param_requestedstate not in (
                 self.values.RequestStateChange.RequestedState.Enabled,
-                self.values.RequestStateChange.RequestedState.Disabled }:
+                self.values.RequestStateChange.RequestedState.Disabled ):
             return ( self.values.RequestStateChange.Invalid_State_Transition
                    , out_params)
 

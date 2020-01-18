@@ -1,4 +1,4 @@
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -19,73 +19,27 @@
 # Authors: Roman Rakus <rrakus@redhat.com>
 #
 """
-Base class and utilities for test suits written with plain pywbem
+Base class and utilities for test suits written with plain lmiwbem
 abastractions.
 """
 
 import BaseHTTPServer
-import pywbem
 import Queue
 import random
+import subprocess
 import threading
 import time
 
 from lmi.test import base
+from lmi.test import CIMError
+from lmi.test import wbem
 
 JOB_CREATED = 4096
 
-class CIMListener(object):
-    """ CIM Listener for indication events. """
-
-    class CIMHandler(BaseHTTPServer.BaseHTTPRequestHandler):
-        """ Handler for the POST request from *CIMOM*. """
-        def do_POST(self):
-            """ Handle the POST request. """
-            data = self.rfile.read(int(self.headers['Content-Length']))
-            ttree = pywbem.parse_cim(pywbem.xml_to_tupletree(data))
-            # Get the instance from CIM-XML, copied from
-            # http://sf.net/apps/mediawiki/pywbem/?title=Indications_Tutorial
-            insts = [x[1] for x in ttree[2][2][0][2][2]]
-            for inst in insts:
-                self.callback(inst)
-            self.send_response(200)
-            self.end_headers()
-
-        def log_message(self, _fmt, *_args):
-            # suppress log messages
-            pass
-
-    def __init__(self, callback, http_port=5988):
-        self.address = ('', http_port)
-        self.CIMHandler.callback = callback
-        self.thread = None
-        self.server = None
-
-    def start(self):
-        """ Start listening. """
-        BaseHTTPServer.HTTPServer.allow_reuse_address = True
-        self.server = BaseHTTPServer.HTTPServer(self.address, self.CIMHandler)
-        self.thread = threading.Thread(target=self.server.serve_forever)
-        self.thread.start()
-
-    def stop(self):
-        """ Stop listening. """
-        if self.server is not None:
-            self.server.shutdown()
-            self.server.socket.close()
-        if self.thread is not None:
-            self.thread.join()
-
-    def running(self):
-        """
-        Are we listening for events?
-        :rtype: bool
-        """
-        return self.thread is not None
 
 class CIMTestCase(base.BaseLmiTestCase):
     """
-    Base class for LMI test cases based on plain pywbem.
+    Base class for LMI test cases based on plain lmiwbem.
     """
 
     #: Says, whether the test case needs indication listener running or not.
@@ -111,9 +65,9 @@ class CIMTestCase(base.BaseLmiTestCase):
         if cls.needs_indications():
             cls.indication_port = random.randint(12000, 13000)
             cls.indication_queue = Queue.Queue()
-            cls.listener = CIMListener(
-                    callback=cls._process_indication,
-                    http_port=cls.indication_port)
+            cls.listener = wbem.CIMIndicationListener(
+                "0.0.0.0", cls.indication_port)
+            cls.listener.add_handler("", cls._process_indication)
 
     @classmethod
     def tearDownClass(cls):
@@ -128,16 +82,17 @@ class CIMTestCase(base.BaseLmiTestCase):
     @classmethod
     def _process_indication(cls, indication):
         """ Callback to process one indication."""
+        print "Got indication"
         cls.indication_queue.put(indication)
 
     @property
     def wbemconnection(self):
         """
         :returns: Active connection to *CIMOM*.
-        :rtype: :py:class:`pywbem.WBEMConnection`
+        :rtype: :py:class:`lmiwbem.WBEMConnection`
         """
         if CIMTestCase._WBEMCONNECTION is None:
-            CIMTestCase._WBEMCONNECTION = pywbem.WBEMConnection(self.url,
+            CIMTestCase._WBEMCONNECTION = wbem.WBEMConnection(self.url,
                     (self.username, self.password))
         return CIMTestCase._WBEMCONNECTION
 
@@ -169,7 +124,7 @@ class CIMTestCase(base.BaseLmiTestCase):
             raise TypeError("cls must be a string")
         if not isinstance(base_cls, basestring):
             raise TypeError("base_cls must be a string")
-        return self.assertTrue(pywbem.is_subclass(self.wbemconnection,
+        return self.assertTrue(wbem.is_subclass(self.wbemconnection,
             "root/cimv2", base_cls, cls))
 
     def get_indication(self, timeout):
@@ -185,9 +140,9 @@ class CIMTestCase(base.BaseLmiTestCase):
         """
         Create an instance name of ``CIM_IndicationFilter``.
 
-        :rtype: :py:class:`pywbem.CIMInstanceName`
+        :rtype: :py:class:`lmiwbem.CIMInstanceName`
         """
-        return pywbem.CIMInstanceName(
+        return wbem.CIMInstanceName(
                     classname="CIM_IndicationFilter",
                     namespace="root/interop",
                     keybindings={
@@ -200,9 +155,9 @@ class CIMTestCase(base.BaseLmiTestCase):
         """
         Create an instance of ``CIM_IndicationFilter``.
 
-        :rtype: :py:class:`pywbem.CIMInstance`
+        :rtype: :py:class:`lmiwbem.CIMInstance`
         """
-        inst = pywbem.CIMInstance('CIM_IndicationFilter')
+        inst = wbem.CIMInstance('CIM_IndicationFilter')
         inst['CreationClassName'] = 'CIM_IndicationFilter'
         inst['SystemCreationClassName'] = self.system_cs_name
         inst['SystemName'] = self.SYSTEM_NAME
@@ -230,14 +185,14 @@ class CIMTestCase(base.BaseLmiTestCase):
             indfilter = self.make_filter_iname(filter_name)
 
         # create destination
-        destinst = pywbem.CIMInstance('CIM_ListenerDestinationCIMXML')
+        destinst = wbem.CIMInstance('CIM_ListenerDestinationCIMXML')
         destinst['CreationClassName'] = 'CIM_ListenerDestinationCIMXML'
         destinst['SystemCreationClassName'] = self.system_cs_name
         destinst['SystemName'] = self.SYSTEM_NAME
         destinst['Name'] = filter_name
         destinst['Destination'] = "http://localhost:%d" % (self.indication_port)
-        destinst['PersistenceType'] = pywbem.Uint16(3) # Transient
-        cop = pywbem.CIMInstanceName(
+        destinst['PersistenceType'] = wbem.Uint16(3) # Transient
+        cop = wbem.CIMInstanceName(
                 'CIM_ListenerDestinationCIMXML', namespace="root/interop")
         cop.keybindings = {
                 'CreationClassName' : 'CIM_ListenerDestinationCIMXML',
@@ -248,11 +203,11 @@ class CIMTestCase(base.BaseLmiTestCase):
         destname = self.wbemconnection.CreateInstance(destinst)
 
         # create the subscription
-        subinst = pywbem.CIMInstance(
+        subinst = wbem.CIMInstance(
                 'CIM_IndicationSubscription')
         subinst['Filter'] = indfilter
         subinst['Handler'] = destname
-        cop = pywbem.CIMInstanceName(
+        cop = wbem.CIMInstanceName(
                 'CIM_IndicationSubscription', namespace="root/interop")
         cop.keybindings = {
                 'Filter': indfilter,
@@ -262,7 +217,7 @@ class CIMTestCase(base.BaseLmiTestCase):
 
         self.subscribed[filter_name] = [subscription, destname]
 
-        if not self.listener.running():
+        if not self.listener.is_alive:
             self._start_listening()
         return subscription
 
@@ -289,7 +244,7 @@ class CIMTestCase(base.BaseLmiTestCase):
         care is needed.
 
         :param jobname: Name of the job.
-        :type jobname: :py:class:`pywbem.CIMInstanceName`
+        :type jobname: :py:class:`lmiwbem.CIMInstanceName`
         :param callable return_constructor: Callable, which converts
             string to the right type, for example ``int``.
         :returns: ``(retvalue, outparams)`` in the same way as
@@ -315,12 +270,12 @@ class CIMTestCase(base.BaseLmiTestCase):
             err = ind['Error'][0]
             code = err['CIMStatusCode']
             msg = err['Message']
-            raise pywbem.CIMError(code, msg)
+            raise CIMError(code, msg)
 
         ret = return_constructor(ind['ReturnValue'])
 
         # convert output parameters to format returned by InvokeMethod
-        outparams = pywbem.NocaseDict()
+        outparams = wbem.NocaseDict()
         try:
             params = ind['MethodParameters']
         except KeyError:
@@ -341,7 +296,7 @@ class CIMTestCase(base.BaseLmiTestCase):
 
         :param string method_name: Name of the method.
         :param object_name: Instance, on which the method should be invoked.
-        :type object_name: :py:class:`pywbem.CIMInstanceName`
+        :type object_name: :py:class:`lmiwbem.CIMInstanceName`
         :param callable return_constructor: Callable, which converts
             string to the right type, for example ``int``.
         :param list args: Positional arguments passed to invoked method.
@@ -360,3 +315,21 @@ class CIMTestCase(base.BaseLmiTestCase):
             jobname = outparams['Job']
             (ret, outparams) = self.finish_job(jobname, return_constructor)
         return (ret, outparams)
+
+    def restart_cim(self):
+        """
+        Restart CIMOM
+        """
+        ret = self.log_run(["service", self.cimom, "restart"])
+        time.sleep(1)
+        if ret == 0:
+            CIMTestCase._WBEMCONNECTION = None
+        return ret
+
+    def log_run(self, args):
+        """
+        Print arguments and run them.
+        args must be prepared for subprocess.call()
+        """
+        print "Running:", " ".join(args)
+        return subprocess.call(args)

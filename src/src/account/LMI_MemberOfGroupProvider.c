@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,6 +18,7 @@
  * Authors: Roman Rakus <rrakus@redhat.com>
  */
 
+#include <shadow.h>
 #include <konkret/konkret.h>
 #include "LMI_MemberOfGroup.h"
 #include "LMI_Group.h"
@@ -27,7 +28,6 @@
 #include "aux_lu.h"
 #include "macros.h"
 #include "account_globals.h"
-#include "globals.h"
 
 #include <libuser/entity.h>
 #include <libuser/user.h>
@@ -39,15 +39,15 @@ static void LMI_MemberOfGroupInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_MemberOfGroupCleanup( 
+static CMPIStatus LMI_MemberOfGroupCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_MemberOfGroupEnumInstanceNames( 
+static CMPIStatus LMI_MemberOfGroupEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -57,12 +57,12 @@ static CMPIStatus LMI_MemberOfGroupEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_MemberOfGroupEnumInstances( 
+static CMPIStatus LMI_MemberOfGroupEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_GroupRef lgref;
     LMI_IdentityRef liref;
@@ -103,7 +103,7 @@ static CMPIStatus LMI_MemberOfGroupEnumInstances(
             lu_user_lookup_name(luc,
               g_value_get_string(g_value_array_get_nth(accounts, j)),
               luea, &error);
-            asprintf(&uid, ORGID":UID:%ld",
+            asprintf(&uid, LMI_ORGID":UID:%ld",
               aux_lu_get_long(luea, LU_UIDNUMBER));
             LMI_IdentityRef_Init(&liref, _cb, nameSpace);
             LMI_IdentityRef_Set_InstanceID(&liref, uid);
@@ -135,23 +135,23 @@ static CMPIStatus LMI_MemberOfGroupEnumInstances(
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_MemberOfGroupGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_MemberOfGroupGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_MemberOfGroupCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
+static CMPIStatus LMI_MemberOfGroupCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci)
 {
     CMPIStatus status;
     CMPIEnumeration *instances = NULL;
@@ -168,14 +168,30 @@ static CMPIStatus LMI_MemberOfGroupCreateInstance(
     struct lu_context *luc = NULL;
     struct lu_error *error = NULL;
 
+    CMPIObjectPath *collection_ref;
+    CMPIObjectPath *member_ref;
     CMPIrc rc = CMPI_RC_OK;
     char *errmsg = NULL;
+    int pwdlockres;
+
+#define GET_REF(PROP_NAME, REF) \
+    { \
+        CMPIStatus rcs = { CMPI_RC_OK, NULL }; \
+        CMPIData d = CMGetProperty(ci, PROP_NAME, &rcs); \
+        if (rcs.rc != CMPI_RC_OK || (d.state & CMPI_nullValue) == CMPI_nullValue || \
+            (d.state & CMPI_notFound) == CMPI_notFound || d.value.ref == NULL) \
+            KReturn2(_cb, ERR_INVALID_PARAMETER, "Required argument '%s' not set.", PROP_NAME);\
+        REF = d.value.ref; \
+    }
+
+    GET_REF("Collection", collection_ref);
+    GET_REF("Member", member_ref);
+
+#undef GET_REF
 
     LMI_MemberOfGroup_InitFromObjectPath(&lmog, _cb, cop);
-    LMI_GroupRef_InitFromObjectPath(&lg_ref, _cb,
-        CMGetProperty(ci, "Collection", NULL).value.ref);
-    LMI_IdentityRef_InitFromObjectPath(&li_ref, _cb,
-        CMGetProperty(ci, "Member", NULL).value.ref);
+    LMI_GroupRef_InitFromObjectPath(&lg_ref, _cb, collection_ref);
+    LMI_IdentityRef_InitFromObjectPath(&li_ref, _cb, member_ref);
 
     if (!(instances = CBAssociators(_cb, cc,
         LMI_IdentityRef_ToObjectPath(&li_ref, NULL),
@@ -189,8 +205,14 @@ static CMPIStatus LMI_MemberOfGroupCreateInstance(
     user_name = la.Name.chars;
     group_name = lg_ref.Name.chars;
 
+    pwdlockres = lckpwdf();
+    if (pwdlockres != 0)
+        lmi_warn("Cannot acquire passwd file lock\n");
+
     luc = lu_start(NULL, 0, NULL, NULL, lu_prompt_console_quiet, NULL, &error);
     if (!luc) {
+        if (pwdlockres == 0)
+            ulckpwdf();
         KReturn2(_cb, ERR_FAILED,
                  "Unable to initialize libuser: %s\n", lu_strerror(error));
     }
@@ -217,6 +239,8 @@ static CMPIStatus LMI_MemberOfGroupCreateInstance(
     g_value_unset(&val);
     lu_ent_free(lue);
     lu_end(luc);
+    if (pwdlockres == 0)
+        ulckpwdf();
 
     LMI_MemberOfGroup_Set_Collection(&lmog, &lg_ref);
     LMI_MemberOfGroup_Set_Member(&lmog, &li_ref);
@@ -228,6 +252,8 @@ static CMPIStatus LMI_MemberOfGroupCreateInstance(
 fail:
     lu_ent_free(lue);
     lu_end(luc);
+    if (pwdlockres == 0)
+        ulckpwdf();
     g_value_unset(&val);
 
     CMPIString *errstr = CMNewString(_cb, errmsg, NULL);
@@ -235,22 +261,22 @@ fail:
     CMReturnWithString(rc, errstr);
 }
 
-static CMPIStatus LMI_MemberOfGroupModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_MemberOfGroupModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci,
+    const char**properties)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_MemberOfGroupDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_MemberOfGroupDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     LMI_MemberOfGroup lmog;
     LMI_GroupRef lg_ref;
@@ -268,6 +294,7 @@ static CMPIStatus LMI_MemberOfGroupDeleteInstance(
 
     CMPIrc rc = CMPI_RC_OK;
     char *errmsg = NULL;
+    int pwdlockres;
 
     LMI_MemberOfGroup_InitFromObjectPath(&lmog, _cb, cop);
     LMI_GroupRef_InitFromObjectPath(&lg_ref, _cb, lmog.Collection.value);
@@ -276,8 +303,14 @@ static CMPIStatus LMI_MemberOfGroupDeleteInstance(
     group_name = lg_ref.Name.chars;
     user_id = (uid_t)atol(strrchr(li_ref.InstanceID.chars, ':') + 1);
 
+    pwdlockres = lckpwdf();
+    if (pwdlockres != 0)
+        lmi_warn("Cannot acquire passwd file lock\n");
+
     luc = lu_start(NULL, 0, NULL, NULL, lu_prompt_console_quiet, NULL, &error);
     if (!luc) {
+        if (pwdlockres == 0)
+            ulckpwdf();
         KReturn2(_cb, ERR_FAILED,
                  "Unable to initialize libuser: %s\n", lu_strerror(error));
     }
@@ -327,6 +360,8 @@ fail:
     lu_ent_free(lue_u);
     lu_ent_free(lue_g);
     lu_end(luc);
+    if (pwdlockres == 0)
+        ulckpwdf();
     if (errmsg) {
         CMPIString *errstr = CMNewString(_cb, errmsg, NULL);
         free(errmsg);
@@ -337,20 +372,20 @@ fail:
 }
 
 static CMPIStatus LMI_MemberOfGroupExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_MemberOfGroupAssociationCleanup( 
+static CMPIStatus LMI_MemberOfGroupAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -443,13 +478,13 @@ static CMPIStatus LMI_MemberOfGroupReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_MemberOfGroup,
     LMI_MemberOfGroup,
     _cb,
     LMI_MemberOfGroupInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_MemberOfGroup,
     LMI_MemberOfGroup,
     _cb,

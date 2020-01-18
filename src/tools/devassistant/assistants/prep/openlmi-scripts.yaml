@@ -1,0 +1,34 @@
+fullname: LMI scripts prepare assistant
+description: Set up environment for LMI scripts development and checkout sources.
+
+dependencies:
+- rpm: ['openlmi-python-base', 'openlmi-tools', 'python-docopt']
+
+args:
+  url:
+    flags:
+    - -u
+    - --url
+    help:
+      If used, will check out LMI scripts from given URL (useful when working with fork).
+    required: False
+    default: https://github.com/openlmi/openlmi-scripts.git
+  path:
+    use: common_args
+    help:
+      Path where to checkout the repo (will be created if it does not exist).
+
+run:
+- if not $(test -e "$path"):
+  - cl: mkdir -p "$path"
+- cl: cd "$path"
+- if $(test -e openlmi-scripts):
+  - log_e: 'openlmi-scripts directory/file already exists in directory "$path", exiting'
+- log_i: Getting LMI scripts sources ...
+- $git_output: $(git clone "$url")
+- if $(echo "$git_output" | grep "fatal"):
+  - log_e: Could not checkout sources - $git_output
+- cl: cd openlmi-scripts
+- cl: git submodule init
+- cl: git submodule update
+- log_i: LMI scripts are prepared in $path/openlmi-scripts.

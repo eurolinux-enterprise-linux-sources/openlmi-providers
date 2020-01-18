@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,8 +27,73 @@
  * In ideal world, they wouldn't be needed. Let's use them temporarily
  * until pegasus supports instances of unknown classes.
  ******************************************************************************/
-[Version("0.2.0"), Association]
+[Version("0.4.3"), Association]
 class __MethodParameters_InstallFromSoftwareIdentity {
+
+      [Description("Reference to the Collection to which the"
+        " Software Identity SHALL be added. If NULL then the Software Identity"
+        " will not be added to a Collection.")]
+    LMI_SystemSoftwareCollection REF Collection;
+
+      [Description("Options to control the install process."
+        " Defer target/system reset : do not automatically reset the"
+        " target/system. Force installation : Force the installation of the"
+        " same or an older SoftwareIdentity. Install: Perform an installation"
+        " of this software on the managed element. Update: Perform an update of"
+        " this software on the managed element. Repair: Perform a repair of the"
+        " installation of this software on the managed element by forcing all"
+        " the files required for installing the software to be reinstalled."
+        " Reboot: Reboot or reset the system immediately after the install or"
+        " update of this software, if the install or the update requires a"
+        " reboot or reset. Password: Password will be specified as clear text"
+        " without any encryption for performing the install or update."
+        " Uninstall: Uninstall the software on the managed element. Log: Create"
+        " a log for the install or update of the software. SilentMode: Perform"
+        " the install or update without displaying any user interface."
+        " AdministrativeMode: Perform the install or update of the software in"
+        " the administrative mode. ScheduleInstallAt: Indicates the time at"
+        " which the install or update of the software will occur."),
+       ModelCorrespondence {
+           "CIM_SoftwareInstallationService.InstallOptionsValues[]",
+           "CIM_SoftwareInstallationServiceCapabilities.SupportedInstallOptions[]"},
+       ValueMap { "2", "3", "4", "5", "6", "7", "8", "9", "10",
+                  "11", "12", "13", "..", "32768..65535" },
+       Values { "Defer target/system reset", "Force installation", "Install",
+                "Update", "Repair", "Reboot", "Password", "Uninstall", "Log",
+                "SilentMode", "AdministrativeMode", "ScheduleInstallAt",
+                "DMTF Reserved", "Vendor Specific"},
+       ArrayType("Indexed")]
+    uint16 InstallOptions[];
+
+      [Description(
+        " InstallOptionsValues is an array of strings providing additional"
+        " information to InstallOptions for the method to install the software."
+        " Each entry of this array is related to the entry in InstallOptions"
+        " that is located at the same index providing additional information for"
+        " InstallOptions. If the index in InstallOptions has the value"
+        " \"Password\" then a value at the corresponding index of"
+        " InstallOptionValues shall not be NULL. If the index in InstallOptions"
+        " has the value \"ScheduleInstallAt\" then the value at the"
+        " corresponding index of InstallOptionValues shall not be NULL and shall"
+        " be in the datetime type format. If the index in InstallOptions has the"
+        " value \"Log\" then a value at the corresponding index of"
+        " InstallOptionValues may be NULL. If the index in InstallOptions has"
+        " the value \"Defer target/system reset\", \"Force installation\","
+        " \"Install\", \"Update\", Repair\" or \"Reboot\" then a value at the"
+        " corresponding index of InstallOptionValues shall be NULL."),
+       ArrayType("Indexed"),
+       ModelCorrespondence {"CIM_SoftwareInstallationService.InstallOptions[]"}]
+    string InstallOptionValues[];
+
+      [Description("Reference to the source of the install.")]
+    LMI_SoftwareIdentity REF Source;
+
+      [Description("The installation target. If NULL then"
+        " the SoftwareIdentity will be added to Collection only. The underlying"
+        " implementation is expected to be able to obtain any necessary"
+        " metadata from the Software Identity.")]
+    CIM_ComputerSystem REF Target;
+
 };
 
 [Version("0.2.0"), Association]

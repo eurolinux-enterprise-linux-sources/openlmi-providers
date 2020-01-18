@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2013-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -18,9 +18,10 @@
 #
 # Authors: Jan Synacek <jsynacek@redhat.com>
 
-from test_base import LogicalFileTestBase
-import unittest
-import pywbem
+from test_base import LogicalFileTestBase, Configuration
+from lmi.test import CIMError
+from lmi.test import unittest
+from lmi.test import wbem
 import os
 import stat
 import shutil
@@ -74,7 +75,7 @@ class TestLogicalFile(LogicalFileTestBase):
 
         self.num_files = len(self.files.keys()) + 1
 
-        self.cop = pywbem.CIMInstanceName(classname='LMI_UnixDirectory',
+        self.cop = wbem.CIMInstanceName(classname='LMI_UnixDirectory',
                                           namespace='root/cimv2',
                                           keybindings={
                                               'CSCreationClassName':self.system_cs_name,
@@ -84,12 +85,37 @@ class TestLogicalFile(LogicalFileTestBase):
                                               'CreationClassName':'LMI_UnixDirectory',
                                               'Name':self.testdir
                                           })
+
+        conf_path = '/etc/openlmi/logicalfile/logicalfile.conf'
+        self.configurations = dict()
+        conf = Configuration(conf_path)
+        conf.add('LMI_UnixDirectory', [('AllowMkdir', 'True')])
+        self.configurations['mkdir'] = conf
+
+        conf = Configuration(conf_path)
+        conf.add('LMI_UnixDirectory', [('AllowRmdir', 'True')])
+        self.configurations['rmdir'] = conf
+
+        conf = Configuration(conf_path)
+        conf.add('LMI_SymbolicLink', [('AllowSymlink', 'True')])
+        self.configurations['symlink'] = conf
+
         self._prepare()
 
     def tearDown(self):
         self._cleanup()
 
     def _prepare(self):
+        def check_output(command):
+            '''
+            Python < 2.7 doesn't have subprocess check_output, simulate it
+            if necessary
+            '''
+            if hasattr(subprocess, 'check_output'):
+                return subprocess.check_output(command)
+            else:
+                return subprocess.Popen(command, stdout=subprocess.PIPE).communicate()[0]
+
         try:
             os.stat(self.testdir)
         except OSError:
@@ -102,11 +128,11 @@ class TestLogicalFile(LogicalFileTestBase):
             os.chmod(data_file, 0550)
             if self.selinux_enabled:
                 labels = data_props['SELinuxCurrentContext'].split(':')
-                out = subprocess.check_output(['chcon', '-h',
+                out = check_output(['chcon', '-h',
                                                '-u', labels[0],
                                                '-r', labels[1],
                                                '-t', labels[2], data_file])
-                out = subprocess.check_output(['matchpathcon', '-n', data_file])
+                out = check_output(['matchpathcon', '-n', data_file])
                 data_props['SELinuxExpectedContext'] = out[:-1] # remove \n
             os.mkdir(self.files['dir']['path'])
             os.link(data_file, self.files['hardlink']['path'])
@@ -115,11 +141,11 @@ class TestLogicalFile(LogicalFileTestBase):
             os.symlink(data_file, slink_file)
             if self.selinux_enabled:
                 labels = slink_props['SELinuxCurrentContext'].split(':')
-                out = subprocess.check_output(['chcon', '-h',
+                out = check_output(['chcon', '-h',
                                                '-u', labels[0],
                                                '-r', labels[1],
                                                '-t', labels[2], slink_file])
-                out = subprocess.check_output(['matchpathcon', '-n', slink_file])
+                out = check_output(['matchpathcon', '-n', slink_file])
                 slink_props['SELinuxExpectedContext'] = out[:-1] # remove \n
             os.mkfifo(self.files['fifo']['path'])
             chdev = self.files['chdev']
@@ -135,6 +161,8 @@ class TestLogicalFile(LogicalFileTestBase):
     def _cleanup(self):
         subprocess.call(['umount', self.transient_file['path']])
         shutil.rmtree(self.testdir)
+        for conf in self.configurations.values():
+            conf.dispose()
 
     def test_lmi_directorycontainsfile(self):
         assoc_class = 'LMI_DirectoryContainsFile'
@@ -147,7 +175,7 @@ class TestLogicalFile(LogicalFileTestBase):
                 match = filter(lambda a: a['Name'] == f['path'], assocs)
                 self.assertEquals(len(match), 1)
                 self.assertEquals(match[0].classname, f['class'])
-                if not isinstance(match[0], pywbem.CIMInstanceName):
+                if not isinstance(match[0], wbem.CIMInstanceName):
                     # test some selected properties
                     if k == 'data' or k == 'hardlink':
                         self.assertEquals(match[0]['Readable'], f['props']['Readable'])
@@ -162,7 +190,7 @@ class TestLogicalFile(LogicalFileTestBase):
 
                 # test the other side of LMI_DirectoryContainsFile
                 if k != '..':
-                    cop_file = pywbem.CIMInstanceName(classname=f['class'],
+                    cop_file = wbem.CIMInstanceName(classname=f['class'],
                                                   namespace='root/cimv2',
                                                   keybindings={
                                                       'CSCreationClassName':self.system_cs_name,
@@ -206,7 +234,7 @@ class TestLogicalFile(LogicalFileTestBase):
                 self.assertEquals(match_name.classname, f['class'])
                 # test the other side of LMI_DirectoryContainsFile
                 if k != '..' and k != 'dir':
-                    cop_file = pywbem.CIMInstanceName(classname=f['class'],
+                    cop_file = wbem.CIMInstanceName(classname=f['class'],
                                                   namespace='root/cimv2',
                                                   keybindings={
                                                       'CSCreationClassName':self.system_cs_name,
@@ -233,7 +261,7 @@ class TestLogicalFile(LogicalFileTestBase):
                 self.assertEquals(len(match), 1)
                 self.assertEquals(match[0].classname, f['class'])
 
-                if isinstance(match[0], pywbem.CIMInstanceName):
+                if isinstance(match[0], wbem.CIMInstanceName):
                     match[0].path = match[0]
                 ## SystemElement - LMI_UnixFile
                 assocs_ident = assoc_method(match[0].path,
@@ -244,7 +272,7 @@ class TestLogicalFile(LogicalFileTestBase):
                 self.assertEquals(len(assocs_ident), 1)
                 self.assertEquals(assocs_ident[0]['LFName'], f['path'])
                 self.assertEquals(assocs_ident[0]['LFCreationClassName'], f['class'])
-                if not isinstance(match[0], pywbem.CIMInstanceName):
+                if not isinstance(match[0], wbem.CIMInstanceName):
                     if self.selinux_enabled and (k == 'data' or k == 'symlink'):
                         self.assertEquals(assocs_ident[0]['SELinuxCurrentContext'],
                                           f['props']['SELinuxCurrentContext'])
@@ -265,7 +293,7 @@ class TestLogicalFile(LogicalFileTestBase):
                 self.assertEquals(assocs_ident, [])
 
                 ## SameElement - CIM_LogicalFile
-                cop_ident = pywbem.CIMInstanceName(classname='LMI_UnixFile',
+                cop_ident = wbem.CIMInstanceName(classname='LMI_UnixFile',
                                                    namespace='root/cimv2',
                                                    keybindings={
                                                        'CSCreationClassName':self.system_cs_name,
@@ -316,7 +344,7 @@ class TestLogicalFile(LogicalFileTestBase):
 
 
                 ## SameElement - CIM_LogicalFile
-                cop_ident = pywbem.CIMInstanceName(classname='LMI_UnixFile',
+                cop_ident = wbem.CIMInstanceName(classname='LMI_UnixFile',
                                                    namespace='root/cimv2',
                                                    keybindings={
                                                        'CSCreationClassName':self.system_cs_name,
@@ -363,7 +391,7 @@ class TestLogicalFile(LogicalFileTestBase):
             self.assertEquals(assocs, [])
 
             ## GroupComponent - LMI_UnixDirectory
-            if isinstance(system, pywbem.CIMInstanceName):
+            if isinstance(system, wbem.CIMInstanceName):
                 system.path = system
             assocs = assoc_method(system.path,
                                   AssocClass=assoc_class,
@@ -412,7 +440,7 @@ class TestLogicalFile(LogicalFileTestBase):
         self.assertEquals(rootdir['CSName'], self.SYSTEM_NAME)
         self.assertEquals(rootdir['Name'], '/')
 
-        inst_cop = pywbem.CIMInstanceName(classname=assoc_class,
+        inst_cop = wbem.CIMInstanceName(classname=assoc_class,
                                           namespace='root/cimv2',
                                           keybindings={
                                               'GroupComponent':system,
@@ -428,37 +456,133 @@ class TestLogicalFile(LogicalFileTestBase):
         self.assertEquals(rootdir['CSName'], self.SYSTEM_NAME)
         self.assertEquals(rootdir['Name'], '/')
 
+    def _mkdir(self, path):
+        cop = self.cop.copy()
+        cop['Name'] = path
+        inst = wbem.CIMInstance('LMI_UnixDirectory', cop.keybindings)
+        self.wbemconnection.CreateInstance(inst)
+
+    def _test_mkdir(self, enabled_by_configuration):
+        classname = 'LMI_UnixDirectory'
+        path = self.testdir + '/mkdir-test'
+        cop = self.cop.copy()
+        cop['Name'] = path
+
+        try:
+            self._mkdir(path)
+            inst = self.wbemconnection.GetInstance(cop)
+            self.assertEquals(inst.classname, classname)
+            self.assertEquals(inst['CreationClassName'], classname)
+            self.assertEquals(inst['Name'], path)
+            self._rmdir(path)
+        except CIMError as pe:
+            if enabled_by_configuration:
+                self.fail(pe[1])
+            else:
+                self.assertEquals(pe[1],
+                                  "CIM_ERR_FAILED: Can't mkdir: disabled by provider configuration")
+
+        self.assertRaises(CIMError,
+                          self._mkdir,
+                          '/cant/create/me')
+
     def test_mkdir(self):
-        def mkdir(path):
-            cop = self.cop.copy()
+        conf = self.configurations['mkdir']
+        # should succeed
+        conf.save()
+        self.restart_cim()
+        self._test_mkdir(True)
+        conf.dispose()
+        # should fail
+        conf.add('LMI_UnixDirectory', [('AllowMkdir', 'False')])
+        conf.save()
+        self.restart_cim()
+        self._test_mkdir(False)
+        conf.dispose()
+
+    def _rmdir(self, path):
+        cop = self.cop.copy()
+        cop['Name'] = path
+        inst = wbem.CIMInstance('LMI_UnixDirectory', cop.keybindings)
+        self.wbemconnection.DeleteInstance(cop)
+
+    def _test_rmdir(self, enabled_by_configuration):
+        path = self.files['dir']['path']
+        if not os.path.exists(path):
+            self._mkdir(path)
+
+        try:
+            self._rmdir(path)
+        except CIMError as pe:
+            if enabled_by_configuration:
+                self.fail(pe[1])
+            else:
+                self.assertEquals(pe[1],
+                                  "CIM_ERR_FAILED: Can't rmdir: disabled by provider configuration")
+
+        self.assertRaises(CIMError,
+                          self._rmdir,
+                          '/cant/remove/me')
+
+    def test_rmdir(self):
+        conf = self.configurations['rmdir']
+        # should succeed
+        conf.save()
+        self.restart_cim()
+        self._test_rmdir(True)
+        conf.dispose()
+        # should fail
+        conf.add('LMI_UnixDirectory', [('AllowRmdir', 'False')])
+        conf.save()
+        self.restart_cim()
+        self._test_rmdir(False)
+        conf.dispose()
+
+    def _test_create_symlink(self, enabled_by_configuration):
+        classname = 'LMI_SymbolicLink'
+        cop = self.cop.copy()
+        cop.classname = classname
+        target = self.files['data']['path']
+        name = self.testdir + '/target-symlink'
+
+        def create_symlink(target, path):
             cop['Name'] = path
-            inst = pywbem.CIMInstance('LMI_UnixDirectory', cop.keybindings)
+            cop['TargetFile'] = target
+            inst = wbem.CIMInstance(classname, cop.keybindings)
             self.wbemconnection.CreateInstance(inst)
 
         try:
-            mkdir(self.testdir + '/mkdir-test')
-        except pywbem.CIMError as pe:
-            self.fail(pe[1])
+            create_symlink(target, name)
+            inst = self.wbemconnection.GetInstance(cop)
+            self.assertEquals(inst.classname, classname)
+            self.assertEquals(inst['CreationClassName'], classname)
+            self.assertEquals(inst['TargetFile'], target)
+            self.assertEquals(inst['Name'], name)
+        except CIMError as pe:
+            if enabled_by_configuration:
+                self.fail(pe[1])
+            else:
+                self.assertEquals(pe[1],
+                                  "CIM_ERR_FAILED: Can't create symlink: disabled by provider configuration")
 
-        self.assertRaises(pywbem.CIMError,
-                          mkdir,
-                          '/cant/create/me')
+        self.assertRaises(CIMError,
+                          create_symlink,
+                          target,
+                          name)
 
-    def test_rmdir(self):
-        def rmdir(path):
-            cop = self.cop.copy()
-            cop['Name'] = path
-            inst = pywbem.CIMInstance('LMI_UnixDirectory', cop.keybindings)
-            self.wbemconnection.DeleteInstance(cop)
-
-        try:
-            rmdir(self.files['dir']['path'])
-        except pywbem.CIMError as pe:
-            self.fail(pe[1])
-
-        self.assertRaises(pywbem.CIMError,
-                          rmdir,
-                          '/cant/remove/me')
+    def test_create_symlink(self):
+        conf = self.configurations['symlink']
+        # should succeed
+        conf.save()
+        self.restart_cim()
+        self._test_create_symlink(True)
+        conf.dispose()
+        # should fail
+        conf.add('LMI_SymbolicLink',  [('AllowSymlink', 'False')])
+        conf.save()
+        self.restart_cim()
+        self._test_create_symlink(False)
+        conf.dispose()
 
     # for now, this test just checks if FSName, FSCreationClassName,
     # CreationClassName and LFCreationClassName are properly ignored; empty
@@ -471,7 +595,7 @@ class TestLogicalFile(LogicalFileTestBase):
         else:
             prefix = ''
             clsname = 'LMI_DataFile'
-        cop = pywbem.CIMInstanceName(classname=clsname,
+        cop = wbem.CIMInstanceName(classname=clsname,
                                      namespace='root/cimv2',
                                      keybindings={
                                          'CSCreationClassName':self.system_cs_name,
@@ -485,7 +609,7 @@ class TestLogicalFile(LogicalFileTestBase):
 
         try:
             self.wbemconnection.GetInstance(cop)
-        except pywbem.CIMError as pe:
+        except CIMError as pe:
             self.fail(pe[1])
 
     def test_unixfile_missing_or_wrong_properties(self):
@@ -497,10 +621,13 @@ class TestLogicalFile(LogicalFileTestBase):
     def test_transient_file(self):
         cop = self.cop.copy()
         cop['Name'] = self.transient_file['path']
+        cop['FSName'] = ''
+        cop['FSCreationClassName'] = ''
 
         try:
+            print type(cop)
             inst = self.wbemconnection.GetInstance(cop)
-        except pywbem.CIMError as pe:
+        except CIMError as pe:
             self.fail(pe[1])
 
         self.assertEquals(inst['FSCreationClassName'], 'LMI_TransientFileSystem')

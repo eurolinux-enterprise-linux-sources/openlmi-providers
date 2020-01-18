@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_MemorySlot.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 static const CMPIBroker* _cb = NULL;
@@ -58,7 +57,7 @@ static CMPIStatus LMI_MemorySlotEnumInstances(
 {
     LMI_MemorySlot lmi_mem_slot;
     const char *ns = KNameSpace(cop);
-    char tag[LONG_INT_LEN], instance_id[INSTANCE_ID_LEN];
+    char tag[LONG_INT_LEN], instance_id[BUFLEN];
     unsigned i;
     DmiMemory dmi_memory;
 
@@ -70,8 +69,8 @@ static CMPIStatus LMI_MemorySlotEnumInstances(
         LMI_MemorySlot_Init(&lmi_mem_slot, _cb, ns);
 
         snprintf(tag, LONG_INT_LEN, "%d", dmi_memory.slots[i].slot_number);
-        snprintf(instance_id, INSTANCE_ID_LEN,
-                ORGID ":" ORGID "_" MEMORY_SLOT_CLASS_NAME ":%d",
+        snprintf(instance_id, BUFLEN,
+                LMI_ORGID ":" LMI_MemorySlot_ClassName ":%d",
                 dmi_memory.slots[i].slot_number);
 
         LMI_MemorySlot_Set_ConnectorLayout(&lmi_mem_slot,
@@ -83,7 +82,7 @@ static CMPIStatus LMI_MemorySlotEnumInstances(
                 LMI_MemorySlot_ConnectorGender_Female);
 
         LMI_MemorySlot_Set_CreationClassName(&lmi_mem_slot,
-                ORGID "_" MEMORY_SLOT_CLASS_NAME);
+                LMI_MemorySlot_ClassName);
         LMI_MemorySlot_Set_Tag(&lmi_mem_slot, tag);
         LMI_MemorySlot_Set_Number(&lmi_mem_slot,
                 dmi_memory.slots[i].slot_number);

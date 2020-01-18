@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -25,7 +25,6 @@
 
 #include "macros.h"
 #include "account_globals.h"
-#include "globals.h"
 
 static const CMPIBroker* _cb;
 
@@ -36,7 +35,7 @@ static void LMI_HostedAccountManagementServiceInitialize(const CMPIContext *ctx)
 
 static CMPIStatus LMI_HostedAccountManagementServiceCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
@@ -54,28 +53,28 @@ static CMPIStatus LMI_HostedAccountManagementServiceEnumInstanceNames(
 
 static CMPIStatus LMI_HostedAccountManagementServiceEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_AccountManagementServiceRef lamsref;
     LMI_HostedAccountManagementService lhs;
 
     const char *nameSpace = KNameSpace(cop);
-    const char *hostname = get_system_name();
+    const char *hostname = lmi_get_system_name_safe(cc);
 
     LMI_AccountManagementServiceRef_Init(&lamsref, _cb, nameSpace);
     LMI_AccountManagementServiceRef_Set_Name(&lamsref, LAMSNAME);
     LMI_AccountManagementServiceRef_Set_SystemCreationClassName(&lamsref,
-      get_system_creation_class_name());
+      lmi_get_system_creation_class_name());
     LMI_AccountManagementServiceRef_Set_SystemName(&lamsref, hostname);
     LMI_AccountManagementServiceRef_Set_CreationClassName(&lamsref,
       LMI_AccountManagementService_ClassName);
 
     LMI_HostedAccountManagementService_Init(&lhs, _cb, nameSpace);
     LMI_HostedAccountManagementService_SetObjectPath_Antecedent(&lhs,
-            lmi_get_computer_system());
+            lmi_get_computer_system_safe(cc));
     LMI_HostedAccountManagementService_Set_Dependent(&lhs, &lamsref);
 
     KReturnInstance(cr, lhs);
@@ -83,61 +82,61 @@ static CMPIStatus LMI_HostedAccountManagementServiceEnumInstances(
 }
 
 static CMPIStatus LMI_HostedAccountManagementServiceGetInstance(
-    CMPIInstanceMI* mi, 
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
 static CMPIStatus LMI_HostedAccountManagementServiceCreateInstance(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_HostedAccountManagementServiceModifyInstance(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci,
+    const char**properties)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_HostedAccountManagementServiceDeleteInstance(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_HostedAccountManagementServiceExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_HostedAccountManagementServiceAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -230,13 +229,13 @@ static CMPIStatus LMI_HostedAccountManagementServiceReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_HostedAccountManagementService,
     LMI_HostedAccountManagementService,
     _cb,
     LMI_HostedAccountManagementServiceInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_HostedAccountManagementService,
     LMI_HostedAccountManagementService,
     _cb,

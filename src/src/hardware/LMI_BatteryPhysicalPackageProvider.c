@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,8 +21,7 @@
 #include <time.h>
 #include <konkret/konkret.h>
 #include "LMI_BatteryPhysicalPackage.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 static const CMPIBroker* _cb = NULL;
@@ -59,7 +58,7 @@ static CMPIStatus LMI_BatteryPhysicalPackageEnumInstances(
 {
     LMI_BatteryPhysicalPackage lmi_batt_phys;
     const char *ns = KNameSpace(cop);
-    char instance_id[INSTANCE_ID_LEN];
+    char instance_id[BUFLEN];
     struct tm tm;
     unsigned i;
     DmiBattery *dmi_batt = NULL;
@@ -73,7 +72,7 @@ static CMPIStatus LMI_BatteryPhysicalPackageEnumInstances(
         LMI_BatteryPhysicalPackage_Init(&lmi_batt_phys, _cb, ns);
 
         LMI_BatteryPhysicalPackage_Set_CreationClassName(&lmi_batt_phys,
-                ORGID "_" BATTERY_PHYS_PKG_CLASS_NAME);
+                LMI_BatteryPhysicalPackage_ClassName);
         LMI_BatteryPhysicalPackage_Set_PackageType(&lmi_batt_phys,
                 LMI_BatteryPhysicalPackage_PackageType_Battery);
         LMI_BatteryPhysicalPackage_Set_Caption(&lmi_batt_phys,
@@ -81,8 +80,8 @@ static CMPIStatus LMI_BatteryPhysicalPackageEnumInstances(
         LMI_BatteryPhysicalPackage_Set_Description(&lmi_batt_phys,
                 "This object represents one physical battery package in system.");
 
-        snprintf(instance_id, INSTANCE_ID_LEN,
-                ORGID ":" ORGID "_" BATTERY_PHYS_PKG_CLASS_NAME ":%s",
+        snprintf(instance_id, BUFLEN,
+                LMI_ORGID ":" LMI_BatteryPhysicalPackage_ClassName ":%s",
                 dmi_batt[i].name);
 
         LMI_BatteryPhysicalPackage_Set_Tag(&lmi_batt_phys, dmi_batt[i].name);

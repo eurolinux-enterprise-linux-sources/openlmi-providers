@@ -2,7 +2,7 @@
 #
 # servicedisc.sh
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -37,10 +37,7 @@ then
   exit 0
 elif [ -d $SYSV_SDIR ];
 then
-  for i in $SYSV_SDIR/*;
-  do
-    echo ${i#$SYSV_SDIR/}
-  done
+  chkconfig --list | awk '{print $1}'
   exit 0
 fi
 

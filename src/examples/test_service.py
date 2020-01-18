@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -65,7 +65,7 @@ cliconn.debug = True
 services = cliconn.ExecQuery("WQL", "select * from LMI_Service where Name='%s'" % service)
 
 if len(services) == 0:
-    print >>sys.stderr, "Service %s doesn't exist" % service 
+    print >>sys.stderr, "Service %s doesn't exist" % service
     sys.exit(2)
 
 if len(services) > 1:

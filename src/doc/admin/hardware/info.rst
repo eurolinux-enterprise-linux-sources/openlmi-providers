@@ -140,3 +140,30 @@ PCI Device Profile provides information about PCI devices:
 Used Resources
 ^^^^^^^^^^^^^^
 * libpci library *[from pciutils package, pci/pci.h header file]*
+
+Disk Drive Profile
+------------------
+Disk Drive Profile provides information about disk drives:
+
+* Disk Drive:
+
+  - Overall S.M.A.R.T. status
+  - Temperature
+  - Capacity
+  - Manufacturer
+  - Model
+  - Serial Number
+  - Firmware version
+  - Form Factor (disk size: 2.5", 3.5"..)
+  - RPM
+  - Port Type (ATA/SATA/SATA2)
+  - Max Port Speed
+  - Current Port Speed
+  - Disk Type (HDD/SSD)
+
+Used Resources
+^^^^^^^^^^^^^^
+* lsblk program *[from util-linux package]*
+* smartctl program *[from smartmontools package]*
+* /sys/class/block/\*/device/vendor file
+* /sys/class/block/\*/queue/rotational file

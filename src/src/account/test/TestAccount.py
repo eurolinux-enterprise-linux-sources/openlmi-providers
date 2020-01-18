@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -13,84 +13,98 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 #
 # Authors: Roman Rakus <rrakus@redhat.com>
 #
 
-from common import AccountBase
-from methods import *
-import subprocess
+import common
+import methods
+from lmi.shell import LMIInstance
 
-class TestAccount(AccountBase):
+
+class TestAccount(common.AccountBase):
     """
     Class for testing LMI_Account class
     """
+
+    CLASS_NAME = "LMI_Account"
+
+    def tearDown(self):
+        common.UserOps.clean_account(self.user_name)
+
     def test_account_properties(self):
         """
         Account: Test if there are key and main properties in LMI_Account
         """
-        slct = "select * from LMI_Account"
-        instances = self.wbemconnection.ExecQuery('WQL', slct)
-        self.assertTrue(len(instances) > 0)
+        inst = self.cim_class.first_instance()
+        self.assertIsInstance(inst, LMIInstance)
         # check if it provides key properties
-        for attr in ["CreationClassName", "Name", "SystemCreationClassName",
-                     "SystemName"]:
-            self.assertIsNotNone(instances[0][attr])
+        for attr in ['CreationClassName', 'Name', 'SystemCreationClassName',
+                     'SystemName']:
+            self.assertIsNotNone(inst.properties_dict()[attr])
 
         # check if it provides other properties, which should be set
-        for attr in ["host", "UserID", "UserPassword", "UserPasswordEncoding"]:
-            self.assertIsNotNone(instances[0][attr])
+        for attr in ['host', 'UserID', 'UserPassword', 'UserPasswordEncoding']:
+            self.assertIsNotNone(inst.properties_dict()[attr])
 
     def test_create_account(self):
         """
         Account: Test to create user account
         """
         # make sure the account will not exist
-        clean_account(self.user_name)
-        computer_system = self.wbemconnection.ExecQuery('WQL',
-            'select * from %s' % self.system_cs_name)[0]
-        lams = self.wbemconnection.ExecQuery('WQL',
-            'select * from LMI_AccountManagementService')[0]
-        self.wbemconnection.InvokeMethod("CreateAccount", lams.path,
-            Name=self.user_name, System=computer_system.path)
+        common.UserOps.clean_account(self.user_name)
+        lams = self.ns.LMI_AccountManagementService.first_instance()
+        self.assertIsInstance(lams, LMIInstance)
+        (retval, rparam, errorstr) = lams.CreateAccount({
+            'Name': self.user_name,
+            'System': self.system_iname
+        })
+        self.assertEqual(retval, 0)
         # The user now should be created, check it
-        self.assertTrue(user_exists(self.user_name))
-        # now delete that user
-        clean_account(self.user_name)
+        self.assertTrue(common.UserOps.is_user(self.user_name))
 
     def test_delete_account(self):
         """
         Account: Test to delete account
         """
         # make sure the account will exist
-        create_account(self.user_name)
-        i = self.wbemconnection.ExecQuery('WQL',
-            'select * from LMI_Account where Name = "%s"' % self.user_name)[0]
-        self.wbemconnection.DeleteInstance(i.path)
+        common.UserOps.create_account(self.user_name)
+        inst = self.cim_class.first_instance({"Name": self.user_name})
+        self.assertIsInstance(inst, LMIInstance)
+        r = inst.delete()
+        self.assertTrue(r)
         # check if it was really deleted
-        self.assertFalse(user_exists(self.user_name))
-        clean_account(self.user_name)
+        self.assertFalse(common.UserOps.is_user(self.user_name))
 
     def test_modify_account(self):
         """
         Account: Test several modifications
         """
-        create_account(self.user_name)
-        i = self.wbemconnection.ExecQuery('WQL',
-            'select * from LMI_Account where Name = "%s"' % self.user_name)[0]
+        common.UserOps.create_account(self.user_name)
+        inst = self.cim_class.first_instance({"Name": self.user_name})
+        self.assertIsInstance(inst, LMIInstance)
         # gecos
-        i["ElementName"] = "GECOS"
-        self.wbemconnection.ModifyInstance(i)
-        self.assertEqual(field_in_passwd(self.user_name, 4), "GECOS")
+        inst.ElementName = "GECOS"
+        (retval, rparam, errorstr) = inst.push()
+        self.assertEqual(retval, 0)
+        self.assertEqual(methods.field_in_passwd(self.user_name, 4),
+                         "GECOS")
         # login shell
-        i["LoginShell"] = "/modified"
-        self.wbemconnection.ModifyInstance(i)
-        self.assertEqual(field_in_passwd(self.user_name, 6), "/modified")
+        inst.LoginShell = "/modified"
+        (retval, rparam, errorstr) = inst.push()
+        self.assertEqual(retval, 0)
+        self.assertEqual(methods.field_in_passwd(self.user_name, 6),
+                         "/modified")
         # password
-        i["UserPassword"][0] = '$6$9Ky8vI6f$ipRcdc7rgMrtDh.sWOaRSoBck2cLz4eUom8Eze.NaY2DoMmNimuFBrXpJjlPCjMoeFTYC.FdZwj488JZcohyw1'
-        self.wbemconnection.ModifyInstance(i)
-        self.assertEqual(field_in_shadow(self.user_name, 1),
-            '$6$9Ky8vI6f$ipRcdc7rgMrtDh.sWOaRSoBck2cLz4eUom8Eze.NaY2DoMmNimuFBrXpJjlPCjMoeFTYC.FdZwj488JZcohyw1')
-        clean_account(self.user_name)
-
+        inst.UserPassword = [
+            '$6$9Ky8vI6f$ipRcdc7rgMrtDh.sWOaRSoBck2cLz4eUom8Ez'
+            'e.NaY2DoMmNimuFBrXpJjlPCjMoeFTYC.FdZwj488JZcohyw1'
+        ]
+        (retval, rparam, errorstr) = inst.push()
+        self.assertEqual(retval, 0)
+        shad = (
+            '$6$9Ky8vI6f$ipRcdc7rgMrtDh.sWOaRSoBck2cLz4eUom8Ez'
+            'e.NaY2DoMmNimuFBrXpJjlPCjMoeFTYC.FdZwj488JZcohyw1'
+        )
+        self.assertEqual(methods.field_in_shadow(self.user_name, 1), shad)

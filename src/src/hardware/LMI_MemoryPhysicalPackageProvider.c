@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_MemoryPhysicalPackage.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 static const CMPIBroker* _cb = NULL;
@@ -58,7 +57,7 @@ static CMPIStatus LMI_MemoryPhysicalPackageEnumInstances(
 {
     LMI_MemoryPhysicalPackage lmi_phys_mem_pkg;
     const char *ns = KNameSpace(cop);
-    char instance_id[INSTANCE_ID_LEN];
+    char instance_id[BUFLEN];
     unsigned i;
     DmiMemory dmi_memory;
 
@@ -70,7 +69,7 @@ static CMPIStatus LMI_MemoryPhysicalPackageEnumInstances(
         LMI_MemoryPhysicalPackage_Init(&lmi_phys_mem_pkg, _cb, ns);
 
         LMI_MemoryPhysicalPackage_Set_CreationClassName(&lmi_phys_mem_pkg,
-                ORGID "_" MEMORY_PHYS_PKG_CLASS_NAME);
+                LMI_MemoryPhysicalPackage_ClassName);
         LMI_MemoryPhysicalPackage_Set_PackageType(&lmi_phys_mem_pkg,
                 LMI_MemoryPhysicalPackage_PackageType_Memory);
         LMI_MemoryPhysicalPackage_Set_Caption(&lmi_phys_mem_pkg,
@@ -78,8 +77,8 @@ static CMPIStatus LMI_MemoryPhysicalPackageEnumInstances(
         LMI_MemoryPhysicalPackage_Set_Description(&lmi_phys_mem_pkg,
                 "This object represents one physical memory package in system.");
 
-        snprintf(instance_id, INSTANCE_ID_LEN,
-                ORGID ":" ORGID "_" MEMORY_PHYS_PKG_CLASS_NAME ":%s",
+        snprintf(instance_id, BUFLEN,
+                LMI_ORGID ":" LMI_MemoryPhysicalPackage_ClassName ":%s",
                 dmi_memory.modules[i].serial_number);
 
         LMI_MemoryPhysicalPackage_Set_Tag(&lmi_phys_mem_pkg,

@@ -221,7 +221,7 @@ class BaseConfiguration(Singleton):
         """
         path = self.config.get(section, option)
         if not os.path.isabs(path):
-            path = os.path.join(self.config_directory(), path)
+            path = os.path.join(self.config_directory_provider(), path)
         return path
 
     def get_safe(self, section, option, convert=str, fallback=None,

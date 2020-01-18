@@ -1,4 +1,4 @@
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -444,7 +444,7 @@ class IndicationManager(singletonmixin.Singleton):
         This function checks for existence of filters at broker. Filters
         must be registered with this instance before the check can be done.
         Without arguments all registered filters will be checked.
-        
+
         :param class_name: (``string``) Name of *Scoped class* that reduces
             searched filters.
         :param fltr_id: (``string``) Indication name reducing filters that
@@ -521,12 +521,12 @@ class IndicationManager(singletonmixin.Singleton):
 
         It asks us to verify whether this filter is allowed.
 
-        :param fltr: Contains the filter that must be authorized. 
+        :param fltr: Contains the filter that must be authorized.
         :param _class_name: (``String``) Contains the class name extracted
-            from the filter FROM clause. 
+            from the filter FROM clause.
         :param _op: The name of the class for which monitoring is required.
             Only the namespace part is set if className is a process indication.
-        :param _owner The owner argument is the destination owner. 
+        :param _owner The owner argument is the destination owner.
         """
         with self._access_lock:
             res = self._get_matching_filter(fltr)
@@ -548,14 +548,14 @@ class IndicationManager(singletonmixin.Singleton):
         monitoring the resource according to the filter express only.
 
         :param fltr: The filter argument contains the filter specification
-            for this subscription to become active. 
+            for this subscription to become active.
         :param _class_name: (``String``) The class name extracted from the filter
-            FROM clause. 
+            FROM clause.
         :param _class_path: (``CIMInstanceName``) The name of the class for
             which monitoring is required. Only the namespace part is set if
-            eventType is a process indication. 
+            eventType is a process indication.
         :param first_activation: (``bool``) Set to true if this is the first
-            filter for className. 
+            filter for className.
         """
         with self._access_lock:
             if not first_activation:
@@ -576,14 +576,14 @@ class IndicationManager(singletonmixin.Singleton):
         Informs us that monitoring using this filter should stop.
 
         :param fltr: The filter argument contains the filter specification for
-            this subscription to become active. 
+            this subscription to become active.
         :param class_name: (``String``) The class name extracted from the filter
-            FROM clause. 
+            FROM clause.
         :param class_path: (``CIMInstanceName``) class_path The name of the
             class for which monitoring is required. Only the namespace part is
-            set if className is a process indication. 
+            set if className is a process indication.
         :last_activation: (``bool``) Set to true if this is the last filter for
-            className. 
+            className.
         """
         with self._access_lock:
             if not last_activation:

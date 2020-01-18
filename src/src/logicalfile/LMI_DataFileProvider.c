@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -65,12 +65,12 @@ static CMPIStatus LMI_DataFileGetInstance(
     CMPIStatus st = {.rc = CMPI_RC_OK};
     logicalfile_t logicalfile;
 
-    st = lmi_check_required(_cb, cc, cop);
-    check_status(st);
+    st = lmi_check_required_properties(_cb, cc, cop, "CSCreationClassName", "CSName");
+    lmi_return_if_status_not_ok(st);
 
     LMI_DataFile_InitFromObjectPath(&logicalfile.lf.datafile, _cb, cop);
     st = stat_logicalfile_and_fill(_cb, &logicalfile, S_IFREG, "Not a regular file: %s");
-    check_status(st);
+    lmi_return_if_status_not_ok(st);
 
     KReturnInstance(cr, logicalfile.lf.datafile);
     return st;

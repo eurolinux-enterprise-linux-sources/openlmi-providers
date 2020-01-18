@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_ChassisComputerSystemPackage.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 static const CMPIBroker* _cb;
@@ -31,15 +30,15 @@ static void LMI_ChassisComputerSystemPackageInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_ChassisComputerSystemPackageCleanup( 
+static CMPIStatus LMI_ChassisComputerSystemPackageCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_ChassisComputerSystemPackageEnumInstanceNames( 
+static CMPIStatus LMI_ChassisComputerSystemPackageEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -49,12 +48,12 @@ static CMPIStatus LMI_ChassisComputerSystemPackageEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_ChassisComputerSystemPackageEnumInstances( 
+static CMPIStatus LMI_ChassisComputerSystemPackageEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_ChassisComputerSystemPackage lmi_chassis_cs_pkg;
     LMI_ChassisRef lmi_chassis;
@@ -69,11 +68,11 @@ static CMPIStatus LMI_ChassisComputerSystemPackageEnumInstances(
 
     LMI_ChassisRef_Init(&lmi_chassis, _cb, ns);
     LMI_ChassisRef_Set_CreationClassName(&lmi_chassis,
-            ORGID "_" CHASSIS_CLASS_NAME);
+            LMI_Chassis_ClassName);
     LMI_ChassisRef_Set_Tag(&lmi_chassis, dmi_get_chassis_tag(&dmi_chassis));
 
     LMI_ChassisComputerSystemPackage_SetObjectPath_Dependent(
-            &lmi_chassis_cs_pkg, lmi_get_computer_system());
+            &lmi_chassis_cs_pkg, lmi_get_computer_system_safe(cc));
     LMI_ChassisComputerSystemPackage_Set_Antecedent(&lmi_chassis_cs_pkg,
             &lmi_chassis);
     LMI_ChassisComputerSystemPackage_Set_PlatformGUID(&lmi_chassis_cs_pkg, "0");
@@ -86,62 +85,62 @@ done:
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_ChassisComputerSystemPackageGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_ChassisComputerSystemPackageGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_ChassisComputerSystemPackageCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_ChassisComputerSystemPackageModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_ChassisComputerSystemPackageCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_ChassisComputerSystemPackageDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_ChassisComputerSystemPackageModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_ChassisComputerSystemPackageDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_ChassisComputerSystemPackageExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_ChassisComputerSystemPackageAssociationCleanup( 
+static CMPIStatus LMI_ChassisComputerSystemPackageAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -234,13 +233,13 @@ static CMPIStatus LMI_ChassisComputerSystemPackageReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_ChassisComputerSystemPackage,
     LMI_ChassisComputerSystemPackage,
     _cb,
     LMI_ChassisComputerSystemPackageInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_ChassisComputerSystemPackage,
     LMI_ChassisComputerSystemPackage,
     _cb,

@@ -15,6 +15,7 @@ konkretcmpi_generate(${MOF}
                      CIM_PROVIDERS
                      CIM_HEADERS
                      CIM_CLASSES
+                     ${OPENLMI_QUALIFIERS_MOF}
 )
 
 add_library(${LIBRARY_NAME} SHARED
@@ -28,9 +29,9 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMPI_INCLUDE_DIR})
 target_link_libraries(${LIBRARY_NAME} openlmicommon ${KONKRETCMPI_LIBRARIES} sensors)
 
 # Create registration file
-cim_registration(${PROVIDER_NAME} ${LIBRARY_NAME} ${MOF} share/openlmi-providers)
 set(TARGET_MOF "${CMAKE_BINARY_DIR}/mof/90_LMI_Fan_Profile.mof")
 profile_mof_generate("90_LMI_Fan_Profile.mof.skel" "${TARGET_MOF}" "${CIM_CLASSES}")
+cim_registration(${PROVIDER_NAME} ${LIBRARY_NAME} ${MOF} share/openlmi-providers "${TARGET_MOF}")
 
 install(TARGETS ${LIBRARY_NAME} DESTINATION lib${LIB_SUFFIX}/cmpi/)
 install(FILES ${TARGET_MOF} DESTINATION share/openlmi-providers/)

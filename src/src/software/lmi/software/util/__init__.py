@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -23,6 +23,7 @@
 """Common utilities for LMI_Software* providers
 """
 
+import datetime
 import platform
 import pywbem
 import re
@@ -195,3 +196,33 @@ def new_instance_name(class_name, namespace=None, **kwargs):
             host=host,
             namespace=namespace,
             keybindings=keybindings)
+
+def date_time_to_cim_tz_aware(dt):
+    """
+    Convert datetime object to pywbem.CIMDateTime which is time zone aware.
+
+    :param dt: Either a timestamp or datetime object.
+    :type dt: float, datetime or pywbem.CIMDateTime
+    :return: time zone aware cim date time object
+    :rtype: `pywbem.CIMDateTime`
+    """
+    def _get_tzinfo():
+        """ Get time zone info for this system. """
+        return pywbem.cim_types.MinutesFromUTC(
+                pywbem.CIMDateTime.get_local_utcoffset())
+    if isinstance(dt, float):
+        # time zone info will be properly added
+        res = pywbem.CIMDateTime.fromtimestamp(dt)
+    elif isinstance(dt, datetime.datetime):
+        if not dt.tzinfo:
+            dt = dt.replace(tzinfo=_get_tzinfo())
+        res = pywbem.CIMDateTime(dt)
+    elif isinstance(dt, pywbem.CIMDateTime):
+        if not dt.is_interval and not dt.datetime.tzinfo:
+            res = pywbem.CIMDateTime(dt.datetime.replace(tzinfo=_get_tzinfo()))
+        else:
+            res = dt
+    else:
+        raise TypeError("unsupported time object type \"%s\" for dt"
+                % dt.__class__.__name__)
+    return res

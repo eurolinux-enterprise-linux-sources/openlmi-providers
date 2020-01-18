@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -122,7 +122,7 @@ static CMPIStatus LMI_UnixFileGetInstance(
     char *fsname;
     char *fsclassname;
 
-    st = lmi_check_required(_cb, cc, cop);
+    st = lmi_check_required_properties(_cb, cc, cop, "CSCreationClassName", "CSName");
     if (st.rc != CMPI_RC_OK) {
         return st;
     }
@@ -135,12 +135,15 @@ static CMPIStatus LMI_UnixFileGetInstance(
         CMReturnWithChars(_cb, CMPI_RC_ERR_NOT_FOUND, aux);
     }
     /* set ignored stuff */
+    /* only use udev information if no fs information is provided */
+    /* discarding const qualifiers is ok here, it makes the code a bit more simple */
+    fsname = (char *) KChars(lmi_file.FSName.value);
+    fsclassname = (char *) KChars(lmi_file.FSCreationClassName.value);
     st = get_fsinfo_from_stat(_cb, &sb, path, &fsclassname, &fsname);
-    check_status(st);
+    lmi_return_if_status_not_ok(st);
     LMI_UnixFile_Set_FSCreationClassName(&lmi_file, fsclassname);
     LMI_UnixFile_Set_FSName(&lmi_file, fsname);
-    free(fsname);
-    get_class_from_stat(&sb, aux);
+    get_logfile_class_from_stat(&sb, aux);
     LMI_UnixFile_Set_LFCreationClassName(&lmi_file, aux);
 
     /* set unix-specific stuff */
@@ -264,4 +267,5 @@ KONKRET_REGISTRATION(
 /* vi: set et: */
 /* Local Variables: */
 /* indent-tabs-mode: nil */
+/* c-basic-offset: 4 */
 /* End: */

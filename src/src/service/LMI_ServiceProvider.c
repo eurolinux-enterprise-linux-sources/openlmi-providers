@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,6 @@
 #include <stdint.h>
 #include "LMI_Service.h"
 #include "util/serviceutil.h"
-#include "globals.h"
 
 static const CMPIBroker* _cb = NULL;
 
@@ -54,8 +53,8 @@ static CMPIStatus LMI_ServiceEnumInstanceNames(
         LMI_ServiceRef w;
         LMI_ServiceRef_Init(&w, _cb, ns);
         LMI_ServiceRef_Set_CreationClassName(&w, "LMI_Service");
-        LMI_ServiceRef_Set_SystemCreationClassName(&w, get_system_creation_class_name());
-        LMI_ServiceRef_Set_SystemName(&w, get_system_name());
+        LMI_ServiceRef_Set_SystemCreationClassName(&w, lmi_get_system_creation_class_name());
+        LMI_ServiceRef_Set_SystemName(&w, lmi_get_system_name_safe(cc));
         LMI_ServiceRef_Set_Name(&w, slist->name[i]);
 
         KReturnObjectPath(cr, w);
@@ -225,6 +224,10 @@ unsigned int Service_RunOperation(const char *service, const char *operation, CM
     int res = Service_Operation(service, operation, output, sizeof(output));
     if (res == 0) {
         KSetStatus2(_cb, status, OK, output);
+      /* serviceutil.sh returns '1' in case of unsupported method, SysV initscript should return '2'
+       * and print 'Usage:' string when called with unknown operation */
+    } else if (res == 1 || res == 2) {
+        KSetStatus2(_cb, status, ERR_NOT_SUPPORTED, output);
     } else {
         KSetStatus2(_cb, status, ERR_FAILED, output);
     }

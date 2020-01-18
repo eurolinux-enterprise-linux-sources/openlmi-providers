@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,11 +21,7 @@
 #ifndef LSCPU_H_
 #define LSCPU_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "utils.h"
-
 
 /* Processor from lscpu program. */
 typedef struct _LscpuProcessor {
@@ -50,6 +46,5 @@ short lscpu_get_processor(LscpuProcessor *cpu);
  * @param cpu
  */
 void lscpu_free_processor(LscpuProcessor *cpu);
-
 
 #endif /* LSCPU_H_ */

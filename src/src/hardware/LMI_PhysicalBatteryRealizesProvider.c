@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_PhysicalBatteryRealizes.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 static const CMPIBroker* _cb;
@@ -31,15 +30,15 @@ static void LMI_PhysicalBatteryRealizesInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_PhysicalBatteryRealizesCleanup( 
+static CMPIStatus LMI_PhysicalBatteryRealizesCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_PhysicalBatteryRealizesEnumInstanceNames( 
+static CMPIStatus LMI_PhysicalBatteryRealizesEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -49,12 +48,12 @@ static CMPIStatus LMI_PhysicalBatteryRealizesEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_PhysicalBatteryRealizesEnumInstances( 
+static CMPIStatus LMI_PhysicalBatteryRealizesEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_PhysicalBatteryRealizes lmi_phys_batt_realizes;
     LMI_BatteryPhysicalPackageRef lmi_batt_phys;
@@ -73,15 +72,15 @@ static CMPIStatus LMI_PhysicalBatteryRealizesEnumInstances(
 
         LMI_BatteryRef_Init(&lmi_batt, _cb, ns);
         LMI_BatteryRef_Set_SystemCreationClassName(&lmi_batt,
-                get_system_creation_class_name());
-        LMI_BatteryRef_Set_SystemName(&lmi_batt, get_system_name());
+                lmi_get_system_creation_class_name());
+        LMI_BatteryRef_Set_SystemName(&lmi_batt, lmi_get_system_name_safe(cc));
         LMI_BatteryRef_Set_CreationClassName(&lmi_batt,
-                ORGID "_" BATTERY_CLASS_NAME);
+                LMI_Battery_ClassName);
         LMI_BatteryRef_Set_DeviceID(&lmi_batt, dmi_batt[i].name);
 
         LMI_BatteryPhysicalPackageRef_Init(&lmi_batt_phys, _cb, ns);
         LMI_BatteryPhysicalPackageRef_Set_CreationClassName(&lmi_batt_phys,
-                ORGID "_" BATTERY_PHYS_PKG_CLASS_NAME);
+                LMI_BatteryPhysicalPackage_ClassName);
         LMI_BatteryPhysicalPackageRef_Set_Tag(&lmi_batt_phys, dmi_batt[i].name);
 
         LMI_PhysicalBatteryRealizes_Set_Antecedent(&lmi_phys_batt_realizes,
@@ -98,62 +97,62 @@ done:
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_PhysicalBatteryRealizesGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_PhysicalBatteryRealizesGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_PhysicalBatteryRealizesCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_PhysicalBatteryRealizesModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_PhysicalBatteryRealizesCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_PhysicalBatteryRealizesDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_PhysicalBatteryRealizesModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_PhysicalBatteryRealizesDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_PhysicalBatteryRealizesExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_PhysicalBatteryRealizesAssociationCleanup( 
+static CMPIStatus LMI_PhysicalBatteryRealizesAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -246,13 +245,13 @@ static CMPIStatus LMI_PhysicalBatteryRealizesReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_PhysicalBatteryRealizes,
     LMI_PhysicalBatteryRealizes,
     _cb,
     LMI_PhysicalBatteryRealizesInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_PhysicalBatteryRealizes,
     LMI_PhysicalBatteryRealizes,
     _cb,

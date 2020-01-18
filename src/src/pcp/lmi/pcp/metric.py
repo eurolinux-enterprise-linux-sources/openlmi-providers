@@ -1,6 +1,6 @@
 # PCP bridge Providers
 #
-# Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2013-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -35,8 +35,8 @@ context = None  # persistent pcp context
 # Since we serve a whole slew of PCP_Metric_** subclasses, we can't
 # use a straight classname->provider-class dictionary.
 #
-#def get_providers(env): 
-#    return {'PCP_Metric_****': PCP_MetricProvider} 
+#def get_providers(env):
+#    return {'PCP_Metric_****': PCP_MetricProvider}
 #
 # Instead, we implement the one-hop-higher proxy-level function calls,
 # namely the IM_* functions at the bottom.
@@ -91,7 +91,7 @@ def get_instance (env, op, model, keys_only):
     except pmapi.pmErr, e:
         context = None
         raise pywbem.CIMError(pywbem.CIM_ERR_FAILED, "Unable to connect to local PMCD:" + str(e))
-        
+
     pmids = context.pmLookupName(metric)
     pmid = pmids[0]
     desc = context.pmLookupDesc(pmid)
@@ -100,7 +100,7 @@ def get_instance (env, op, model, keys_only):
         selected_instanceid = model['InstanceID']
     else:
         selected_instanceid = None
-    
+
     model.path.update({'InstanceID':None})
 
     if (not keys_only):
@@ -138,7 +138,7 @@ def get_instance (env, op, model, keys_only):
                     model['StatisticTime'] = PCP_CIMStatisticTime (results)
                     model['ValueString'] = PCP_CIMValueString (context, results, desc, iL)
                 yield model
-    except pmapi.pmErr: # pmGetInDom is expected to fail for non-instance (PM_INDOM_NULL) metrics 
+    except pmapi.pmErr: # pmGetInDom is expected to fail for non-instance (PM_INDOM_NULL) metrics
         new_instanceid = 'PCP:'+metric
         if (selected_instanceid is None or
             new_instanceid == selected_instanceid):
@@ -151,10 +151,10 @@ def get_instance (env, op, model, keys_only):
                 model['StatisticTime'] = PCP_CIMStatisticTime (results)
                 model['ValueString'] = PCP_CIMValueString (context, results, desc, None)
             yield model
-        
+
 # hooks for impersonating CIMProvider2 functions
 
-    
+
 def MI_enumInstanceNames (env, op):
     model = pywbem.CIMInstance(classname = op.classname, path=op)
     for x in get_instance (env, op, model, True):

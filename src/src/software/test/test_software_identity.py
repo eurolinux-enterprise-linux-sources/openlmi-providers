@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -23,10 +23,11 @@ Unit tests for ``LMI_SoftwareIdentity`` provider.
 """
 
 from datetime import datetime, timedelta
-import pywbem
-import unittest
 
+from lmi.test import unittest
+from lmi.test import wbem
 from lmi.test.lmibase import enable_lmi_exceptions
+
 import package
 import swbase
 import util
@@ -69,7 +70,7 @@ class TestSoftwareIdentity(swbase.SwTestCase):
         self.assertTrue(inst.IsEntity)
         self.assertEqual(inst.Name, pkg.name,
                 "Name does not match for pkg %s" % pkg)
-        self.assertIsInstance(inst.Epoch, pywbem.Uint32,
+        self.assertNotEqual(inst.Epoch, None,
                 "Epoch does not match for pkg %s" % pkg)
         self.assertEqual(inst.Epoch, pkg.epoch)
         self.assertEqual(inst.Version, pkg.ver,
@@ -83,29 +84,31 @@ class TestSoftwareIdentity(swbase.SwTestCase):
         self.assertTrue(inst.InstanceID.endswith(inst.ElementName),
                 "InstanceID has package nevra at its end for pkg %s" % pkg)
 
-        if package.is_pkg_installed(pkg):
+        if not util.USE_PKCON and package.is_pkg_installed(pkg):
             self.assertNotEqual(inst.InstallDate, None)
         else:
             self.assertEqual(inst.InstallDate, None)
 
-    @swbase.test_with_packages(**{'stable#pkg1' : False})
+    @swbase.test_with_packages(**{'stable#pkg1' : True})
     def test_get_instance_installed(self):
         """
         Test ``GetInstance()`` call on ``LMI_SoftwareIdentity`` with
         installed package.
         """
         pkg = self.get_repo('stable')['pkg1']
-        package.remove_pkgs(pkg.name)
-        package.install_pkgs(pkg)
         self.assertTrue(package.is_pkg_installed(pkg))
 
         objpath = self.make_op(pkg)
         inst = objpath.to_instance()
         self.assertNotEqual(inst, None, "GetInstance is successful on %s" % pkg)
-        self.assertIsNotNone(inst.InstallDate)
-        time_stamp = datetime.now(pywbem.cim_types.MinutesFromUTC(0)) \
-                - timedelta(seconds=5)
-        self.assertGreater(inst.InstallDate.datetime, time_stamp)
+        if not util.USE_PKCON:
+            self.assertIsNotNone(inst.InstallDate)
+            time_stamp = datetime.now(
+                    # lmiwbem has differently named modules
+                    getattr(wbem, 'lmiwbem_types',
+                        getattr(wbem, 'cim_types', None)).MinutesFromUTC(0)) \
+                    - timedelta(seconds=5)
+            self.assertGreater(inst.InstallDate.datetime, time_stamp)
         self._check_package_instance(pkg, inst)
 
     @swbase.test_with_repos('stable')
@@ -148,13 +151,26 @@ class TestSoftwareIdentity(swbase.SwTestCase):
         inst = self.make_op(pkg).to_instance()
         self.assertEqual(inst.InstallDate, None)
         self._check_package_instance(pkg, inst)
+        refs = inst.associator_names(
+                AssocClass="LMI_InstalledSoftwareIdentity",
+                Role="InstalledSoftware",
+                ResultRole="System",
+                ResultClass=self.system_cs_name)
+        self.assertEqual(len(refs), 0)
 
         # install it
         package.install_pkgs(pkg)
         self.assertTrue(package.is_pkg_installed(pkg))
         inst.refresh()
-        self.assertNotEqual(inst.InstallDate, None)
         self._check_package_instance(pkg, inst)
+        refs = inst.associator_names(
+                AssocClass="LMI_InstalledSoftwareIdentity",
+                Role="InstalledSoftware",
+                ResultRole="System",
+                ResultClass=self.system_cs_name)
+        self.assertEqual(len(refs), 1)
+        if not util.USE_PKCON:
+            self.assertNotEqual(inst.InstallDate, None)
 
     @swbase.test_with_repos('stable')
     @swbase.test_with_packages('stable#pkg4')
@@ -166,15 +182,28 @@ class TestSoftwareIdentity(swbase.SwTestCase):
         pkg = self.get_repo('stable')['pkg4']
         self.assertTrue(package.is_pkg_installed(pkg))
         inst = self.make_op(pkg).to_instance()
-        self.assertNotEqual(inst.InstallDate, None)
         self._check_package_instance(pkg, inst)
+        refs = inst.associator_names(
+                AssocClass="LMI_InstalledSoftwareIdentity",
+                Role="InstalledSoftware",
+                ResultRole="System",
+                ResultClass=self.system_cs_name)
+        self.assertEqual(len(refs), 1)
+        if not util.USE_PKCON:
+            self.assertNotEqual(inst.InstallDate, None)
 
-        # install it
+        # uninstall it
         package.remove_pkgs(pkg.name)
         self.assertFalse(package.is_pkg_installed(pkg))
         inst.refresh()
         self.assertEqual(inst.InstallDate, None)
         self._check_package_instance(pkg, inst)
+        refs = inst.associator_names(
+                AssocClass="LMI_InstalledSoftwareIdentity",
+                Role="InstalledSoftware",
+                ResultRole="System",
+                ResultClass=self.system_cs_name)
+        self.assertEqual(len(refs), 0)
 
     @enable_lmi_exceptions
     @swbase.test_with_packages('stable#pkg3')
@@ -186,23 +215,26 @@ class TestSoftwareIdentity(swbase.SwTestCase):
         # leave out arch part
         nvr = '%s-%s-%s' % (pkg.name, pkg.ver, pkg.rel)
         objpath = self.make_op(nvr)
-        self.assertRaisesCIM(pywbem.CIM_ERR_NOT_FOUND, objpath.to_instance)
+        self.assertRaisesCIM(wbem.CIM_ERR_NOT_FOUND, objpath.to_instance)
 
         # leave out version part
         nra = '%s-%s.%s' % (pkg.name, pkg.rel, pkg.arch)
         objpath = self.make_op(nra)
-        self.assertRaisesCIM(pywbem.CIM_ERR_NOT_FOUND, objpath.to_instance)
+        self.assertRaisesCIM(wbem.CIM_ERR_NOT_FOUND, objpath.to_instance)
 
         # leave out release part
         nva = '%s-%s.%s' % (pkg.name, pkg.ver, pkg.arch)
         objpath = self.make_op(nva)
-        self.assertRaisesCIM(pywbem.CIM_ERR_NOT_FOUND, objpath.to_instance)
+        self.assertRaisesCIM(wbem.CIM_ERR_NOT_FOUND, objpath.to_instance)
 
         # leave out name part
         vra = '%s-%s.%s' % (pkg.ver, pkg.rel, pkg.arch)
         objpath = self.make_op(vra)
-        self.assertRaisesCIM(pywbem.CIM_ERR_INVALID_PARAMETER,
-                objpath.to_instance)
+        if util.USE_PKCON:
+            self.assertRaisesCIM(wbem.CIM_ERR_NOT_FOUND, objpath.to_instance)
+        else:
+            self.assertRaisesCIM(wbem.CIM_ERR_INVALID_PARAMETER,
+                    objpath.to_instance)
 
         # leave out just epoch
         nvra = '%s-%s-%s.%s' % (pkg.name, pkg.ver, pkg.rel, pkg.arch)
@@ -229,12 +261,13 @@ class TestSoftwareIdentity(swbase.SwTestCase):
         self.assertNotEqual(inst, None, "GetInstance is successful on %s" % pkg)
         self._check_package_instance(pkg, inst)
 
+    @swbase.run_for_backends('yum')
     @enable_lmi_exceptions
     def test_enum_instance_names(self):
         """
         Test ``EnumInstanceNames()`` call on ``LMI_SoftwareIdentity``.
         """
-        self.assertRaisesCIM(pywbem.CIM_ERR_NOT_SUPPORTED,
+        self.assertRaisesCIM(wbem.CIM_ERR_NOT_SUPPORTED,
                 self.cim_class.instance_names)
 
 def suite():

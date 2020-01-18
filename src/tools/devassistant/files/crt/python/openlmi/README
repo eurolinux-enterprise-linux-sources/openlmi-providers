@@ -1,0 +1,35 @@
+If you're reading this, it means the very basic skeleton of the Python OpenLMI
+provider has been successfully created. There is certain amount of work needed
+to be done manually as Developer Assistant provides no wizard that will help
+you to generate fully working provider.
+
+ 1. Prepare your model and create corresponding MOF files
+
+ 2. Update your python sources either manually or using the attached script.
+    A script "gen_code.sh" in the tools/ directory is provided for convenience
+    and recreates all Python source files for classes found in the MOF files.
+
+    It has few limitations though, such as it needs to be run as root and
+    a CIMOM should be running. This is due to MOF files being registered
+    in order to be able to generate source (skeleton) files. This is not however
+    needed for the very basic example case, the OpenLMI devassistant templates
+    are pre-generated and ready to use. Note that the script overwrites files
+    without asking.
+
+    The script optionally takes one argument of project name used in generated
+    files. When run with no argument, a template mode is assumed and placeholders
+    are used (to be processed by the devassistant project creation mode).
+    A LMI_CIMOM_USERNAME and LMI_CIMOM_PASSWORD env. variables are used for MOF
+    files registration.
+
+ 3. Check the path in the .reg file, located in the "mof" subdirectory. A guess
+    of python site-packages path is made during creation, though it might be
+    necessary to tweak it in some environments.
+
+ 4. Run "python setup.py install --root /" under root to install your provider.
+
+ 5. In the "mof" directory register the MOF files using a similar command like
+    this (needs root privileges):
+     # openlmi-mof-register register -v 0.0.1 60_LMI_MyProject.mof MyProject.reg
+
+ 6. Restart your CIMOM and check the result!

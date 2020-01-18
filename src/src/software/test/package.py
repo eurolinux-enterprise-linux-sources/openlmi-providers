@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- Coding:utf-8 -*-
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -26,8 +26,7 @@ import subprocess
 
 import util
 
-RE_NOT_INSTALLED = re.compile(r'package\s+([^[:space:]]+)\s+is not installed',
-        re.IGNORECASE)
+RE_NOT_INSTALLED = re.compile(r'package (\S+) is not installed', re.IGNORECASE)
 
 class Package(object):
     """
@@ -105,8 +104,8 @@ class Package(object):
         """
         :returns: Package summary string.
         """
-        return subprocess.check_output(
-                ['/usr/bin/rpm', '-q', '--qf', '%{SUMMARY}', '-p',
+        return util.check_output(
+                ['/bin/rpm', '-q', '--qf', '%{SUMMARY}', '-p',
                     self.rpm_path])
 
     def get_nevra(self, with_epoch='NOT_ZERO'):
@@ -164,7 +163,7 @@ def from_json(json_object):
     :rtype: :py:class:`Package`
     """
     if isinstance(json_object, dict) and '_arch' in json_object:
-        kwargs = {k[1:]: v for k, v in json_object.items()}
+        kwargs = dict((k[1:],v) for k,v in json_object.items())
         return Package(**kwargs)
     return json_object
 
@@ -173,17 +172,27 @@ def is_pkg_installed(pkg):
     Check, whether package is installed.
     """
     if not isinstance(pkg, Package):
-        return subprocess.call(["rpm", "--quiet", "-q", pkg]) == 0
+        match = util.RE_NEVRA.match(pkg)
+        if not match:
+            match = util.RE_ENVRA.match(pkg)
+        if not match:
+            return subprocess.call(["rpm", "--quiet", "-q", pkg]) == 0
+        cmp_nvra = "%s-%s-%s.%s" % (match.group('name'),
+                   match.group('ver'), match.group('rel'), match.group('arch'))
+        cmp_epoch = match.group('epoch')
     else:
-        cmd = ["/usr/bin/rpm", "-q", "--qf", "%{EPOCH}:%{NVRA}\n", pkg.nevra]
-        try:
-            out = subprocess.check_output(cmd).splitlines()[0]
-            epoch, _ = out.split(':')
-            if not epoch or epoch.lower() == "(none)":
-                epoch = "0"
-            return int(epoch) == int(pkg.epoch)
-        except subprocess.CalledProcessError:
-            return False
+        cmp_nvra = pkg.get_nevra('NEVER')
+        cmp_epoch = pkg.epoch
+
+    cmd = ["/bin/rpm", "-q", "--qf", "%{EPOCH}:%{NVRA}\n", cmp_nvra]
+    try:
+        out = util.check_output(cmd).splitlines()[0]
+        epoch, _ = out.split(':')
+        if not epoch or epoch.lower() == "(none)":
+            epoch = "0"
+        return int(epoch) == int(cmp_epoch)
+    except subprocess.CalledProcessError:
+        return False
 
 def filter_installed_packages(pkgs, installed=True):
     """
@@ -205,13 +214,13 @@ def filter_installed_packages(pkgs, installed=True):
     pkg_map = {}
     for pkg in pkgs:
         if isinstance(pkg, Package):
-            pkg_map[pkg.nevra] = pkg
-            pkg = pkg.nevra
+            pkg_map[pkg.get_nevra('NEVER')] = pkg
+            pkg = pkg.get_nevra('NEVER')
         elif not installed:
             raise TypeError("packages must be objects of Package")
         pkg_strings.append(pkg)
-    cmd = [ "/usr/bin/rpm", "-q", "--qf"
-          , "%{NAME}-%{EPOCH}:%{VERSION}-%{RELEASE}.%{ARCH}\n"]
+    cmd = [ "/bin/rpm", "-q", "--qf"
+          , "%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n"]
     cmd.extend(pkg_strings)
     process = subprocess.Popen(cmd,
             stdout=subprocess.PIPE, stderr=util.DEV_NULL)
@@ -219,21 +228,20 @@ def filter_installed_packages(pkgs, installed=True):
     if installed:
         result = set()
         for line in out.splitlines():
-            if not util.RE_NEVRA.match(line):
+            if not util.RE_NEVRA_OPT_EPOCH.match(line):
                 continue
             if line in result:
                 continue
             result.add(pkg_map.get(line, line))
     else:
-        result = set(pkg_strings)
+        result = set()
         for match in RE_NOT_INSTALLED.finditer(out):
             if match.group(1) not in pkg_strings:
                 raise ValueError('got unexpected package nevra "%s" which'
                         ' should be one of: %s'
                         % (match.group(1), str(pkg_strings)))
-            pkg_strings.remove(match.group(1))
-            result.remove(result)
-        result = {pkg_map.get(pstr, pstr) for pstr in result}
+            result.add(match.group(1))
+        result = set(pkg_map.get(pstr, pstr) for pstr in result)
     return result
 
 def remove_pkgs(pkgs, *args, **kwargs):
@@ -254,7 +262,7 @@ def remove_pkgs(pkgs, *args, **kwargs):
     pkg_strings = []
     for pkg in pkgs:
         if isinstance(pkg, Package):
-            pkg_strings.append(pkg.nevra)
+            pkg_strings.append(pkg.get_nevra('NEVER'))
         else:
             pkg_strings.append(pkg)
     if len(pkg_strings) > 0:
@@ -263,6 +271,9 @@ def remove_pkgs(pkgs, *args, **kwargs):
         if suppress_stderr:
             kwargs['stderr'] = util.DEV_NULL
         subprocess.call(cmd, **kwargs)
+        if util.USE_PKCON:
+            subprocess.call(['pkcon', '-p', 'refresh'], \
+                            stdout=util.DEV_NULL, stderr=util.DEV_NULL)
 
 def install_pkgs(pkgs, *args):
     """
@@ -282,4 +293,6 @@ def install_pkgs(pkgs, *args):
     if len(pkg_paths) > 0:
         cmd.extend(pkg_paths)
         subprocess.call(cmd)
-
+        if util.USE_PKCON:
+            subprocess.call(['pkcon', '-p', 'refresh'], \
+                            stdout=util.DEV_NULL, stderr=util.DEV_NULL)

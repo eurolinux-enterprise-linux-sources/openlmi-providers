@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,8 +23,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include "LMI_Memory.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 #include "procfs.h"
 #include "sysfs.h"
@@ -83,9 +82,9 @@ static CMPIStatus LMI_MemoryEnumInstances(
     LMI_Memory_Init(&lmi_mem, _cb, ns);
 
     LMI_Memory_Set_SystemCreationClassName(&lmi_mem,
-            get_system_creation_class_name());
-    LMI_Memory_Set_SystemName(&lmi_mem, get_system_name());
-    LMI_Memory_Set_CreationClassName(&lmi_mem, ORGID "_" MEM_CLASS_NAME);
+            lmi_get_system_creation_class_name());
+    LMI_Memory_Set_SystemName(&lmi_mem, lmi_get_system_name_safe(cc));
+    LMI_Memory_Set_CreationClassName(&lmi_mem, LMI_Memory_ClassName);
 
     LMI_Memory_Set_DeviceID(&lmi_mem, "0");
     LMI_Memory_Set_Volatile(&lmi_mem, 1);
@@ -102,7 +101,7 @@ static CMPIStatus LMI_MemoryEnumInstances(
     LMI_Memory_Set_Description(&lmi_mem,
             "This object represents all memory available in system.");
     LMI_Memory_Set_InstanceID(&lmi_mem,
-            ORGID ":" ORGID "_" MEM_CLASS_NAME ":0");
+            LMI_ORGID ":" LMI_Memory_ClassName ":0");
     LMI_Memory_Set_IsCompressed(&lmi_mem, 0);
     LMI_Memory_Set_Purpose(&lmi_mem, "The system memory is temporary storage "
             "area storing instructions and data required by processor "

@@ -77,7 +77,7 @@ Mapping of objects to *CIM* classes
 
 Repository : :ref:`LMI_SoftwareIdentityResource<LMI-SoftwareIdentityResource>`
     Is represented by ``LMI_SoftwareIdentityResource``. What distinguishes
-    particular repository from others on the same system is a 
+    particular repository from others on the same system is a
     :ref:`LMI_SoftwareIdentityResource.Name<LMI-SoftwareIdentityResource-Name>`
     key property. It's the name of repository written in square brackets in
     repository config. Not the configuration file name, not the ``name``
@@ -98,7 +98,7 @@ Installed file : :ref:`LMI_SoftwareIdentityFileCheck<LMI-SoftwareIdentityFileChe
     Is represented by ``LMI_SoftwareIdentityFileCheck``. Represents a
     verification check of particular file installed by *RPM* package. It contains
     attributes being checked, like:
-    
+
         * ``User ID``, ``Group ID``
         * ``Checksum``
         * ``Link Target``
@@ -107,15 +107,15 @@ Installed file : :ref:`LMI_SoftwareIdentityFileCheck<LMI-SoftwareIdentityFileChe
     Each is present twice. One property represents the current value of
     installed file and the other the value stored in *RPM* package, that the
     file should have. The later properties have ``Original`` suffix. So for
-    example: 
-        
+    example:
+
         * :ref:`UserID<LMI-SoftwareIdentityFileCheck-UserID>` vs
-          :ref:`UserIDOriginal<LMI-SoftwareIdentityFileCheck-UserIDOriginal>` 
+          :ref:`UserIDOriginal<LMI-SoftwareIdentityFileCheck-UserIDOriginal>`
         * :ref:`FileChecksum<LMI-SoftwareIdentityFileCheck-FileChecksum>` vs
-          :ref:`FileChecksumOriginal<LMI-SoftwareIdentityFileCheck-FileChecksumOriginal>` 
+          :ref:`FileChecksumOriginal<LMI-SoftwareIdentityFileCheck-FileChecksumOriginal>`
 
     Mentioned attributes are compared when the package verification is done.
-    Single file can also be easily checked. Either by running 
+    Single file can also be easily checked. Either by running
     :ref:`LMI_SoftwareIdentityFileCheck.Invoke()<LMI-SoftwareIdentityFileCheck-Invoke>`
     method on particular object path or by testing the
     :ref:`FailedFlags<LMI-SoftwareIdentityFileCheck-FailedFlags>` property for

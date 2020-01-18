@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -584,8 +584,19 @@ def _fill_non_keys(repo, model):
     model['GPGCheck'] = repo.gpg_check
     if repo.ready:
         model['HealthState'] = Values.HealthState.OK
+        model['OperationalStatus'] = [Values.OperationalStatus.OK]
+        model['PrimaryStatus'] = Values.PrimaryStatus.OK
+        model['StatusDescriptions'] = ["Ready"]
+    elif repo.ready is None:
+        model['HealthState'] = Values.HealthState.Unknown
+        model['OperationalStatus'] = [Values.OperationalStatus.Stopped]
+        model['PrimaryStatus'] = Values.PrimaryStatus.Unknown
+        model['StatusDescriptions'] = ["Disabled"]
     else:
         model['HealthState'] = Values.HealthState.Major_failure
+        model['OperationalStatus'] = [Values.OperationalStatus.Error]
+        model['PrimaryStatus'] = Values.PrimaryStatus.Error
+        model['StatusDescriptions'] = ["Not Ready"]
     if repo.revision is not None:
         model["Generation"] = pywbem.Uint64(repo.revision)
     else:
@@ -598,26 +609,19 @@ def _fill_non_keys(repo, model):
     else:
         model['MirrorList'] = pywbem.CIMProperty('MirrorList',
                 None, type='string')
-    model['OperationalStatus'] = [ Values.OperationalStatus.OK
-                if repo.ready else Values.OperationalStatus.Error]
     model['OtherAccessContext'] = "YUM package repository"
     model['OtherResourceType'] = "RPM Software Package"
     # this would need to populateSack, which is expensive
     #model["PackageCount"] = pywbem.Uint32(repo.pkg_count)
-    if repo.ready:
-        model['PrimaryStatus'] = Values.PrimaryStatus.OK
-    else:
-        model['PrimaryStatus'] = Values.PrimaryStatus.Error
     model['RepoGPGCheck'] = repo.repo_gpg_check
     if repo.enabled:
         model['RequestedState'] = Values.RequestedState.Enabled
     else:
         model['RequestedState'] = Values.RequestedState.Disabled
     model['ResourceType'] = Values.ResourceType.Other
-    model['StatusDescriptions'] = [ "Ready" if repo.ready else "Not Ready" ]
-    model['TimeOfLastStateChange'] = pywbem.CIMDateTime(repo.last_edit)
+    model['TimeOfLastStateChange'] = util.date_time_to_cim_tz_aware(repo.last_edit)
     if repo.last_update is not None:
-        model['TimeOfLastUpdate'] = pywbem.CIMDateTime(repo.last_update)
+        model['TimeOfLastUpdate'] = util.date_time_to_cim_tz_aware(repo.last_update)
     else:
         model['TimeOfLastUpdate'] = pywbem.CIMProperty('TimeOfLastUpdate',
                 None, type='datetime')

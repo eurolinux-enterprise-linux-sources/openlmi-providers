@@ -9,7 +9,6 @@
 
 #include "rdcp_error.h"
 #include "openlmi.h"
-#include "globals.h"
 
 const char *provider_name;
 const ConfigEntry *provider_config_defaults;
@@ -38,7 +37,7 @@ const ConfigEntry *provider_config_defaults;
     klass##_Init(obj, _cb, name_space);                                 \
     klass##_Set_Name(obj, REALMD_SERVICE_NAME);                         \
     klass##_Set_SystemCreationClassName(obj,                            \
-                                        get_system_creation_class_name()); \
+                                        lmi_get_system_creation_class_name()); \
     klass##_Set_SystemName(obj, host_name);                             \
     klass##_Set_CreationClassName(obj,                                  \
                                   LMI_RealmdService_ClassName);         \

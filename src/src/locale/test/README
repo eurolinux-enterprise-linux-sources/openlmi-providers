@@ -1,0 +1,18 @@
+Locale provider test
+====================
+Basic set of tests for Locale provider. It covers all methods
+implemented in the provider (setting locale variables, setting
+virtual console keyboard, setting x11 keyboard) and correctness
+of all related property values compared to localectl command
+output. The test also cleans up after itself and should restore
+original values of all locale settings.
+
+The test must be run as root (localectl requires root privileges for
+non-read operations) on machine with CIMOM broker.
+
+You can use localtest.sh for running the test - just update exported
+variables there before you execute it.
+
+For more details about OpenLMI testing see [1].
+
+[1] https://fedorahosted.org/openlmi/wiki/TestGuidelines

@@ -1,4 +1,4 @@
-# Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2013-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -21,11 +21,12 @@
 Base class and utilities for Journald tests.
 """
 
-from lmi.test import cimbase
+from lmi.test import lmibase
 
-class JournalBase(cimbase.CIMTestCase):
+class JournalBase(lmibase.LmiTestCase):
     """
     Base class for all LMI Journal tests
     """
-    pass
+
+    USE_EXCEPTIONS = True
 

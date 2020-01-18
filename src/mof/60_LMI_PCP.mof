@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc.
+ * Copyright (C) 2013-2014 Red Hat, Inc.
  *
  * Stub MOF for the CIM<->PCP bridge.  Further MOF/REG clauses that
  * describe the PCP PMNS details may be generated periodically using
@@ -40,5 +40,5 @@ class PCP_MetricValue : CIM_StatisticalData
 
     [Description("The metric units, as returned by pmUnitsStr(3)")]
     string Units;
-}; 
+};
 

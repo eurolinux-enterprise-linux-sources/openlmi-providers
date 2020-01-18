@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,8 +23,6 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include <glib.h>
-
 #ifdef HAS_GDBUS
 #  include <gio/gio.h>
 
@@ -40,8 +38,6 @@
 
 #include "LMI_AssociatedPowerManagementService.h"
 #include "LMI_PowerConcreteJob.h"
-
-#include "globals.h"
 
 const char *provider_name = "powermanagement";
 const ConfigEntry *provider_config_defaults = NULL;
@@ -137,8 +133,16 @@ Proxy *power_create_logind()
         G_DBUS_PROXY_FLAGS_NONE, NULL, LOGIND_NAME, LOGIND_PATH,
         LOGIND_INTERFACE, NULL, &err)) == NULL) {
 
-        error("Unable to connect to logind via DBus: %s", err->message);
+        lmi_error("Unable to connect to logind via DBus: %s", err->message);
         g_error_free(err);
+        return NULL;
+    }
+    // Logind always has some properties, if no property is cached,
+    // the proxied object doesn't exist => don't use logind
+    if (g_dbus_proxy_get_cached_property_names(logind_proxy) == NULL) {
+        g_object_unref(logind_proxy);
+        lmi_debug("Logind DBus interface is not available");
+        return NULL;
     }
     return logind_proxy;
 #else
@@ -156,7 +160,7 @@ bool power_call_logind(Proxy *proxy, const char *method)
                 g_variant_new("(b)", false), G_DBUS_CALL_FLAGS_NONE, -1, NULL,
                 &err)) == NULL) {
 
-            error("Unable to call: %s", method, err->message);
+            lmi_error("Unable to call: %s", method, err->message);
             g_error_free(err);
             return false;
         } else {
@@ -164,6 +168,7 @@ bool power_call_logind(Proxy *proxy, const char *method)
             return true;
         }
     }
+    return false;
 #endif
     return false;
 }
@@ -177,7 +182,7 @@ bool power_check_logind(Proxy *proxy, const char *method)
         if ((result = g_dbus_proxy_call_sync(proxy, method, g_variant_new("()"),
             G_DBUS_CALL_FLAGS_NONE, -1, NULL, &err)) == NULL) {
 
-            error("Unable to call %s: %s", method, err->message);
+            lmi_error("Unable to call %s: %s", method, err->message);
             g_error_free(err);
             return false;
         } else {
@@ -227,7 +232,7 @@ void *state_change_thread(void *data)
             MUTEX_UNLOCK(powerStateChangeJob->power);
         }
 
-        debug("State change thread cancelled\n");
+        lmi_debug("State change thread cancelled\n");
         return NULL;
     }
 
@@ -265,7 +270,7 @@ void *state_change_thread(void *data)
 #ifdef HAS_SYSTEMCTL
             succeeded = system("systemctl --force poweroff &") == 0;
 #else
-            succeeded =  system("shutdown --halt now &") == 0;
+            succeeded =  system("poweroff --force &") == 0;
 #endif
             break;
         case LMI_AssociatedPowerManagementService_PowerState_Off___Soft_Graceful:
@@ -273,7 +278,7 @@ void *state_change_thread(void *data)
             succeeded = power_call_logind(logind_proxy, "PowerOff");
 
             if (!succeeded) {
-                succeeded = system("shutdown --poweroff now &") == 0;
+                succeeded = system("poweroff &") == 0;
             }
             break;
         case LMI_AssociatedPowerManagementService_PowerState_Power_Cycle_Off___Soft_Graceful:
@@ -281,7 +286,7 @@ void *state_change_thread(void *data)
             succeeded = power_call_logind(logind_proxy, "Reboot");
 
             if (!succeeded) {
-                succeeded =  system("shutdown --reboot now &") == 0;
+                succeeded =  system("reboot &") == 0;
             }
             break;
     }
@@ -304,7 +309,7 @@ void *state_change_thread(void *data)
     powerStateChangeJob->timeOfLastChange = time(NULL);
     MUTEX_UNLOCK(powerStateChangeJob);
 
-    debug("State change thread finished\n");
+    lmi_debug("State change thread finished\n");
     return NULL;
 }
 
@@ -325,13 +330,13 @@ int power_request_power_state(Power *power, unsigned short state)
     }
     free(states);
     if (!found) {
-        error("Invalid state requested: %d\n",  state);
+        lmi_error("Invalid state requested: %d\n",  state);
         return CMPI_RC_ERR_INVALID_PARAMETER;
     }
 
     PowerStateChangeJob *powerStateChangeJob = malloc(sizeof(PowerStateChangeJob));
     if (powerStateChangeJob == NULL) {
-        error("Memory allocation failed");
+        lmi_error("Memory allocation failed");
         return CMPI_RC_ERR_FAILED;
     }
     powerStateChangeJob->id = job_max_id++;
@@ -370,7 +375,7 @@ int power_request_power_state(Power *power, unsigned short state)
     powerStateChangeJob->thread = power->broker->xft->newThread(state_change_thread, powerStateChangeJob, 1);
     power->jobs = g_list_append(power->jobs, powerStateChangeJob);
     MUTEX_UNLOCK(power);
-    debug("State change thread started\n");
+    lmi_debug("State change thread started\n");
 
     return rc;
 }
@@ -379,21 +384,13 @@ unsigned short *power_available_requested_power_states(Power *power, int *count)
 {
     unsigned short *list = malloc(17 * sizeof(unsigned short));
     if (list == NULL) {
-        error("Memory allocation failed");
+        lmi_error("Memory allocation failed");
         return NULL;
     }
     int i = 0;
 
 #ifdef HAS_GDBUS
-    GError *err = NULL;
-    GDBusProxy *logind_proxy;
-    if ((logind_proxy = g_dbus_proxy_new_for_bus_sync(G_BUS_TYPE_SYSTEM,
-        G_DBUS_PROXY_FLAGS_NONE, NULL, LOGIND_NAME, LOGIND_PATH,
-        LOGIND_INTERFACE, NULL, &err)) == NULL) {
-
-        error("Unable to connect to logind via DBus: %s", err->message);
-        g_error_free(err);
-    }
+    GDBusProxy *logind_proxy = power_create_logind();
 #else
     void *logind_proxy = NULL;
 #endif

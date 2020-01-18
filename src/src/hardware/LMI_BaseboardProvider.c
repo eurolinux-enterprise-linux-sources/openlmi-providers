@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_Baseboard.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 static const CMPIBroker* _cb = NULL;
@@ -58,7 +57,7 @@ static CMPIStatus LMI_BaseboardEnumInstances(
 {
     LMI_Baseboard lmi_baseboard;
     const char *ns = KNameSpace(cop);
-    char instance_id[INSTANCE_ID_LEN];
+    char instance_id[BUFLEN];
     DmiBaseboard dmi_baseboard;
 
     if (dmi_get_baseboard(&dmi_baseboard) != 0) {
@@ -68,24 +67,24 @@ static CMPIStatus LMI_BaseboardEnumInstances(
     LMI_Baseboard_Init(&lmi_baseboard, _cb, ns);
 
     LMI_Baseboard_Set_CreationClassName(&lmi_baseboard,
-            ORGID "_" BASEBOARD_CLASS_NAME);
+            LMI_Baseboard_ClassName);
     LMI_Baseboard_Set_PackageType(&lmi_baseboard,
             LMI_Baseboard_PackageType_Cross_Connect_Backplane);
-    LMI_Baseboard_Set_Name(&lmi_baseboard, BASEBOARD_CLASS_NAME);
-    LMI_Baseboard_Set_ElementName(&lmi_baseboard, BASEBOARD_CLASS_NAME);
+    LMI_Baseboard_Set_Name(&lmi_baseboard, "Baseboard");
+    LMI_Baseboard_Set_ElementName(&lmi_baseboard, "Baseboard");
     LMI_Baseboard_Set_HostingBoard(&lmi_baseboard, 1);
-    LMI_Baseboard_Set_Caption(&lmi_baseboard, BASEBOARD_CLASS_NAME);
+    LMI_Baseboard_Set_Caption(&lmi_baseboard, "Baseboard");
     LMI_Baseboard_Set_Description(&lmi_baseboard,
             "This object represents baseboard of the system.");
 
     if (strcmp(dmi_baseboard.serial_number, "Not Specified") == 0) {
         LMI_Baseboard_Set_Tag(&lmi_baseboard, "0");
         LMI_Baseboard_Set_InstanceID(&lmi_baseboard,
-            ORGID ":" ORGID "_" BASEBOARD_CLASS_NAME ":0");
+            LMI_ORGID ":" LMI_Baseboard_ClassName ":0");
     } else {
         LMI_Baseboard_Set_Tag(&lmi_baseboard, dmi_baseboard.serial_number);
-        snprintf(instance_id, INSTANCE_ID_LEN,
-            ORGID ":" ORGID "_" BASEBOARD_CLASS_NAME ":%s",
+        snprintf(instance_id, BUFLEN,
+            LMI_ORGID ":" LMI_Baseboard_ClassName ":%s",
             dmi_baseboard.serial_number);
         LMI_Baseboard_Set_InstanceID(&lmi_baseboard, instance_id);
     }

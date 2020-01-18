@@ -1,0 +1,70 @@
+fullname: Python OpenLMI provider
+description: 'Python OpenLMI assistant will help you create an OpenLMI provider and install necessary dependencies.'
+
+dependencies:
+- use: super.dependencies
+- rpm: ['pywbem', 'cmpi-bindings-pywbem', 'openlmi-providers']
+
+dependencies_eclipse:
+- use: eclipse.dependencies_python
+
+dependencies_vim:
+- use: vim.dependencies
+
+args:
+  name:
+    use: common_args
+
+  eclipse:
+    use: eclipse
+
+  github:
+    use: common_args
+
+  vim:
+    use: vim
+
+files:
+  gitignore: &gitignore
+    source: ../.gitignore
+  sources: &sources
+    source: .
+
+run:
+- $dirname~: $(dirname "$name")
+- $basename~: $(basename "$name")
+- log_i: 'Creating Python OpenLMI provider $basename in $dirname ...'
+- if $(test -e "$name"):
+  - log_e: '$name already exists, cannot proceed.'
+- else:
+  - cl_i: mkdir -p "$name"
+  - jinja_render_dir:
+      template: *sources
+      destination: "$name"
+      data:
+        PROJECT_NAME: $basename
+  - cl: cd "$name"
+  - cl: chmod a+x pycmpi{{PROJECT_NAME}}-cimprovagt
+  - cl: chmod a+x tools/gen_code.sh
+  - cl: for j in `find -name '*{{PROJECT_NAME}}*'`; do mv "$j" "`echo $j | sed 's/{{PROJECT_NAME}}/$basename/'`"; done
+
+  - log_i: 'Building sources ...'
+  - cl: python setup.py build
+  - cl_i: cd ..
+
+- cl: cd "$name"
+- dda_c: .
+- if defined $vim:
+  - use: vim.run
+- if $eclipse:
+  - use: eclipse.run_python
+- cl: cp *gitignore .
+- use: git_init_add_commit.run
+- if defined $github:
+  - github: create_and_push
+- log_i: 'Python OpenLMI provider project $basename in $dirname has been created.'
+- log_i: 'Remember it''s just a skeleton that should be filled in order to make the provider'
+- log_i: 'usable. Specifically classes in MOF files and corresponding code in the generated'
+- log_i: 'skeleton.'
+- log_i: ''
+- log_i: 'Please have a look at the README file for further instructions.'

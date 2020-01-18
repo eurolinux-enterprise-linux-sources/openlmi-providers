@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -233,8 +233,8 @@ class LMI_SoftwareJob(CIMProvider2):
         """
         job = Job.object_path2job(object_name)
         try:
-            if param_requestedstate not in {
-                    self.values.RequestStateChange.RequestedState.Terminate }:
+            if param_requestedstate != \
+                    self.values.RequestStateChange.RequestedState.Terminate:
                 raise pywbem.CIMError(pywbem.CIM_ERR_INVALID_PARAMETER,
                         "Valid RequestedState can by only Terminate (%d)" %
                         self.values.RequestStateChange.RequestedState.Terminate)
@@ -291,12 +291,13 @@ class LMI_SoftwareJob(CIMProvider2):
         """
         job = Job.object_path2job(object_name)
         error = Job.job2error(env, job)
-        out_params = []
         if error is not None:
             param = pywbem.CIMParameter('Errors', type='instance',
                     is_array=True, array_size=1, value=[error])
-            out_params.append(param)
-        return (self.values.GetErrors.Success, out_params)
+        else:
+            param = pywbem.CIMParameter('Errors', type='instance',
+                    is_array=True, array_size=0, value=[])
+        return (self.values.GetErrors.Success, [param])
 
     @cmpi_logging.trace_method
     def cim_method_killjob(self, env, object_name,
@@ -379,8 +380,5 @@ class LMI_SoftwareJob(CIMProvider2):
         """
         job = Job.object_path2job(object_name)
         error = Job.job2error(env, job)
-        out_params = []
-        if error is not None:
-            param = pywbem.CIMParameter('Error', type='instance', value=error)
-            out_params.append(param)
-        return (self.values.GetErrors.Success, out_params)
+        param = pywbem.CIMParameter('Error', type='instance', value=error)
+        return (self.values.GetErrors.Success, [param])

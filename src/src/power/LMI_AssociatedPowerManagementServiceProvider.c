@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,10 +21,8 @@
 #include "LMI_AssociatedPowerManagementService.h"
 #include "LMI_PowerManagementService.h"
 #include "CIM_ComputerSystem.h"
-
 #include "power.h"
 
-#include "globals.h"
 
 static const CMPIBroker* _cb;
 
@@ -42,7 +40,7 @@ static void LMI_AssociatedPowerManagementServiceAssociationInitialize(
 
 static CMPIStatus LMI_AssociatedPowerManagementServiceCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     power_unref(mi->hdl);
@@ -62,24 +60,24 @@ static CMPIStatus LMI_AssociatedPowerManagementServiceEnumInstanceNames(
 
 static CMPIStatus LMI_AssociatedPowerManagementServiceEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     const char *ns = KNameSpace(cop);
 
     LMI_AssociatedPowerManagementService w;
     LMI_AssociatedPowerManagementService_Init(&w, _cb, ns);
 
-    LMI_AssociatedPowerManagementService_SetObjectPath_UserOfService(&w, lmi_get_computer_system());
+    LMI_AssociatedPowerManagementService_SetObjectPath_UserOfService(&w, lmi_get_computer_system_safe(cc));
 
     LMI_PowerManagementServiceRef powerManagementServiceRef;
     LMI_PowerManagementServiceRef_Init(&powerManagementServiceRef, _cb, ns);
-    LMI_PowerManagementServiceRef_Set_Name(&powerManagementServiceRef, get_system_name());
-    LMI_PowerManagementServiceRef_Set_SystemName(&powerManagementServiceRef, get_system_name());
+    LMI_PowerManagementServiceRef_Set_Name(&powerManagementServiceRef, lmi_get_system_name_safe(cc));
+    LMI_PowerManagementServiceRef_Set_SystemName(&powerManagementServiceRef, lmi_get_system_name_safe(cc));
     LMI_PowerManagementServiceRef_Set_CreationClassName(&powerManagementServiceRef, "LMI_PowerManagementService");
-    LMI_PowerManagementServiceRef_Set_SystemCreationClassName(&powerManagementServiceRef, get_system_creation_class_name());
+    LMI_PowerManagementServiceRef_Set_SystemCreationClassName(&powerManagementServiceRef, lmi_get_system_creation_class_name());
     LMI_AssociatedPowerManagementService_Set_ServiceProvided(&w, &powerManagementServiceRef);
 
     int count;
@@ -102,61 +100,61 @@ static CMPIStatus LMI_AssociatedPowerManagementServiceEnumInstances(
 }
 
 static CMPIStatus LMI_AssociatedPowerManagementServiceGetInstance(
-    CMPIInstanceMI* mi, 
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
 static CMPIStatus LMI_AssociatedPowerManagementServiceCreateInstance(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_AssociatedPowerManagementServiceModifyInstance(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci,
+    const char**properties)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_AssociatedPowerManagementServiceDeleteInstance(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_AssociatedPowerManagementServiceExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_AssociatedPowerManagementServiceAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     power_unref(mi->hdl);
     mi->hdl = NULL;
@@ -268,13 +266,13 @@ static CMPIStatus LMI_AssociatedPowerManagementServiceReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_AssociatedPowerManagementService,
     LMI_AssociatedPowerManagementService,
     _cb,
     LMI_AssociatedPowerManagementServiceInitialize(&mi, ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_AssociatedPowerManagementService,
     LMI_AssociatedPowerManagementService,
     _cb,

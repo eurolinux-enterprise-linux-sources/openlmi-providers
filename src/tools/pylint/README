@@ -22,7 +22,7 @@ FIX FOR PYLINT
  * To fix this you may apply attached patch "logilab-modutils-0.57.1.patch"
    to logilab module (this one is for version 0.57.1):
      $ patch -d /usr/lib/python2.7/site-packages/logilab -p1 \
-        <logilab-modutils-0.57.1.patch 
+        <logilab-modutils-0.57.1.patch
 
 RUNNING PYLINT CHECKER
  1. Add pylint directory to your PATH:

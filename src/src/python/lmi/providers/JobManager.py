@@ -1,4 +1,4 @@
-# Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2013-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -688,7 +688,7 @@ class JobManager(object):
         IND_JOB_SUCCEEDED: {
             "Query" : "SELECT * FROM LMI_%(prefix)sInstModification WHERE "
                 "SourceInstance ISA %(classname)s AND "
-                "SourceInstance.CIM_ConcreteJob::JobState = 17",
+                "SourceInstance.CIM_ConcreteJob::JobState = 7",
             "Description": "Modification of Job State for a "
                 "Concrete Job to 'Complete'.",
         },
@@ -951,8 +951,8 @@ class JobManager(object):
         # Empty the queue, we don't want the worker to proceed with any other
         # queued job.
         while not self.queue.empty():
-            queue.get(False)
-            queue.task_done()
+            self.queue.get(False)
+            self.queue.task_done()
 
         self.queue.put(self.COMMAND_STOP)
         self.worker.join(timeout)

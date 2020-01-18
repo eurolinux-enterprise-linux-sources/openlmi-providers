@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,8 @@
 
 #include "utils.h"
 
-const ConfigEntry *provider_config_defaults = NULL;
 const char *provider_name = "hardware";
+const ConfigEntry *provider_config_defaults = NULL;
 
 short read_fp_to_2d_buffer(FILE *fp, char ***buffer, unsigned *buffer_size)
 {
@@ -34,7 +34,7 @@ short read_fp_to_2d_buffer(FILE *fp, char ***buffer, unsigned *buffer_size)
     free_2d_buffer(buffer, buffer_size);
 
     if (!fp) {
-        warn("Given file pointer is NULL.");
+        lmi_warn("Given file pointer is NULL.");
         goto done;
     }
 
@@ -42,7 +42,7 @@ short read_fp_to_2d_buffer(FILE *fp, char ***buffer, unsigned *buffer_size)
     tmp_buffer_lines = 128;
     tmp_buffer = (char **)calloc(tmp_buffer_lines, sizeof(char *));
     if (!tmp_buffer) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
         tmp_buffer_lines = 0;
         goto done;
     }
@@ -59,7 +59,7 @@ short read_fp_to_2d_buffer(FILE *fp, char ***buffer, unsigned *buffer_size)
             char **newtmp = (char **)realloc(tmp_buffer,
                     tmp_buffer_lines * sizeof(char *));
             if (!newtmp) {
-                warn("Failed to allocate memory.");
+                lmi_warn("Failed to allocate memory.");
                 tmp_buffer_lines /= 2;
                 goto done;
             }
@@ -71,7 +71,7 @@ short read_fp_to_2d_buffer(FILE *fp, char ***buffer, unsigned *buffer_size)
         if (!tmp_buffer[lines_read]) {
             tmp_buffer[lines_read] = strdup("");
             if (!tmp_buffer[lines_read]) {
-                warn("Failed to allocate memory.");
+                lmi_warn("Failed to allocate memory.");
                 goto done;
             }
         }
@@ -79,7 +79,7 @@ short read_fp_to_2d_buffer(FILE *fp, char ***buffer, unsigned *buffer_size)
     }
 
     if (lines_read < 1) {
-        warn("No data read from given source.");
+        lmi_warn("No data read from given source.");
         goto done;
     }
 
@@ -88,7 +88,7 @@ short read_fp_to_2d_buffer(FILE *fp, char ***buffer, unsigned *buffer_size)
         char **newtmp = (char **)realloc(tmp_buffer,
                 lines_read * sizeof(char *));
         if (!newtmp) {
-            warn("Failed to allocate memory.");
+            lmi_warn("Failed to allocate memory.");
             goto done;
         }
         tmp_buffer = newtmp;
@@ -132,19 +132,20 @@ short run_command(const char *command, char ***buffer, unsigned *buffer_size)
 {
     FILE *fp = NULL;
     short ret = -1;
+    char errbuf[BUFLEN];
 
     /* if command is empty */
     if (!command || strlen(command) < 1) {
-        warn("Given command is empty.");
+        lmi_warn("Given command is empty.");
         goto done;
     }
 
     /* execute command */
-    debug("Running command: \"%s\"", command);
+    lmi_debug("Running command: \"%s\"", command);
     fp = popen(command, "r");
     if (!fp) {
-        warn("Failed to run command: \"%s\"; Error: %s",
-                command, strerror(errno));
+        lmi_warn("Failed to run command: \"%s\"; Error: %s",
+                command, strerror_r(errno, errbuf, sizeof(errbuf)));
         goto done;
     }
 
@@ -158,20 +159,19 @@ done:
     if (fp) {
         int ret_code = pclose(fp);
         if (ret_code == -1) {
-            warn("Failed to run command: \"%s\"; Error: %s",
-                    command, strerror(errno));
+            lmi_warn("Failed to run command: \"%s\"; Error: %s",
+                    command, strerror_r(errno, errbuf, sizeof(errbuf)));
             if (ret == 0) {
                 ret = -1;
             }
         } else if (ret_code != 0) {
-            warn("Command \"%s\" exited unexpectedly.", command);
-            if (ret == 0) {
-                ret = -1;
-            }
+            lmi_warn("Command \"%s\" exited unexpectedly with return code: %d",
+                    command, ret_code);
+            ret = ret_code;
         }
     }
 
-    if (ret != 0) {
+    if (ret < 0) {
         free_2d_buffer(buffer, buffer_size);
     }
 
@@ -185,15 +185,15 @@ short read_file(const char *filename, char ***buffer, unsigned *buffer_size)
 
     /* if filename is empty */
     if (!filename || strlen(filename) < 1) {
-        warn("Given file name is empty.");
+        lmi_warn("Given file name is empty.");
         goto done;
     }
 
     /* open file */
-    debug("Reading \"%s\" file.", filename);
+    lmi_debug("Reading \"%s\" file.", filename);
     fp = fopen(filename, "r");
     if (!fp) {
-        warn("Failed to open \"%s\" file.", filename);
+        lmi_warn("Failed to open \"%s\" file.", filename);
         goto done;
     }
 
@@ -272,7 +272,7 @@ char *trim(const char *str, const char *delims)
     /* copy string */
     out = strndup(str, l);
     if (!out) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
     }
 
     return out;
@@ -305,7 +305,7 @@ short explode(const char *str, const char *delims, char ***buffer, unsigned *buf
     tmp_buffer_size = 128;
     tmp_buffer = (char **)calloc(tmp_buffer_size, sizeof(char *));
     if (!tmp_buffer) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
         tmp_buffer_size = 0;
         goto done;
     }
@@ -327,7 +327,7 @@ short explode(const char *str, const char *delims, char ***buffer, unsigned *buf
             char **new_temp = (char **)realloc(tmp_buffer,
                     tmp_buffer_size * sizeof(char *));
             if (!new_temp) {
-                warn("Failed to allocate memory.");
+                lmi_warn("Failed to allocate memory.");
                 tmp_buffer_size /= 2;
                 goto done;
             }
@@ -336,7 +336,7 @@ short explode(const char *str, const char *delims, char ***buffer, unsigned *buf
         /* copy the substring */
         tmp_buffer[item] = strndup(ts, l);
         if (!tmp_buffer[item]) {
-            warn("Failed to allocate memory.");
+            lmi_warn("Failed to allocate memory.");
             goto done;
         }
         item++;
@@ -348,7 +348,7 @@ short explode(const char *str, const char *delims, char ***buffer, unsigned *buf
         char **new_temp = (char **)realloc(tmp_buffer,
                 item * sizeof(char *));
         if (!new_temp) {
-            warn("Failed to allocate memory.");
+            lmi_warn("Failed to allocate memory.");
             goto done;
         }
         tmp_buffer = new_temp;
@@ -393,7 +393,7 @@ char *append_str(char *str, ...)
     /* reallocate string */
     char *temp = (char *)realloc(str, newlen);
     if (!temp) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
         return NULL;
     }
     str = temp;
@@ -408,4 +408,28 @@ char *append_str(char *str, ...)
     va_end(ap);
 
     return str;
+}
+
+char *get_part_of_string_between(const char *str, const char *after, const char *until)
+{
+    char *temp = NULL, *end_pos = NULL, *out = NULL;
+
+    if (!str || strlen(str) < 1 || !after || strlen(after) < 1) {
+        return NULL;
+    }
+
+    temp = copy_string_part_after_delim(str, after);
+    if (!temp) {
+        return NULL;
+    }
+
+    end_pos = strstr(temp, until);
+    if (!end_pos) {
+        return temp;
+    }
+
+    end_pos[0] = '\0';
+    out = trim(temp, NULL);
+    free(temp);
+    return out;
 }

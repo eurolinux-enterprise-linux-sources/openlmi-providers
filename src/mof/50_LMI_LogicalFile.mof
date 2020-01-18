@@ -1,0 +1,86 @@
+/*
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Authors: Jan Synacek <jsynacek@redhat.com>
+ */
+
+[ Version("0.2.0") ]
+class LMI_UnixFile : CIM_UnixFile
+{
+  [ Description (
+    "Current SELinux context." ) ]
+    string SELinuxCurrentContext;
+
+  [ Description (
+    "Expected SELinux context." ) ]
+    string SELinuxExpectedContext;
+};
+
+[ Version("0.2.0") ]
+class LMI_DataFile : CIM_DataFile
+{
+};
+
+[ Version("0.2.0") ]
+class LMI_UnixDeviceFile : CIM_UnixDeviceFile
+{
+};
+
+[ Version("0.2.0") ]
+class LMI_UnixDirectory : CIM_UnixDirectory
+{
+};
+
+[ Version("0.2.0") ]
+class LMI_FIFOPipeFile : CIM_FIFOPipeFile
+{
+};
+
+[ Version("0.2.0") ]
+class LMI_SymbolicLink : CIM_SymbolicLink
+{
+};
+
+[ Version("0.2.0") ]
+class LMI_UnixSocket : CIM_DataFile
+{
+};
+
+[ Version("0.2.0") ]
+class LMI_FileIdentity : CIM_FileIdentity
+{
+};
+
+[ Version("0.2.0") ]
+class LMI_DirectoryContainsFile : CIM_DirectoryContainsFile
+{
+};
+
+[ Version("0.2.0"),
+  Association,
+  Provider("cmpi:cmpiLMI_LogicalFile") ]
+class LMI_RootDirectory: CIM_Component
+{
+  [ Override("GroupComponent"), Min(1), Max(1),
+    Description("The hosting System.") ]
+  CIM_ComputerSystem REF GroupComponent;
+
+  [ Override("PartComponent"), Min(1), Max(1),
+    Description("The root directory on the System") ]
+  LMI_UnixDirectory REF PartComponent;
+};
+/* vi: set et: */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,8 +22,8 @@
 #include <konkret/konkret.h>
 #include <stdint.h>
 #include "LMI_Fan.h"
-#include "globals.h"
 #include "fan.h"
+
 static const CMPIBroker* _cb = NULL;
 
 static void LMI_FanInitialize(const CMPIContext *ctx)
@@ -60,7 +60,7 @@ static CMPIStatus LMI_FanEnumInstances(
     const char *ns = KNameSpace(cop);
     CMPIStatus status;
 
-    char buf[200];
+    char buf[BUFLEN];
     struct fanlist *lptr = NULL;
     struct fanlist *fans = NULL;
     struct cim_fan *sptr;
@@ -76,13 +76,13 @@ static CMPIStatus LMI_FanEnumInstances(
         LMI_Fan w;
         LMI_Fan_Init(&w, _cb, ns);
         LMI_Fan_Set_CreationClassName(&w, "LMI_Fan");
-        LMI_Fan_Set_SystemCreationClassName(&w, get_system_creation_class_name());
-        LMI_Fan_Set_SystemName(&w, get_system_name());
+        LMI_Fan_Set_SystemCreationClassName(&w, lmi_get_system_creation_class_name());
+        LMI_Fan_Set_SystemName(&w, lmi_get_system_name_safe(cc));
         LMI_Fan_Set_DeviceID(&w, sptr->device_id);
 
         LMI_Fan_Set_Caption(&w, "Computer's fan");
         LMI_Fan_Set_Description(&w,"Computer's fan.");
-        snprintf(buf, 200, "Fan \"%s\" on chip \"%s\"", sptr->name, sptr->chip_name);
+        snprintf(buf, BUFLEN, "Fan \"%s\" on chip \"%s\"", sptr->name, sptr->chip_name);
         LMI_Fan_Set_ElementName(&w, buf);
 
         // ManagedSystemElement
@@ -102,7 +102,7 @@ static CMPIStatus LMI_FanEnumInstances(
                 " Thus the measurement for this channel should not be trusted."
                 : "Fan seems to be functioning correctly.");
         if (sptr->alarm || sptr->alarm_min || sptr->alarm_max) {
-            snprintf(buf, 200, "These alarm flags are set by the fan's chip:"
+            snprintf(buf, BUFLEN, "These alarm flags are set by the fan's chip:"
                      "  alarm=%s, min_alarm=%s, max_alarm=%s",
                      sptr->alarm ? "1":"0",
                      sptr->alarm_min ? "1":"0",
@@ -136,7 +136,7 @@ static CMPIStatus LMI_FanEnumInstances(
 
         uint32_t i = 1;
         int index = 0;
-        debug("accessible_features: %d", sptr->accessible_features);
+        lmi_debug("accessible_features: %d", sptr->accessible_features);
         LMI_Fan_Init_AccessibleFeatures(&w, 8);
         while (i <= CIM_FAN_AF_FEATURE_MAX) {
             if (i & sptr->accessible_features) {

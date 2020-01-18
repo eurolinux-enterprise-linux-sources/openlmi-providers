@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+includedir=${prefix}/include
+libdir=${exec_prefix}/lib@LIB_SUFFIX@
+
+Name: openlmijobmanager
+Description: OpenLMI job manager support
+Version: @OPENLMIJOBMANAGER_VERSION@
+Requires: openlmicommon openlmiindsender
+Libs: -L${libdir} -lopenlmijobmanager
+CFlags: -I${includedir}/openlmi

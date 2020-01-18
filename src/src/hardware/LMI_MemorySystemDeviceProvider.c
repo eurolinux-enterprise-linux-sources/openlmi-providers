@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_MemorySystemDevice.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 
 static const CMPIBroker* _cb;
 
@@ -30,15 +29,15 @@ static void LMI_MemorySystemDeviceInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_MemorySystemDeviceCleanup( 
+static CMPIStatus LMI_MemorySystemDeviceCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_MemorySystemDeviceEnumInstanceNames( 
+static CMPIStatus LMI_MemorySystemDeviceEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -48,12 +47,12 @@ static CMPIStatus LMI_MemorySystemDeviceEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_MemorySystemDeviceEnumInstances( 
+static CMPIStatus LMI_MemorySystemDeviceEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_MemorySystemDevice lmi_mem_sys_device;
     LMI_MemoryRef lmi_mem;
@@ -63,13 +62,13 @@ static CMPIStatus LMI_MemorySystemDeviceEnumInstances(
 
     LMI_MemoryRef_Init(&lmi_mem, _cb, ns);
     LMI_MemoryRef_Set_SystemCreationClassName(&lmi_mem,
-            get_system_creation_class_name());
-    LMI_MemoryRef_Set_SystemName(&lmi_mem, get_system_name());
-    LMI_MemoryRef_Set_CreationClassName(&lmi_mem, ORGID "_" MEM_CLASS_NAME);
+            lmi_get_system_creation_class_name());
+    LMI_MemoryRef_Set_SystemName(&lmi_mem, lmi_get_system_name_safe(cc));
+    LMI_MemoryRef_Set_CreationClassName(&lmi_mem, LMI_Memory_ClassName);
     LMI_MemoryRef_Set_DeviceID(&lmi_mem, "0");
 
     LMI_MemorySystemDevice_SetObjectPath_GroupComponent(
-            &lmi_mem_sys_device, lmi_get_computer_system());
+            &lmi_mem_sys_device, lmi_get_computer_system_safe(cc));
     LMI_MemorySystemDevice_Set_PartComponent(&lmi_mem_sys_device,
             &lmi_mem);
 
@@ -78,62 +77,62 @@ static CMPIStatus LMI_MemorySystemDeviceEnumInstances(
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_MemorySystemDeviceGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_MemorySystemDeviceGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_MemorySystemDeviceCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_MemorySystemDeviceModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_MemorySystemDeviceCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_MemorySystemDeviceDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_MemorySystemDeviceModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_MemorySystemDeviceDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_MemorySystemDeviceExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_MemorySystemDeviceAssociationCleanup( 
+static CMPIStatus LMI_MemorySystemDeviceAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -226,13 +225,13 @@ static CMPIStatus LMI_MemorySystemDeviceReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_MemorySystemDevice,
     LMI_MemorySystemDevice,
     _cb,
     LMI_MemorySystemDeviceInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_MemorySystemDevice,
     LMI_MemorySystemDevice,
     _cb,

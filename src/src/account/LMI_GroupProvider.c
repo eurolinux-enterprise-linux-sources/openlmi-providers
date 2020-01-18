@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -17,6 +17,7 @@
  *
  * Authors: Roman Rakus <rrakus@redhat.com>
  */
+#include <shadow.h>
 #include <konkret/konkret.h>
 #include "LMI_Group.h"
 
@@ -30,7 +31,8 @@
 #include "aux_lu.h"
 #include "macros.h"
 #include "account_globals.h"
-#include "globals.h"
+
+#include "lock.h"
 
 // Return values of functions
 // Delete group
@@ -42,6 +44,11 @@ static const CMPIBroker* _cb = NULL;
 static void LMI_GroupInitialize(const CMPIContext *ctx)
 {
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
+    if (init_lock_pools() == 0) {
+        lmi_error("Unable to initialize lock pool.");
+        exit (1);
+    }
+
 }
 
 static CMPIStatus LMI_GroupCleanup(
@@ -95,7 +102,7 @@ static CMPIStatus LMI_GroupEnumInstances(
         LMI_Group_Set_Name(&lg, aux_lu_get_str(lue, LU_GROUPNAME));
         LMI_Group_Set_ElementName(&lg, aux_lu_get_str(lue, LU_GROUPNAME));
         LMI_Group_Set_CommonName(&lg, aux_lu_get_str(lue, LU_GROUPNAME));
-        asprintf(&instanceid, ORGID":GID:%ld",
+        asprintf(&instanceid, LMI_ORGID":GID:%ld",
           aux_lu_get_long(lue, LU_GIDNUMBER));
         LMI_Group_Set_InstanceID(&lg, instanceid);
         free(instanceid);
@@ -160,10 +167,24 @@ static CMPIrc delete_group(
     const char *username = NULL;
     long group_gid = 0;
     CMPIrc rc = CMPI_RC_OK;
+    int pwdlockres;
+
+    lmi_debug("Getting giant lock for group: %s", groupname);
+    get_giant_lock();
+
+    pwdlockres = lckpwdf();
+    if (pwdlockres != 0)
+        lmi_warn("Cannot acquire passwd file lock\n");
 
     luc = lu_start(NULL, 0, NULL, NULL, lu_prompt_console_quiet, NULL, &error);
     if (!luc) {
         asprintf(&errormsg, "Unable to initialize libuser: %s\n", lu_strerror(error));
+        if (pwdlockres == 0)
+            ulckpwdf();
+        lmi_debug("Releasing giant lock for group: %s", groupname);
+        release_giant_lock();
+        lmi_debug("Giant lock released for group %s", groupname);
+
         return CMPI_RC_ERR_FAILED;
     }
 
@@ -200,6 +221,12 @@ static CMPIrc delete_group(
     }
 
 clean:
+    if (pwdlockres == 0)
+        ulckpwdf();
+    lmi_debug("Releasing giant lock for group: %s", groupname);
+    release_giant_lock();
+    lmi_debug("Giant lock released for group %s", groupname);
+
     if (users)
         g_value_array_free(users);
     if (lueg)

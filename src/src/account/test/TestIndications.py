@@ -1,4 +1,4 @@
-# Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2013-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -12,16 +12,17 @@
 #
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 #
 # Authors: Roman Rakus <rrakus@redhat.com>
 #
 
-from common import AccountBase
 import time
-from methods import *
 
-class TestIndications(AccountBase):
+import common
+
+
+class TestIndications(common.AccountBase):
     """
     Class for testing LMI_Account indications
     """
@@ -32,9 +33,11 @@ class TestIndications(AccountBase):
         Account: Test good indication filter
         """
         filter_name = "test_good_filter_%d" % (time.time() * 1000000)
-        sub = self.subscribe(filter_name, "select * from LMI_AccountInstanceCreationIndication where SourceInstance isa LMI_Account")
+        q = ("select * from LMI_AccountInstanceCreationIndication"
+             " where SourceInstance isa LMI_Account")
+        sub = self.subscribe(filter_name, q)
         self.assertIsNotNone(sub)
-        self.unsubscribe(filter_name);
+        self.unsubscribe(sub)
 
     def test_check_bad_filter(self):
         """
@@ -46,57 +49,72 @@ class TestIndications(AccountBase):
         """
         Account: Test indication of group deletion
         """
-        create_group(self.group_name)
+        common.UserOps.create_group(self.group_name)
         filter_name = "test_delete_group_%d" % (time.time() * 1000000)
-        sub = self.subscribe(filter_name, "select * from LMI_AccountInstanceDeletionIndication where SourceInstance isa LMI_Group")
-        clean_group(self.group_name)
+        q = ("select * from LMI_AccountInstanceDeletionIndication"
+             " where SourceInstance isa LMI_Group")
+        sub = self.subscribe(filter_name, q)
+        common.UserOps.clean_group(self.group_name)
         indication = self.get_indication(10)
-        self.assertEqual(indication.classname, "LMI_AccountInstanceDeletionIndication")
+        self.assertEqual(indication.classname,
+                         "LMI_AccountInstanceDeletionIndication")
         self.assertIn("SourceInstance", indication.keys())
         self.assertTrue(indication["SourceInstance"] is not None)
         self.assertEqual(indication["SourceInstance"]["Name"], self.group_name)
+        self.unsubscribe(sub)
 
     def test_group_creation_indication(self):
         """
         Account: Test indication of group creation
         """
-        clean_group(self.group_name)
+        common.UserOps.clean_group(self.group_name)
         filter_name = "test_create_group_%d" % (time.time() * 1000000)
-        sub = self.subscribe(filter_name, "select * from LMI_AccountInstanceCreationIndication where SourceInstance isa LMI_Group")
-        create_group(self.group_name)
+        q = ("select * from LMI_AccountInstanceCreationIndication"
+             " where SourceInstance isa LMI_Group")
+        sub = self.subscribe(filter_name, q)
+        common.UserOps.create_group(self.group_name)
         indication = self.get_indication(10)
-        self.assertEqual(indication.classname, "LMI_AccountInstanceCreationIndication")
+        self.assertEqual(indication.classname,
+                         "LMI_AccountInstanceCreationIndication")
         self.assertIn("SourceInstance", indication.keys())
         self.assertTrue(indication["SourceInstance"] is not None)
         self.assertEqual(indication["SourceInstance"]["Name"], self.group_name)
-        clean_group(self.group_name)
+        common.UserOps.clean_group(self.group_name)
+        self.unsubscribe(sub)
 
     def test_account_deletion_indication(self):
         """
         Account: Test indication of account deletion
         """
-        create_account(self.user_name)
+        common.UserOps.create_account(self.user_name)
         filter_name = "test_delete_account_%d" % (time.time() * 1000000)
-        sub = self.subscribe(filter_name, "select * from LMI_AccountInstanceDeletionIndication where SourceInstance isa LMI_Account")
-        clean_account(self.user_name)
+        q = ("select * from LMI_AccountInstanceDeletionIndication"
+             " where SourceInstance isa LMI_Account")
+        sub = self.subscribe(filter_name, q)
+        common.UserOps.clean_account(self.user_name)
         indication = self.get_indication(10)
-        self.assertEqual(indication.classname, "LMI_AccountInstanceDeletionIndication")
+        self.assertEqual(indication.classname,
+                         "LMI_AccountInstanceDeletionIndication")
         self.assertIn("SourceInstance", indication.keys())
         self.assertTrue(indication["SourceInstance"] is not None)
         self.assertEqual(indication["SourceInstance"]["Name"], self.user_name)
+        self.unsubscribe(sub)
 
     def test_account_creation_indication(self):
         """
         Account: Test indication of account creation
         """
-        clean_account(self.user_name)
+        common.UserOps.clean_account(self.user_name)
         filter_name = "test_create_account_%d" % (time.time() * 1000000)
-        sub = self.subscribe(filter_name, "select * from LMI_AccountInstanceCreationIndication where SourceInstance isa LMI_Account")
-        create_account(self.user_name)
+        q = ("select * from LMI_AccountInstanceCreationIndication"
+             " where SourceInstance isa LMI_Account")
+        sub = self.subscribe(filter_name, q)
+        common.UserOps.create_account(self.user_name)
         indication = self.get_indication(10)
-        self.assertEqual(indication.classname, "LMI_AccountInstanceCreationIndication")
+        self.assertEqual(indication.classname,
+                         "LMI_AccountInstanceCreationIndication")
         self.assertIn("SourceInstance", indication.keys())
         self.assertTrue(indication["SourceInstance"] is not None)
         self.assertEqual(indication["SourceInstance"]["Name"], self.user_name)
-        clean_account(self.user_name)
-
+        common.UserOps.clean_account(self.user_name)
+        self.unsubscribe(sub)

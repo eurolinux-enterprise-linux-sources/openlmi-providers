@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -251,7 +251,8 @@ def pkg2model(pkg, keys_only=True, model=None):
         model['Description'] = pkg.description
         model['ElementName'] = pkg.nevra
         if pkg.installed:
-            model['InstallDate'] = pywbem.CIMDateTime(pkg.install_time)
+            model['InstallDate'] = util.date_time_to_cim_tz_aware(
+                    pkg.install_time)
         else:
             model['InstallDate'] = pywbem.CIMProperty(
                     'InstallDate', None, type='datetime')

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,6 @@
 
 #include <systemd/sd-journal.h>
 
-#include "globals.h"
 #include "journal.h"
 #include "instutil.h"
 
@@ -68,6 +67,7 @@ static CMPIStatus LMI_JournalRecordInLogEnumInstances(
     int r;
     CMPIStatus rc;
     unsigned long count = 0;
+    char errbuf[BUFLEN];
 
     LMI_JournalMessageLogRef_Init(&message_log_ref, _cb, ns);
     LMI_JournalMessageLogRef_Set_CreationClassName(&message_log_ref, LMI_JournalMessageLog_ClassName);
@@ -78,12 +78,12 @@ static CMPIStatus LMI_JournalRecordInLogEnumInstances(
 
     r = sd_journal_open(&journal, 0);
     if (r < 0)
-        KReturn2(_cb, ERR_FAILED, "Error opening journal: %s\n", strerror(-r));
+        KReturn2(_cb, ERR_FAILED, "Error opening journal: %s\n", strerror_r(-r, errbuf, sizeof(errbuf)));
 
     r = sd_journal_seek_tail(journal);
     if (r < 0) {
         sd_journal_close(journal);
-        KReturn2(_cb, ERR_NOT_FOUND, "Failed to seek to the end of the journal: %s\n", strerror(-r));
+        KReturn2(_cb, ERR_NOT_FOUND, "Failed to seek to the end of the journal: %s\n", strerror_r(-r, errbuf, sizeof(errbuf)));
     }
 
     SD_JOURNAL_FOREACH_BACKWARDS(journal) {

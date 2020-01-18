@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,8 @@
 
 #include <konkret/konkret.h>
 #include "LMI_PhysicalMemory.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
+
 #include "dmidecode.h"
 
 CMPIUint16 get_form_factor(const char *dmi_ff);
@@ -61,7 +61,7 @@ static CMPIStatus LMI_PhysicalMemoryEnumInstances(
 {
     LMI_PhysicalMemory lmi_phys_mem;
     const char *ns = KNameSpace(cop);
-    char instance_id[INSTANCE_ID_LEN];
+    char instance_id[BUFLEN];
     unsigned i;
     DmiMemory dmi_memory;
 
@@ -73,10 +73,10 @@ static CMPIStatus LMI_PhysicalMemoryEnumInstances(
         LMI_PhysicalMemory_Init(&lmi_phys_mem, _cb, ns);
 
         LMI_PhysicalMemory_Set_CreationClassName(&lmi_phys_mem,
-                ORGID "_" PHYS_MEM_CLASS_NAME);
+                LMI_PhysicalMemory_ClassName);
 
-        snprintf(instance_id, INSTANCE_ID_LEN,
-                ORGID ":" ORGID "_" PHYS_MEM_CLASS_NAME ":%s",
+        snprintf(instance_id, BUFLEN,
+                LMI_ORGID ":" LMI_PhysicalMemory_ClassName ":%s",
                 dmi_memory.modules[i].serial_number);
 
         LMI_PhysicalMemory_Set_Tag(&lmi_phys_mem,
@@ -87,8 +87,6 @@ static CMPIStatus LMI_PhysicalMemoryEnumInstances(
                 get_form_factor(dmi_memory.modules[i].form_factor));
         LMI_PhysicalMemory_Set_MemoryType(&lmi_phys_mem,
                 get_memory_type(dmi_memory.modules[i].type));
-        LMI_PhysicalMemory_Set_Speed(&lmi_phys_mem,
-                dmi_memory.modules[i].speed_time);
         LMI_PhysicalMemory_Set_BankLabel(&lmi_phys_mem,
                 dmi_memory.modules[i].bank_label);
         LMI_PhysicalMemory_Set_ElementName(&lmi_phys_mem,
@@ -104,12 +102,19 @@ static CMPIStatus LMI_PhysicalMemoryEnumInstances(
                 "This object represents one physical memory module in system.");
         LMI_PhysicalMemory_Set_InstanceID(&lmi_phys_mem, instance_id);
         LMI_PhysicalMemory_Set_Name(&lmi_phys_mem, dmi_memory.modules[i].name);
-        LMI_PhysicalMemory_Set_ConfiguredMemoryClockSpeed(&lmi_phys_mem,
-                dmi_memory.modules[i].speed_clock);
         LMI_PhysicalMemory_Set_TotalWidth(&lmi_phys_mem,
                 dmi_memory.modules[i].total_width);
         LMI_PhysicalMemory_Set_DataWidth(&lmi_phys_mem,
                 dmi_memory.modules[i].data_width);
+
+        if (dmi_memory.modules[i].speed_time) {
+            LMI_PhysicalMemory_Set_Speed(&lmi_phys_mem,
+                    dmi_memory.modules[i].speed_time);
+        }
+        if (dmi_memory.modules[i].speed_clock) {
+            LMI_PhysicalMemory_Set_ConfiguredMemoryClockSpeed(&lmi_phys_mem,
+                    dmi_memory.modules[i].speed_clock);
+        }
 
         KReturnInstance(cr, lmi_phys_mem);
     }

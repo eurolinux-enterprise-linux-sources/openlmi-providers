@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,25 +20,19 @@
 
 #include "sysfs.h"
 
-
-/*
- * Read unsigned value from file.
- * @param path of file
- * @paratm result
- * @return 0 if success, negative value otherwise
- */
 short path_get_unsigned(const char *path, unsigned *result)
 {
     short ret = -1;
     unsigned buffer_size = 0;
     char **buffer = NULL;
+    char errbuf[BUFLEN];
 
     if (read_file(path, &buffer, &buffer_size) != 0 || buffer_size < 1) {
         goto done;
     }
     if (sscanf(buffer[0], "%u", result) != 1) {
-        warn("Failed to parse file: \"%s\"; Error: %s",
-                path, strerror(errno));
+        lmi_warn("Failed to parse file: \"%s\"; Error: %s",
+                path, strerror_r(errno, errbuf, sizeof(errbuf)));
         goto done;
     }
 
@@ -54,12 +48,6 @@ done:
     return ret;
 }
 
-/*
- * Read string value from file.
- * @param path of file
- * @paratm result
- * @return 0 if success, negative value otherwise
- */
 short path_get_string(const char *path, char **result)
 {
     short ret = -1;
@@ -71,7 +59,7 @@ short path_get_string(const char *path, char **result)
     }
     *result = trim(buffer[0], NULL);
     if (!(*result)) {
-        warn("Failed to parse file: \"%s\"", path);
+        lmi_warn("Failed to parse file: \"%s\"", path);
         goto done;
     }
 
@@ -131,7 +119,7 @@ short check_sysfs_cpu_cache_attributes(SysfsCpuCache *cache)
 
 done:
     if (ret != 0) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
     }
 
     return ret;
@@ -151,7 +139,7 @@ short copy_sysfs_cpu_cache(SysfsCpuCache *to, const SysfsCpuCache from)
     to->type = strdup(from.type);
 
     if (!to->id || !to->name || !to->type) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
         free(to->id);
         to->id = NULL;
         free(to->name);
@@ -172,6 +160,7 @@ short sysfs_get_cpu_caches(SysfsCpuCache **caches, unsigned *caches_nb)
     DmiProcessor *dmi_cpus = NULL;
     unsigned dmi_cpus_nb = 0, cpus_nb = 0;
     LscpuProcessor lscpu;
+    char errbuf[BUFLEN];
 
     *caches_nb = 0;
 
@@ -188,7 +177,7 @@ short sysfs_get_cpu_caches(SysfsCpuCache **caches, unsigned *caches_nb)
     } else if (lscpu.processors > 0) {
         cpus_nb = lscpu.processors;
     } else {
-        warn("No processor found.");
+        lmi_warn("No processor found.");
         goto done;
     }
 
@@ -197,8 +186,8 @@ short sysfs_get_cpu_caches(SysfsCpuCache **caches, unsigned *caches_nb)
     char *cache_dir = SYSFS_CPU_PATH "/cpu0/cache";
     dir = opendir(cache_dir);
     if (!dir) {
-        warn("Failed to read directory: \"%s\"; Error: %s",
-                cache_dir, strerror(errno));
+        lmi_warn("Failed to read directory: \"%s\"; Error: %s",
+                cache_dir, strerror_r(errno, errbuf, sizeof(errbuf)));
         goto done;
     }
     while (readdir(dir)) {
@@ -211,14 +200,14 @@ short sysfs_get_cpu_caches(SysfsCpuCache **caches, unsigned *caches_nb)
 
     /* if no cache was found */
     if (*caches_nb < 1) {
-        warn("No processor cache was found in sysfs.");
+        lmi_warn("No processor cache was found in sysfs.");
         goto done;
     }
 
     /* allocate memory for caches */
     *caches = (SysfsCpuCache *)calloc(*caches_nb * cpus_nb, sizeof(SysfsCpuCache));
     if (!(*caches)) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
         *caches_nb = 0;
         goto done;
     }
@@ -247,13 +236,13 @@ short sysfs_get_cpu_caches(SysfsCpuCache **caches, unsigned *caches_nb)
         }
         if (asprintf(&(*caches)[i].id, format_str, level) < 0) {
             (*caches)[i].id = NULL;
-            warn("Failed to allocate memory.");
+            lmi_warn("Failed to allocate memory.");
             goto done;
         }
         if (asprintf(&(*caches)[i].name, "Level %u %s cache",
                 level, buf) < 0) {
             (*caches)[i].name = NULL;
-            warn("Failed to allocate memory.");
+            lmi_warn("Failed to allocate memory.");
             goto done;
         }
         (*caches)[i].type = buf;
@@ -356,6 +345,7 @@ short sysfs_get_sizes_of_hugepages(unsigned **sizes, unsigned *sizes_nb)
 {
     short ret = -1;
     DIR *dir = NULL;
+    char errbuf[BUFLEN];
 
     *sizes_nb = 0;
     *sizes = NULL;
@@ -364,8 +354,8 @@ short sysfs_get_sizes_of_hugepages(unsigned **sizes, unsigned *sizes_nb)
     char *sizes_dir = SYSFS_KERNEL_MM "/hugepages";
     dir = opendir(sizes_dir);
     if (!dir) {
-        warn("Failed to read directory: \"%s\"; Error: %s",
-                sizes_dir, strerror(errno));
+        lmi_warn("Failed to read directory: \"%s\"; Error: %s",
+                sizes_dir, strerror_r(errno, errbuf, sizeof(errbuf)));
         goto done;
     }
     while (readdir(dir)) {
@@ -377,14 +367,14 @@ short sysfs_get_sizes_of_hugepages(unsigned **sizes, unsigned *sizes_nb)
 
     /* if no size was found */
     if (*sizes_nb < 1) {
-        warn("Looks like kernel doesn't support huge memory pages.");
+        lmi_warn("Looks like kernel doesn't support huge memory pages.");
         goto done;
     }
 
     /* allocate memory for sizes */
     *sizes = (unsigned *)calloc(*sizes_nb, sizeof(unsigned));
     if (!(*sizes)) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
         *sizes_nb = 0;
         goto done;
     }

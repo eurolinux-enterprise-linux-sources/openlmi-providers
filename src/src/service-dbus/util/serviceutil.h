@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,9 +23,13 @@
 #define SERVICEUTIL_H
 
 #include <stdio.h>
+#include <gio/gio.h>
+#include <pthread.h>
 #include "openlmi.h"
+#include "LMI_Service.h"
 
-#define ARRAY_SIZE(name) (sizeof(name) / sizeof(name[0]))
+/* systemd job result string */
+#define JR_DONE "done"
 
 const char *provider_name;
 const ConfigEntry *provider_config_defaults;
@@ -55,11 +59,38 @@ struct _SList {
 typedef struct _Service Service;
 typedef struct _SList SList;
 
+struct _AllServices {
+  Service **svc;
+  int cnt;
+  int nalloc;
+};
+
+typedef struct _AllServices AllServices;
+
 void service_free_slist(SList *slist);
+void service_free_all_services(AllServices *svcs);
 SList *service_find_all(char *output, int output_len);
 
+AllServices *service_get_properties_all(char *output, int output_len);
 int service_get_properties(Service *svc, const char *service, char *output, int output_len);
 
 unsigned int service_operation(const char *service, const char *method, char *output, int output_len);
+
+/* Indications */
+
+struct _ServiceIndication {
+  SList *slist;
+  GDBusProxy *manager_proxy;
+  GDBusProxy **signal_proxy;
+  GMainContext *context;
+  GMainLoop *loop;
+  pthread_t p;
+};
+
+typedef struct _ServiceIndication ServiceIndication;
+
+int ind_init(ServiceIndication *si, char *output, int output_len);
+bool ind_watcher(void **data);
+void ind_destroy(ServiceIndication *si);
 
 #endif

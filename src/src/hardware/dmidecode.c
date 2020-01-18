@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,7 +19,6 @@
  */
 
 #include "dmidecode.h"
-
 
 /******************************************************************************
  * DmiProcessor
@@ -133,7 +132,7 @@ short check_dmiprocessor_attributes(DmiProcessor *cpu)
 
 done:
     if (ret != 0) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
     }
 
     return ret;
@@ -162,14 +161,14 @@ short dmi_get_processors(DmiProcessor **cpus, unsigned *cpus_nb)
 
     /* if no processor was found */
     if (*cpus_nb < 1) {
-        warn("Dmidecode didn't recognize any processor.");
+        lmi_warn("Dmidecode didn't recognize any processor.");
         goto done;
     }
 
     /* allocate memory for processors */
     *cpus = (DmiProcessor *)calloc(*cpus_nb, sizeof(DmiProcessor));
     if (!(*cpus)) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
         *cpus_nb = 0;
         goto done;
     }
@@ -347,7 +346,7 @@ short dmi_get_processors(DmiProcessor **cpus, unsigned *cpus_nb)
             (*cpus)[curr_cpu].characteristics =
                     (char **)calloc((*cpus)[curr_cpu].charact_nb, sizeof(char *));
             if (!(*cpus)[curr_cpu].characteristics) {
-                warn("Failed to allocate memory.");
+                lmi_warn("Failed to allocate memory.");
                 (*cpus)[curr_cpu].charact_nb = 0;
                 goto done;
             }
@@ -360,7 +359,7 @@ short dmi_get_processors(DmiProcessor **cpus, unsigned *cpus_nb)
                 } else {
                     (*cpus)[curr_cpu].characteristics[j] = strdup("");
                     if (!(*cpus)[curr_cpu].characteristics[j]) {
-                        warn("Failed to allocate memory.");
+                        lmi_warn("Failed to allocate memory.");
                         goto done;
                     }
                 }
@@ -505,7 +504,7 @@ short check_dmi_cpu_cache_attributes(DmiCpuCache *cache)
 
 done:
     if (ret != 0) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
     }
 
     return ret;
@@ -534,14 +533,14 @@ short dmi_get_cpu_caches(DmiCpuCache **caches, unsigned *caches_nb)
 
     /* if no cache was found */
     if (*caches_nb < 1) {
-        warn("Dmidecode didn't recognize any processor cache memory.");
+        lmi_warn("Dmidecode didn't recognize any processor cache memory.");
         goto done;
     }
 
     /* allocate memory for caches */
     *caches = (DmiCpuCache *)calloc(*caches_nb, sizeof(DmiCpuCache));
     if (!(*caches)) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
         *caches_nb = 0;
         goto done;
     }
@@ -556,12 +555,12 @@ short dmi_get_cpu_caches(DmiCpuCache **caches, unsigned *caches_nb)
             char *id_start = buffer[i] + 7;
             char *id_end = strchr(buffer[i], ',');
             if (!id_end) {
-                warn("Unrecognized output from dmidecode program.");
+                lmi_warn("Unrecognized output from dmidecode program.");
                 goto done;
             }
             (*caches)[curr_cache].id = strndup(id_start, id_end - id_start);
             if (!(*caches)[curr_cache].id) {
-                warn("Failed to allocate memory.");
+                lmi_warn("Failed to allocate memory.");
                 goto done;
             }
 
@@ -794,7 +793,7 @@ short check_dmi_memory_attributes(DmiMemory *memory)
 
 done:
     if (ret != 0) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
     }
 
     return ret;
@@ -826,14 +825,14 @@ short dmi_get_memory(DmiMemory *memory)
 
     /* if no module was found */
     if (memory->modules_nb < 1) {
-        warn("Dmidecode didn't recognize any memory module.");
+        lmi_warn("Dmidecode didn't recognize any memory module.");
         goto done;
     }
 
     /* allocate memory for modules */
     memory->modules = (DmiMemoryModule *)calloc(memory->modules_nb, sizeof(DmiMemoryModule));
     if (!memory->modules) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
         memory->modules_nb = 0;
         goto done;
     }
@@ -882,7 +881,7 @@ short dmi_get_memory(DmiMemory *memory)
                 }
                 if (asprintf(&memory->modules[curr_mem].name, str_format, memory_size) < 0) {
                     memory->modules[curr_mem].name = NULL;
-                    warn("Failed to allocate memory.");
+                    lmi_warn("Failed to allocate memory.");
                     goto done;
                 }
 
@@ -891,7 +890,7 @@ short dmi_get_memory(DmiMemory *memory)
                 total_width = 0;
                 data_width = 0;
 
-                debug("Found %s at index %d",
+                lmi_debug("Found %s at index %d",
                         memory->modules[curr_mem].name, curr_mem);
 
                 continue;
@@ -912,31 +911,25 @@ short dmi_get_memory(DmiMemory *memory)
                 buf = NULL;
                 if (asprintf(&memory->modules[curr_mem].serial_number, "%u", curr_mem) < 0) {
                     memory->modules[curr_mem].serial_number = NULL;
-                    warn("Failed to allocate memory.");
+                    lmi_warn("Failed to allocate memory.");
                     goto done;
                 }
             }
             continue;
         }
-        if (strstr(buffer[i], "Locator:")) {
-            if (strstr(buffer[i], "Bank Locator:")) {
-                /* Memory Module Bank Label */
-                buf = copy_string_part_after_delim(buffer[i], "Bank Locator: ");
-                if (buf) {
-                    memory->modules[curr_mem].bank_label = buf;
-                    buf = NULL;
-                    continue;
-                }
-            } else {
-                /* Slot */
-                buf = copy_string_part_after_delim(buffer[i], "Locator: ");
-                if (buf) {
-                    sscanf(buf, "%*s %d", &memory->modules[curr_mem].slot);
-                    free(buf);
-                    buf = NULL;
-                    continue;
-                }
+        /* Memory Module Bank Label and Slot ID */
+        buf = copy_string_part_after_delim(buffer[i], "Locator: ");
+        if (buf) {
+            if (memory->modules[curr_mem].slot != -1
+                    || strncasecmp(buf, "bank ", 5) != 0) {
+                free(buf);
+                buf = NULL;
+                continue;
             }
+            sscanf(buf, "%*s %d", &memory->modules[curr_mem].slot);
+            memory->modules[curr_mem].bank_label = buf;
+            buf = NULL;
+            continue;
         }
         /* Form Factor */
         buf = copy_string_part_after_delim(buffer[i], "Form Factor: ");
@@ -969,7 +962,11 @@ short dmi_get_memory(DmiMemory *memory)
         /* Speed in MHz */
         buf = copy_string_part_after_delim(buffer[i], "Speed: ");
         if (buf) {
-            sscanf(buf, "%u", &memory->modules[curr_mem].speed_clock);
+            if (strstr(buffer[i], "Configured Clock Speed: ")) {
+                sscanf(buf, "%u", &memory->modules[curr_mem].speed_clock);
+            } else if (memory->modules[curr_mem].speed_clock == 0) {
+                sscanf(buf, "%u", &memory->modules[curr_mem].speed_clock);
+            }
             free(buf);
             buf = NULL;
             continue;
@@ -993,7 +990,7 @@ short dmi_get_memory(DmiMemory *memory)
     /* allocate memory for slots */
     memory->slots = (DmiMemorySlot *)calloc(memory->slots_nb, sizeof(DmiMemorySlot));
     if (!memory->slots) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
         memory->slots_nb = 0;
         goto done;
     }
@@ -1210,7 +1207,7 @@ short check_dmi_chassis_attributes(DmiChassis *chassis)
 
 done:
     if (ret != 0) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
     }
 
     return ret;
@@ -1231,7 +1228,7 @@ short dmi_get_chassis(DmiChassis *chassis)
 
     /* empty output from dmidecode */
     if (buffer_size < 5) {
-        warn("Dmidecode has no information about chassis.");
+        lmi_warn("Dmidecode has no information about chassis.");
         goto done;
     }
 
@@ -1442,7 +1439,7 @@ short check_dmi_baseboard_attributes(DmiBaseboard *baseboard)
 
 done:
     if (ret != 0) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
     }
 
     return ret;
@@ -1463,7 +1460,7 @@ short dmi_get_baseboard(DmiBaseboard *baseboard)
 
     /* empty output from dmidecode */
     if (buffer_size < 5) {
-        warn("Dmidecode has no information about baseboard.");
+        lmi_warn("Dmidecode has no information about baseboard.");
         goto done;
     }
 
@@ -1577,7 +1574,7 @@ short check_dmiport_attributes(DmiPort *port)
 
 done:
     if (ret != 0) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
     }
 
     return ret;
@@ -1606,14 +1603,14 @@ short dmi_get_ports(DmiPort **ports, unsigned *ports_nb)
 
     /* if no port was found */
     if (*ports_nb < 1) {
-        warn("Dmidecode didn't recognize any port.");
+        lmi_warn("Dmidecode didn't recognize any port.");
         goto done;
     }
 
     /* allocate memory for ports */
     *ports = (DmiPort *)calloc(*ports_nb, sizeof(DmiPort));
     if (!(*ports)) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
         *ports_nb = 0;
         goto done;
     }
@@ -1739,7 +1736,7 @@ short check_dmislot_attributes(DmiSystemSlot *slot)
 
 done:
     if (ret != 0) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
     }
 
     return ret;
@@ -1768,14 +1765,14 @@ short dmi_get_system_slots(DmiSystemSlot **slots, unsigned *slots_nb)
 
     /* if no slot was found */
     if (*slots_nb < 1) {
-        warn("Dmidecode didn't recognize any system slot.");
+        lmi_warn("Dmidecode didn't recognize any system slot.");
         goto done;
     }
 
     /* allocate memory for slots */
     *slots = (DmiSystemSlot *)calloc(*slots_nb, sizeof(DmiSystemSlot));
     if (!(*slots)) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
         *slots_nb = 0;
         goto done;
     }
@@ -1818,7 +1815,7 @@ short dmi_get_system_slots(DmiSystemSlot **slots, unsigned *slots_nb)
                 (*slots)[curr_slot].link_width = strdup(exploded_buf[0]);
                 if (!(*slots)[curr_slot].link_width) {
                     free_2d_buffer(&exploded_buf, &exploded_buf_size);
-                    warn("Failed to allocate memory.");
+                    lmi_warn("Failed to allocate memory.");
                     goto done;
                 }
                 from = 1;
@@ -1927,7 +1924,7 @@ short check_dmipointingdev_attributes(DmiPointingDevice *dev)
 
 done:
     if (ret != 0) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
     }
 
     return ret;
@@ -1956,14 +1953,14 @@ short dmi_get_pointing_devices(DmiPointingDevice **devices, unsigned *devices_nb
 
     /* if no slot was found */
     if (*devices_nb < 1) {
-        warn("Dmidecode didn't recognize any pointing device.");
+        lmi_warn("Dmidecode didn't recognize any pointing device.");
         goto done;
     }
 
     /* allocate memory for pointing devices */
     *devices = (DmiPointingDevice *)calloc(*devices_nb, sizeof(DmiPointingDevice));
     if (!(*devices)) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
         *devices_nb = 0;
         goto done;
     }
@@ -2102,7 +2099,7 @@ short check_dmibattery_attributes(DmiBattery *batt)
 
 done:
     if (ret != 0) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
     }
 
     return ret;
@@ -2131,14 +2128,14 @@ short dmi_get_batteries(DmiBattery **batteries, unsigned *batteries_nb)
 
     /* if no battery was found */
     if (*batteries_nb < 1) {
-        warn("Dmidecode didn't recognize any batteries.");
+        lmi_warn("Dmidecode didn't recognize any batteries.");
         goto done;
     }
 
     /* allocate memory for batteries */
     *batteries = (DmiBattery *)calloc(*batteries_nb, sizeof(DmiBattery));
     if (!(*batteries)) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
         *batteries_nb = 0;
         goto done;
     }

@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -131,20 +131,26 @@ def check_path(env, op):
 @cmpi_logging.trace_function
 def job2affected_software_identity(job):
     """
-    @return (path of SoftwareIdentity, ElementEffects array,
+    @return (paths of affected SoftwareIdentities, ElementEffects array,
         OtherElementEffectsDescriptions array)
     """
     effects = [Values.ElementEffects.Other]
     descriptions = []
     if isinstance(job, jobs.YumSpecificPackageJob):
+        affected = []
         if job.state == job.COMPLETED and job.result_data:
             if isinstance(job, jobs.YumCheckPackage):
                 # get the first item out of (pkg_info, pkg_check)
-                affected = Identity.pkg2model(job.result_data[0])
+                affected = [Identity.pkg2model(job.result_data[0])]
             else:
-                affected = Identity.pkg2model(job.result_data)
-        else:
-            affected = Identity.pkg2model(job.pkg)
+                if isinstance(job.result_data, (tuple, list, set)):
+                    affected = [Identity.pkg2model(p) for p in job.result_data]
+                else:
+                    affected = [Identity.pkg2model(job.result_data)]
+        if job.pkg:
+            pkgpath = Identity.pkg2model(job.pkg)
+            if pkgpath not in affected:
+                affected.append(pkgpath)
         if isinstance(job, jobs.YumInstallPackage):
             descriptions.append("Installing")
         elif isinstance(job, jobs.YumRemovePackage):
@@ -247,14 +253,17 @@ def generate_models_from_job(env, job, keys_only=True, model=None):
             model = pywbem.CIMInstance("LMI_AffectedSoftwareJobElement",
                     path=model)
     model["AffectingElement"] = Job.job2model(job)
-    (si, element_effects, element_effects_descriptions) = \
+    (sis, element_effects, element_effects_descriptions) = \
             job2affected_software_identity(job)
-    model["AffectedElement"] = si
-    if not keys_only:
-        model["ElementEffects"] = element_effects
-        model["OtherElementEffectsDescriptions"] = \
-                element_effects_descriptions
-    yield model
+
+    for si in sis:
+        model["AffectedElement"] = si
+        if not keys_only:
+            model["ElementEffects"] = element_effects
+            model["OtherElementEffectsDescriptions"] = \
+                    element_effects_descriptions
+        yield model
+
     if not isinstance(job, jobs.YumCheckPackage):
         fill_model_system_collection(model, keys_only=keys_only)
         yield model

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,6 @@
 #include <stdint.h>
 #include "LMI_Service.h"
 #include "util/serviceutil.h"
-#include "globals.h"
 
 static const CMPIBroker* _cb = NULL;
 
@@ -48,7 +47,7 @@ static CMPIStatus LMI_ServiceEnumInstanceNames(
 {
     const char *ns = KNameSpace(cop);
     SList *slist = NULL;
-    char output[1024];
+    char output[BUFLEN];
 
     slist = service_find_all(output, sizeof(output));
     if (slist == NULL) {
@@ -59,8 +58,8 @@ static CMPIStatus LMI_ServiceEnumInstanceNames(
         LMI_ServiceRef w;
         LMI_ServiceRef_Init(&w, _cb, ns);
         LMI_ServiceRef_Set_CreationClassName(&w, LMI_Service_ClassName);
-        LMI_ServiceRef_Set_SystemCreationClassName(&w, get_system_creation_class_name());
-        LMI_ServiceRef_Set_SystemName(&w, get_system_name());
+        LMI_ServiceRef_Set_SystemCreationClassName(&w, lmi_get_system_creation_class_name());
+        LMI_ServiceRef_Set_SystemName(&w, lmi_get_system_name_safe(cc));
         LMI_ServiceRef_Set_Name(&w, slist->name[i]);
 
         CMReturnObjectPath(cr, LMI_ServiceRef_ToObjectPath(&w, NULL));
@@ -77,24 +76,49 @@ static CMPIStatus LMI_ServiceEnumInstances(
     const CMPIObjectPath* cop,
     const char** properties)
 {
-    CMPIStatus st;
-    CMPIEnumeration* e;
-    if (!(e = _cb->bft->enumerateInstanceNames(_cb, cc, cop, &st))) {
-        KReturn2(_cb, ERR_FAILED, "Unable to enumerate instances of LMI_Service");
-    }
-    CMPIData cd;
-    while (CMHasNext(e, &st)) {
+    AllServices *svcs = NULL;
+    CMPIStatus status;
+    char output[BUFLEN];
 
-        cd = CMGetNext(e, &st);
-        if (st.rc || cd.type != CMPI_ref) {
-            KReturn2(_cb, ERR_FAILED, "Enumerate instances didn't returned list of references");
+    if ((svcs = service_get_properties_all(output, sizeof(output))) != NULL) {
+        for(int i = 0; i < svcs->cnt; i++) {
+            LMI_Service w;
+            LMI_Service_InitFromObjectPath(&w, _cb, cop);
+            LMI_Service_Set_CreationClassName(&w, LMI_Service_ClassName);
+            LMI_Service_Set_SystemCreationClassName(&w, lmi_get_system_creation_class_name());
+            LMI_Service_Set_SystemName(&w, lmi_get_system_name_safe(cc));
+            LMI_Service_Set_Name(&w, svcs->svc[i]->svName);
+            LMI_Service_Set_Status(&w, svcs->svc[i]->svStatus);
+            LMI_Service_Set_Started(&w, svcs->svc[i]->svStarted);
+            LMI_Service_Set_Caption(&w, svcs->svc[i]->svCaption);
+            LMI_Service_Init_OperationalStatus(&w, svcs->svc[i]->svOperationalStatusCnt);
+            for (int j = 0; j < svcs->svc[i]->svOperationalStatusCnt; j++) {
+                LMI_Service_Set_OperationalStatus(&w, j, svcs->svc[i]->svOperationalStatus[j]);
+            }
+
+            switch (svcs->svc[i]->svEnabledDefault) {
+                case ENABLED:
+                    LMI_Service_Set_EnabledDefault(&w, LMI_Service_EnabledDefault_Enabled);
+                    break;
+                case DISABLED:
+                    LMI_Service_Set_EnabledDefault(&w, LMI_Service_EnabledDefault_Disabled);
+                    break;
+                default:
+                    LMI_Service_Set_EnabledDefault(&w, LMI_Service_EnabledDefault_Not_Applicable);
+                    break;
+            }
+
+            status = __KReturnInstance((cr), &(w).__base);
+            if (!KOkay(status)) {
+                service_free_all_services(svcs);
+                return status;
+            }
         }
-        CMPIInstance *in = _cb->bft->getInstance(_cb, cc, cd.value.ref, properties, &st);
-        if (st.rc) {
-            KReturn2(_cb, ERR_FAILED, "Unable to get instance of LMI_Service");
-        }
-        cr->ft->returnInstance(cr, in);
+    } else {
+        KReturn2(_cb, ERR_FAILED, "%s", output);
     }
+
+    service_free_all_services(svcs);
     KReturn(OK);
 }
 
@@ -105,7 +129,7 @@ static CMPIStatus LMI_ServiceGetInstance(
     const CMPIObjectPath* cop,
     const char** properties)
 {
-    char output[1024];
+    char output[BUFLEN];
     int res;
     LMI_Service w;
     LMI_Service_InitFromObjectPath(&w, _cb, cop);
@@ -235,7 +259,7 @@ KUint32 LMI_Service_RequestStateChange(
 
 unsigned int Service_RunOperation(const char *service, const char *operation, CMPIStatus *status)
 {
-    char output[1024];
+    char output[BUFLEN];
     int res = service_operation(service, operation, output, sizeof(output));
     if (res == 0) {
         KSetStatus2(_cb, status, OK, output);

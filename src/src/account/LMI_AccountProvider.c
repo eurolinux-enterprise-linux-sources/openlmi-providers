@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -29,6 +29,7 @@
 #include <stdint.h>
 
 #include <utmp.h>
+#include <shadow.h>
 
 // Disable GLib deprecation warnings - GValueArray is deprecated but we
 // need it because libuser uses it
@@ -48,7 +49,6 @@
 
 #include "aux_lu.h"
 #include "macros.h"
-#include "globals.h"
 #include "lock.h"
 #include "account_globals.h"
 
@@ -71,7 +71,7 @@ static void LMI_AccountInitialize(const CMPIContext *ctx)
 {
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
     if (init_lock_pools() == 0) {
-        error("Unable to initialize lock pool.");
+        lmi_error("Unable to initialize lock pool.");
         exit (1);
     }
 }
@@ -110,7 +110,7 @@ static CMPIStatus LMI_AccountEnumInstances(
 
     size_t i;
     const char *nameSpace = KNameSpace(cop);
-    const char *hostname = get_system_name();
+    const char *hostname = lmi_get_system_name_safe(cc);
     char *uid = NULL;
     long last_change, min_lifetime, max_lifetime, warn, inactive, expire;
     time_t last_login;
@@ -132,7 +132,7 @@ static CMPIStatus LMI_AccountEnumInstances(
         LMI_Account_Init(&la, _cb, nameSpace);
         LMI_Account_Set_CreationClassName(&la, LMI_Account_ClassName);
         LMI_Account_Set_SystemName(&la, hostname);
-        LMI_Account_Set_SystemCreationClassName(&la, get_system_creation_class_name());
+        LMI_Account_Set_SystemCreationClassName(&la, lmi_get_system_creation_class_name());
         LMI_Account_Set_Name(&la, aux_lu_get_str(lue, LU_USERNAME));
 
         LMI_Account_Init_OrganizationName(&la, 1); /* XXX */
@@ -154,7 +154,7 @@ static CMPIStatus LMI_AccountEnumInstances(
         if (last_change != SHADOW_VALUE_EMPTY)
           {
             LMI_Account_Set_PasswordLastChange(&la,
-              CMNewDateTimeFromBinary(_cb, DAYSTOMS(last_change), false, rc));
+              CMNewDateTimeFromBinary(_cb, LMI_DAYS_TO_MS(last_change), false, rc));
           }
         min_lifetime = aux_lu_get_long(lue, LU_SHADOWMIN);
         max_lifetime = aux_lu_get_long(lue, LU_SHADOWMAX);
@@ -162,22 +162,22 @@ static CMPIStatus LMI_AccountEnumInstances(
         if (min_lifetime != SHADOW_VALUE_EMPTY)
           {
             LMI_Account_Set_PasswordPossibleChange(&la,
-              CMNewDateTimeFromBinary(_cb, DAYSTOMS(min_lifetime), true, rc));
+              CMNewDateTimeFromBinary(_cb, LMI_DAYS_TO_MS(min_lifetime), true, rc));
           }
 
         if (max_lifetime != SHADOW_VALUE_EMPTY &&
             max_lifetime != SHADOW_MAX_DISABLED)
           {
             LMI_Account_Set_PasswordExpiration(&la,
-              CMNewDateTimeFromBinary(_cb, DAYSTOMS(max_lifetime), true, rc));
+              CMNewDateTimeFromBinary(_cb, LMI_DAYS_TO_MS(max_lifetime), true, rc));
             warn = aux_lu_get_long(lue, LU_SHADOWWARNING);
               LMI_Account_Set_PasswordExpirationWarning(&la,
-                CMNewDateTimeFromBinary(_cb, DAYSTOMS(warn), true, rc));
+                CMNewDateTimeFromBinary(_cb, LMI_DAYS_TO_MS(warn), true, rc));
             inactive = aux_lu_get_long(lue, LU_SHADOWINACTIVE);
             if (inactive != SHADOW_VALUE_EMPTY)
               {
                 LMI_Account_Set_PasswordInactivation(&la,
-                  CMNewDateTimeFromBinary(_cb, DAYSTOMS(inactive), true, rc));
+                  CMNewDateTimeFromBinary(_cb, LMI_DAYS_TO_MS(inactive), true, rc));
               }
           }
         else
@@ -191,7 +191,7 @@ static CMPIStatus LMI_AccountEnumInstances(
         if (expire != SHADOW_VALUE_EMPTY)
           {
             LMI_Account_Set_AccountExpiration(&la,
-              CMNewDateTimeFromBinary(_cb, DAYSTOMS(expire), false, rc));
+              CMNewDateTimeFromBinary(_cb, LMI_DAYS_TO_MS(expire), false, rc));
           }
         else
           {
@@ -203,7 +203,7 @@ static CMPIStatus LMI_AccountEnumInstances(
         if (last_login != SHADOW_VALUE_EMPTY)
           {
             LMI_Account_Set_LastLogin(&la,
-              CMNewDateTimeFromBinary(_cb, STOMS(last_login), false, rc));
+              CMNewDateTimeFromBinary(_cb, LMI_SECS_TO_MS(last_login), false, rc));
           }
 
         password = aux_lu_get_str(lue, LU_SHADOWPASSWORD);
@@ -212,10 +212,11 @@ static CMPIStatus LMI_AccountEnumInstances(
             password = aux_lu_get_str(lue, LU_USERPASSWORD);
         }
         if (password) {
-            LMI_Account_Init_UserPassword(&la, 1);
-            LMI_Account_Set_UserPassword(&la, 0, password);
+            /* see DSP1034 note below */
+            LMI_Account_Init_UserPassword(&la, 0);
             /* Assume all passwords (encrypted or not) are in ascii encoding */
             LMI_Account_Set_UserPasswordEncoding(&la, 2);
+            password = NULL;
         }
 
         KReturnInstance(cr, la);
@@ -284,8 +285,6 @@ static CMPIStatus LMI_AccountModifyInstance(
     struct lu_ent *lue = NULL;
     struct lu_error *error = NULL;
     GValue val;
-    GValueArray *groups = NULL;
-    guint i = 0;
 
     long last_change;
     date_time_prop expiration, warning, inactive_password, inactive_account;
@@ -293,6 +292,8 @@ static CMPIStatus LMI_AccountModifyInstance(
 
     CMPIrc rc = CMPI_RC_OK;
     char *errmsg = NULL;
+
+    int pwdlockres;
 
     LMI_Account la;
 
@@ -302,16 +303,20 @@ static CMPIStatus LMI_AccountModifyInstance(
     char userlock[USERNAME_LEN_MAX] = {0};
     /* -1 for NULL char */
     strncpy(userlock, la.Name.chars, sizeof(userlock) - 1);
-    lmi_debug("Getting lock for user: %s", userlock);
-    if (get_user_lock(userlock) == 0) {
-        KReturn2(_cb, ERR_FAILED, "Unable to obtain lock.");
-    }
+    lmi_debug("Getting giant lock for user: %s", userlock);
+    get_giant_lock();
+    pwdlockres = lckpwdf();
+    if (pwdlockres != 0)
+        lmi_warn("Cannot acquire passwd file lock\n");
 
     luc = lu_start(NULL, lu_user, NULL, NULL, lu_prompt_console_quiet, NULL, &error);
     if (!luc)
       {
-        const int ret = release_user_lock(userlock);
-        lmi_debug("Releasing lock for user: %s. Result: %d", userlock, ret);
+        if (pwdlockres == 0)
+            ulckpwdf();
+        lmi_debug("Releasing giant lock for user: %s", userlock);
+        release_giant_lock();
+        lmi_debug("Giant lock released for user %s", userlock);
         KReturn2(_cb, ERR_FAILED,
                  "Unable to initialize libuser: %s\n", lu_strerror(error));
       }
@@ -325,40 +330,35 @@ static CMPIStatus LMI_AccountModifyInstance(
         goto fail;
       }
 
-    /* get list of groups and lock them. userlock variable is our stored username */
-    groups = lu_groups_enumerate_by_user (luc, userlock, &error);
-    if (groups == NULL)
-      {
-        rc = CMPI_RC_ERR_NOT_FOUND;
-        asprintf(&errmsg, "Get groups for user %s failed with: %s",
-                          userlock, lu_strerror(error));
-        goto fail;
-      }
-
-    for (i = 0; i < groups->n_values; ++i) {
-        GValue *group_val = g_value_array_get_nth (groups, i);
-        const gchar *const group_str = g_value_get_string(group_val);
-        const int ret = get_group_lock((const char *const) group_str);
-        lmi_debug("Getting lock for group: %s. Result: %d", group_str, ret);
-    }
-
+    /* from DSP1034:
+       When an instance of CIM_Account is retrieved and the underlying account
+       has a valid password, the value of the CIM_Account.UserPassword property
+       shall be an array of length zero to indicate that the account has a
+       password configured.
+       When the underlying account does not have a valid password, the
+       CIM_Account.UserPassword property shall be NULL.
+     */
     data = ci->ft->getProperty(ci, "UserPassword", NULL);
     ar = data.value.array;
-    if (ar && (arsize = ar->ft->getSize(ar, NULL) > 0))
+    if (ar != NULL)
       {
-        vs = ar->ft->getElementAt(ar, 0, NULL).value.string;
-        value = vs->ft->getCharPtr(vs, NULL);
-        password = aux_lu_get_str(lue, LU_SHADOWPASSWORD);
-        if (strcmp(password, value) != 0)
+        if ((arsize = ar->ft->getSize(ar, NULL) > 0))
           {
-            if (!lu_user_setpass(luc, lue, value, TRUE, &error))
+            vs = ar->ft->getElementAt(ar, 0, NULL).value.string;
+            value = vs->ft->getCharPtr(vs, NULL);
+            password = aux_lu_get_str(lue, LU_SHADOWPASSWORD);
+            if (strcmp(password, value) != 0)
               {
-                rc = CMPI_RC_ERR_FAILED;
-                asprintf(&errmsg, "Error setting password: %s",
-                                  lu_strerror(error));
-                goto fail;
+                if (!lu_user_setpass(luc, lue, value, TRUE, &error))
+                  {
+                    rc = CMPI_RC_ERR_FAILED;
+                    asprintf(&errmsg, "Error setting password: %s",
+                                      lu_strerror(error));
+                    goto fail;
+                  }
               }
           }
+        /* zero array length means no change; password is configured */
       }
     else
       {
@@ -373,7 +373,7 @@ static CMPIStatus LMI_AccountModifyInstance(
 
 #define PARAMSTR(ATTR, VAR)\
     g_value_init(&val, G_TYPE_STRING);\
-    g_value_set_string(&val, (VAR));\
+    g_value_set_string(&val, (VAR));  /* can handle NULL */ \
     lu_ent_clear(lue, (ATTR));\
     lu_ent_add(lue, (ATTR), &val);\
     g_value_unset(&val);\
@@ -388,7 +388,7 @@ static CMPIStatus LMI_AccountModifyInstance(
 #define GETSTRVALUE(NAME)\
     data = ci->ft->getProperty(ci, (NAME), NULL);\
     vs = data.value.string;\
-    value = vs->ft->getCharPtr(vs, NULL);\
+    value = vs ? vs->ft->getCharPtr(vs, NULL) : NULL;\
 
 #define GETDATEVALUE(NAME, VAR)\
     (VAR).null = CMGetProperty(ci, (NAME), NULL).state == CMPI_nullValue;\
@@ -396,7 +396,7 @@ static CMPIStatus LMI_AccountModifyInstance(
       {\
         (VAR).interval = CMIsInterval(\
           CMGetProperty(ci, (NAME), NULL).value.dateTime, NULL); \
-        (VAR).value = MSTODAYS(CMGetBinaryFormat(\
+        (VAR).value = LMI_MS_TO_DAYS(CMGetBinaryFormat(\
           CMGetProperty(ci, (NAME), NULL).value.dateTime, NULL));\
       }\
 
@@ -419,18 +419,13 @@ static CMPIStatus LMI_AccountModifyInstance(
     last_change = aux_lu_get_long(lue, LU_SHADOWLASTCHANGE);
 
 #define FAIL(msg) \
-  for (i = 0; (groups != NULL) && (i < groups->n_values); ++i) { \
-      GValue *group_val = g_value_array_get_nth (groups, i); \
-      const gchar *const group_str = g_value_get_string(group_val); \
-      const int ret = release_group_lock((const char *const) group_str); \
-      lmi_debug("Releasing lock for group: %s. Result: %d", group_str, ret); \
-  } \
-  g_value_array_free (groups); \
-  groups = NULL; \
-  const int ret = release_user_lock(userlock); \
-  lmi_debug("Releasing lock for user: %s. Result: %d", userlock, ret); \
   lu_end(luc); \
   lu_ent_free(lue); \
+  if (pwdlockres == 0) \
+      ulckpwdf(); \
+  lmi_debug("Releasing lock for user: %s", userlock); \
+  release_giant_lock(); \
+  lmi_debug("Giant lock released for user %s", userlock); \
   KReturn2(_cb, ERR_FAILED, msg);
     GETDATEVALUE("PasswordExpiration", expiration);
     if (!expiration.null && !expiration.interval)
@@ -519,16 +514,12 @@ static CMPIStatus LMI_AccountModifyInstance(
       }
 
 fail:
-    for (i = 0; (groups != NULL) && (i < groups->n_values); ++i) {
-        GValue *group_val = g_value_array_get_nth (groups, i);
-        const gchar *const group_str = g_value_get_string(group_val);
-        const int ret = release_group_lock((const char *const) group_str);
-        lmi_debug("Releasing lock for group: %s. Result: %d", group_str, ret);
-    }
-    g_value_array_free (groups);
-    groups = NULL;
-    const int ret = release_user_lock(userlock);
-    lmi_debug("Releasing lock for user: %s. Result: %d", userlock, ret);
+    if (pwdlockres == 0)
+        ulckpwdf();
+    lmi_debug("Releasing giant lock for user: %s", userlock);
+    release_giant_lock ();
+    lmi_debug("Giant lock released for user %s", userlock);
+
     lu_ent_free(lue);
     lu_end(luc);
 
@@ -563,22 +554,26 @@ static CMPIrc delete_user(
     struct lu_error *error = NULL;
     struct lu_ent *lue = NULL;
     struct lu_ent *lueg = NULL;
+    int pwdlockres;
 
     /* boilerplate code */
     char userlock[USERNAME_LEN_MAX] = {0};
     /* -1 for NULL char */
     strncpy(userlock, username, sizeof(userlock) - 1);
-    lmi_debug("Getting lock for user: %s. Result: %d", userlock);
-    if (get_user_lock(userlock) == 0) {
-        asprintf(&errormsg, "Unable to obtain lock.");
-        return CMPI_RC_ERR_FAILED;
-    }
+    lmi_debug("Getting giant lock for user: %s", userlock);
+    get_giant_lock();
+    pwdlockres = lckpwdf();
+    if (pwdlockres != 0)
+        lmi_warn("Cannot acquire passwd file lock\n");
 
     luc = lu_start(NULL, 0, NULL, NULL, lu_prompt_console_quiet, NULL, &error);
     if (!luc) {
-        const int ret = release_user_lock(userlock);
-        lmi_debug("Releasing lock for user: %s. Result: %d", userlock, ret);
+        if (pwdlockres == 0)
+            ulckpwdf();
         asprintf(&errormsg, "Unable to initialize libuser: %s\n", lu_strerror(error));
+        lmi_debug("Releasing giant lock for user: %s", userlock);
+        release_giant_lock();
+        lmi_debug("Giant lock released for user %s", userlock);
         return CMPI_RC_ERR_FAILED;
     }
 
@@ -607,7 +602,7 @@ static CMPIrc delete_user(
         if (!ret) {
             const char *const home = lu_ent_get_first_string(lue, LU_HOMEDIRECTORY);
             /* If null is returned then asprintf handle it. */
-            warn("User's homedir %s could not be deleted: %s\n", home, lu_strerror(error));
+            lmi_warn("User's homedir %s could not be deleted: %s\n", home, lu_strerror(error));
             /* Silently succeed, remove the user despite keeping homedir aside */
             lu_error_free(&error);
         }
@@ -655,11 +650,11 @@ static CMPIrc delete_user(
     }
 
 clean:
-    /* Because C specification... */
-    {
-        const int ret = release_user_lock(userlock);
-        lmi_debug("Releasing lock for user: %s. Result: %d", userlock, ret);
-    }
+    if (pwdlockres == 0)
+        ulckpwdf();
+    lmi_debug("Releasing giant lock for user: %s", userlock);
+    release_giant_lock();
+    lmi_debug("Giant lock released for user %s", userlock);
     lu_ent_free(lue);
     lu_ent_free(lueg);
     lu_end(luc);
@@ -764,6 +759,7 @@ KUint32 LMI_Account_ChangePassword(
     struct lu_error *error = NULL;
     struct lu_ent *lue = NULL;
     char *errmsg = NULL;
+    int pwdlockres = -1;
     KUint32 result = KUINT32_INIT;
     KUint32_Set(&result, CHANGE_PASSWORD_OK);
 
@@ -773,6 +769,16 @@ KUint32 LMI_Account_ChangePassword(
         CMSetStatusWithChars(_cb, status, CMPI_RC_ERR_FAILED, errmsg);
         goto clean;
     }
+
+    char userlock[USERNAME_LEN_MAX] = {0};
+    /* -1 for NULL char */
+    strncpy(userlock, self->Name.chars, sizeof(userlock) - 1);
+    lmi_debug("Getting giant lock for user: %s", userlock);
+    get_giant_lock();
+
+    pwdlockres = lckpwdf();
+    if (pwdlockres != 0)
+        lmi_warn("Cannot acquire passwd file lock\n");
 
     luc = lu_start(NULL, lu_user, NULL, NULL, lu_prompt_console_quiet, NULL,
       &error);
@@ -800,6 +806,12 @@ KUint32 LMI_Account_ChangePassword(
     }
 
 clean:
+    if (pwdlockres == 0)
+        ulckpwdf();
+    lmi_debug("Releasing giant lock for user: %s", userlock);
+    release_giant_lock();
+    lmi_debug("Giant lock released for user %s", userlock);
+
     free(errmsg);
     if(luc) lu_end(luc);
     if(lue) lu_ent_free(lue);

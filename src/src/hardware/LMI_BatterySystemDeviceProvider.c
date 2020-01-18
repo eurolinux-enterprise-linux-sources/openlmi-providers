@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_BatterySystemDevice.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 static const CMPIBroker* _cb;
@@ -31,15 +30,15 @@ static void LMI_BatterySystemDeviceInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_BatterySystemDeviceCleanup( 
+static CMPIStatus LMI_BatterySystemDeviceCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_BatterySystemDeviceEnumInstanceNames( 
+static CMPIStatus LMI_BatterySystemDeviceEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -49,12 +48,12 @@ static CMPIStatus LMI_BatterySystemDeviceEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_BatterySystemDeviceEnumInstances( 
+static CMPIStatus LMI_BatterySystemDeviceEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_BatterySystemDevice lmi_batt_sys_device;
     LMI_BatteryRef lmi_batt;
@@ -72,14 +71,14 @@ static CMPIStatus LMI_BatterySystemDeviceEnumInstances(
 
         LMI_BatteryRef_Init(&lmi_batt, _cb, ns);
         LMI_BatteryRef_Set_SystemCreationClassName(&lmi_batt,
-                get_system_creation_class_name());
-        LMI_BatteryRef_Set_SystemName(&lmi_batt, get_system_name());
+                lmi_get_system_creation_class_name());
+        LMI_BatteryRef_Set_SystemName(&lmi_batt, lmi_get_system_name_safe(cc));
         LMI_BatteryRef_Set_CreationClassName(&lmi_batt,
-                ORGID "_" BATTERY_CLASS_NAME);
+                LMI_Battery_ClassName);
         LMI_BatteryRef_Set_DeviceID(&lmi_batt, dmi_batt[i].name);
 
         LMI_BatterySystemDevice_SetObjectPath_GroupComponent(
-                &lmi_batt_sys_device, lmi_get_computer_system());
+                &lmi_batt_sys_device, lmi_get_computer_system_safe(cc));
         LMI_BatterySystemDevice_Set_PartComponent(&lmi_batt_sys_device,
                 &lmi_batt);
 
@@ -92,62 +91,62 @@ done:
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_BatterySystemDeviceGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_BatterySystemDeviceGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_BatterySystemDeviceCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_BatterySystemDeviceModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_BatterySystemDeviceCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_BatterySystemDeviceDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_BatterySystemDeviceModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_BatterySystemDeviceDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_BatterySystemDeviceExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_BatterySystemDeviceAssociationCleanup( 
+static CMPIStatus LMI_BatterySystemDeviceAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -240,13 +239,13 @@ static CMPIStatus LMI_BatterySystemDeviceReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_BatterySystemDevice,
     LMI_BatterySystemDevice,
     _cb,
     LMI_BatterySystemDeviceInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_BatterySystemDevice,
     LMI_BatterySystemDevice,
     _cb,

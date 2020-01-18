@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_SystemSlotContainer.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 static const CMPIBroker* _cb;
@@ -31,15 +30,15 @@ static void LMI_SystemSlotContainerInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_SystemSlotContainerCleanup( 
+static CMPIStatus LMI_SystemSlotContainerCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_SystemSlotContainerEnumInstanceNames( 
+static CMPIStatus LMI_SystemSlotContainerEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -49,12 +48,12 @@ static CMPIStatus LMI_SystemSlotContainerEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_SystemSlotContainerEnumInstances( 
+static CMPIStatus LMI_SystemSlotContainerEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_SystemSlotContainer lmi_slot_container;
     LMI_SystemSlotRef lmi_slot;
@@ -74,7 +73,7 @@ static CMPIStatus LMI_SystemSlotContainerEnumInstances(
 
     LMI_ChassisRef_Init(&lmi_chassis, _cb, ns);
     LMI_ChassisRef_Set_CreationClassName(&lmi_chassis,
-            ORGID "_" CHASSIS_CLASS_NAME);
+            LMI_Chassis_ClassName);
     LMI_ChassisRef_Set_Tag(&lmi_chassis, dmi_get_chassis_tag(&dmi_chassis));
 
     for (i = 0; i < dmi_slots_nb; i++) {
@@ -82,7 +81,7 @@ static CMPIStatus LMI_SystemSlotContainerEnumInstances(
 
         LMI_SystemSlotRef_Init(&lmi_slot, _cb, ns);
         LMI_SystemSlotRef_Set_CreationClassName(&lmi_slot,
-                ORGID "_" SYSTEM_SLOT_CLASS_NAME);
+                LMI_SystemSlot_ClassName);
         LMI_SystemSlotRef_Set_Tag(&lmi_slot, dmi_slots[i].name);
 
         LMI_SystemSlotContainer_Set_GroupComponent(
@@ -100,62 +99,62 @@ done:
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_SystemSlotContainerGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_SystemSlotContainerGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_SystemSlotContainerCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_SystemSlotContainerModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_SystemSlotContainerCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_SystemSlotContainerDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_SystemSlotContainerModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_SystemSlotContainerDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_SystemSlotContainerExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_SystemSlotContainerAssociationCleanup( 
+static CMPIStatus LMI_SystemSlotContainerAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -248,13 +247,13 @@ static CMPIStatus LMI_SystemSlotContainerReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_SystemSlotContainer,
     LMI_SystemSlotContainer,
     _cb,
     LMI_SystemSlotContainerInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_SystemSlotContainer,
     LMI_SystemSlotContainer,
     _cb,

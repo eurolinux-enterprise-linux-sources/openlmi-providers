@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,7 +23,6 @@
 
 #include "macros.h"
 #include "account_globals.h"
-#include "globals.h"
 
 #include <stdbool.h>
 
@@ -64,7 +63,7 @@ static CMPIStatus LMI_EnabledAccountCapabilitiesEnumInstances(
     const char *nameSpace = KNameSpace(cop);
 
     LMI_EnabledAccountCapabilities_Init(&leac, _cb, nameSpace);
-    LMI_EnabledAccountCapabilities_Set_InstanceID(&leac, ORGID":"LEACNAME);
+    LMI_EnabledAccountCapabilities_Set_InstanceID(&leac, LMI_ORGID":"LEACNAME);
     LMI_EnabledAccountCapabilities_Set_ElementName(&leac, LEACNAME);
     LMI_EnabledAccountCapabilities_Init_RequestedStatesSupported(&leac, 0);
     LMI_EnabledAccountCapabilities_Set_ElementNameEditSupported(&leac,

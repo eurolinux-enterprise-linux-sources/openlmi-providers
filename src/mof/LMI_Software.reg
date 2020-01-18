@@ -152,6 +152,13 @@
    namespace: root/cimv2
    group: pycmpiLMI_Software
 
+[LMI_SoftwareInstDeletion]
+   provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
+   location: pyCmpiProvider
+   type: indication
+   namespace: root/cimv2
+   group: pycmpiLMI_Software
+
 [LMI_SoftwareIdentityFileCheck]
    provider: /usr/lib/python2.7/site-packages/lmi/software/cimom_entry.py
    location: pyCmpiProvider

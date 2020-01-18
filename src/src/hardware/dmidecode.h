@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,11 +21,7 @@
 #ifndef DMIDECODE_H_
 #define DMIDECODE_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "utils.h"
-
 
 /* Processor from dmidecode. */
 typedef struct _DmiProcessor {
@@ -160,7 +156,7 @@ typedef struct _DmiBattery {
 
 /*
  * Get array of processors according to the dmidecode program.
- * @param cpu array of cpus, this function will allocate necessary memory,
+ * @param cpus array of cpus, this function will allocate necessary memory,
  *      but caller is responsible for freeing it
  * @param cpus_nb number of processors in cpus
  * @return 0 if success, negative value otherwise
@@ -303,6 +299,5 @@ short dmi_get_batteries(DmiBattery **batteries, unsigned *batteries_nb);
  * @param batteries_nb number of batteries
  */
 void dmi_free_batteries(DmiBattery **batteries, unsigned *batteries_nb);
-
 
 #endif /* DMIDECODE_H_ */

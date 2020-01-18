@@ -123,6 +123,7 @@ endmacro(konkretcmpi_generate MOF PROVIDERS HEADERS)
 # @param[in] LIBRARY_NAME name of the library without lib prefix and .so suffix (same as for add_library)
 # @param[in] MOF name of the MOF file
 # @param[in] DEST destination directory where to install .reg file (use "" to skip installation)
+# @param[in] ARGN optional varargs argument: path(s) to the profile(s) to be registered
 #
 macro(cim_registration PROVIDER_NAME LIBRARY_NAME MOF DEST)
     string(REPLACE ".mof" ".reg" REG ${MOF})
@@ -143,11 +144,17 @@ macro(cim_registration PROVIDER_NAME LIBRARY_NAME MOF DEST)
               ${MOF}
               PATHS ${CMAKE_SOURCE_DIR}/mof/
     )
+    set(PROFILE_DO_REG "false")
+    if (NOT "${ARGN}" STREQUAL "")
+        set(PROFILE_DO_REG "true")
+    endif (NOT "${ARGN}" STREQUAL "")
 
     add_custom_target(register-${PROVIDER_NAME}
-                      ${OPENLMI_MOF_REGISTER} -v ${OPENLMI_VERSION} register ${MOF_FILE} ${CMAKE_CURRENT_BINARY_DIR}/${REG})
+                      ${OPENLMI_MOF_REGISTER} -v ${OPENLMI_VERSION} register ${MOF_FILE} ${CMAKE_CURRENT_BINARY_DIR}/${REG} && 
+                      if ${PROFILE_DO_REG}\; then ${OPENLMI_MOF_REGISTER} --just-mofs -n root/interop -c tog-pegasus register ${ARGN}\; fi)
     add_custom_target(unregister-${PROVIDER_NAME}
-                      ${OPENLMI_MOF_REGISTER} -v ${OPENLMI_VERSION} unregister ${MOF_FILE} ${CMAKE_CURRENT_BINARY_DIR}/${REG})
+                      ${OPENLMI_MOF_REGISTER} -v ${OPENLMI_VERSION} unregister ${MOF_FILE} ${CMAKE_CURRENT_BINARY_DIR}/${REG} && 
+                      if ${PROFILE_DO_REG}\; then ${OPENLMI_MOF_REGISTER} --just-mofs -n root/interop -c tog-pegasus unregister ${ARGN}\; fi)
 endmacro(cim_registration)
 
 

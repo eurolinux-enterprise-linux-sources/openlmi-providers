@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -32,6 +32,12 @@ typedef struct lock {
     unsigned int instances;
 } lock_t;
 
+typedef struct giant_lock {
+    pthread_mutex_t mutex;
+} giant_lock_t;
+
+giant_lock_t giant_lock;
+
 typedef struct lock_pool {
     GHashTable *hash_table;
     pthread_mutex_t csec;
@@ -51,5 +57,7 @@ int get_user_lock (const char *const username) __attribute__((nonnull));
 int get_group_lock (const char *const groupname) __attribute__((nonnull));
 int release_user_lock (const char *const username) __attribute__((nonnull));
 int release_group_lock (const char *const username) __attribute__((nonnull));
+void get_giant_lock (void);
+void release_giant_lock (void);
 
 #endif /* _LOCK_H */

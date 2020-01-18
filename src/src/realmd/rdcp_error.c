@@ -57,8 +57,8 @@ handle_g_error(GError **g_error, const CMPIBroker* mb, CMPIStatus* st, CMPIrc rc
     g_return_val_if_fail (g_error != NULL && *g_error != NULL, failsafe_status);
     g_return_val_if_fail (st != NULL, failsafe_status);
 
-    message = g_string_sized_new(DEFAULT_STATUS_MSG_SIZE);
-    g_string_append_printf(message, "%s: ", ORGID);
+    message = g_string_sized_new(BUFLEN);
+    g_string_append_printf(message, "%s: ", LMI_ORGID);
 
     if (format) {
         va_start(va, format);
@@ -106,8 +106,8 @@ SetCMPIStatus(const CMPIBroker* mb, CMPIStatus* st, CMPIrc rc,
     g_return_val_if_fail (st != NULL, failsafe_status);
 
     if (format) {
-        message = g_string_sized_new(DEFAULT_STATUS_MSG_SIZE);
-        g_string_append_printf(message, "%s: ", ORGID);
+        message = g_string_sized_new(BUFLEN);
+        g_string_append_printf(message, "%s: ", LMI_ORGID);
 
         va_start(va, format);
         g_string_append_vprintf(message, format, va);

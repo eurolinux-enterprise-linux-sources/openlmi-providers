@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,7 +18,7 @@
  * Authors: Tomas Bzatek <tbzatek@redhat.com>
  */
 
-[ Version("0.4.1"), Provider("cmpi:cmpiLMI_Journald") ]
+[ Version("0.4.2"), Provider("cmpi:cmpiLMI_Journald") ]
 class LMI_JournalMessageLog: CIM_MessageLog
 {
     [ Implemented(true), Override("CreationClassName"), Key ]
@@ -57,6 +57,24 @@ class LMI_JournalMessageLog: CIM_MessageLog
       ValueMap { "0", "1", "2" },
       Values { "Success", "Not supported", "Failed" } ]
     uint32 PositionToFirstRecord(
+          [IN ( false ), OUT, Description (
+             "An identifier for the iterator." )]
+       string IterationIdentifier);
+
+
+    [ Implemented(true), Description (
+          "Requests that an iteration of the MessageLog be "
+          "established and that the iterator be set to the last "
+          "entry in the Log. An identifier for the iterator is "
+          "returned as an output parameter of the method. \n"
+          "\n"
+          "The return value from PositionToFirstRecord is 0 "
+          "if the request was successfully executed, 1 if the "
+          "request is not supported and some other value if an "
+          "error occurred." ),
+      ValueMap { "0", "1", "2" },
+      Values { "Success", "Not supported", "Failed" } ]
+    uint32 PositionToLastRecord(
           [IN ( false ), OUT, Description (
              "An identifier for the iterator." )]
        string IterationIdentifier);
@@ -179,7 +197,7 @@ class LMI_JournalMessageLog: CIM_MessageLog
       string IterationIdentifier);
 };
 
-[ Version("0.4.1"), Provider("cmpi:cmpiLMI_Journald") ]
+[ Version("0.4.3"), Provider("cmpi:cmpiLMI_Journald") ]
 class LMI_JournalLogRecord: CIM_LogRecord
 {
     [ Implemented(true), Override("LogCreationClassName"), Key ]
@@ -206,6 +224,51 @@ class LMI_JournalLogRecord: CIM_LogRecord
 
     [ Implemented(true), Override("PerceivedSeverity") ]
     uint16 PerceivedSeverity;
+
+    [ Implemented(true), Description (
+          "Denotes numerical effective user ID of the process that sent the "
+          "message. This ID is system specific and usually maps to a local "
+          "POSIX account." ) ]
+    uint64 UserID;
+
+    [ Implemented(true), Description (
+          "Denotes numerical effective group ID of the process that sent the "
+          "message. This ID is system specific and usually maps to a local "
+          "POSIX account." ) ]
+    uint64 GroupID;
+
+    [ Implemented(true), Description (
+          "Denotes numerical ID of the process that sent the message." ) ]
+    uint64 ProcessID;
+
+    [ Implemented(true), Description (
+          "A syslog facility level specifying what type of program is logging "
+          "the message. Values are defined by RFC 3164." ),
+      ValueMap { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11",
+                 "12", "13", "14", "15", "16", "17", "18", "19", "20", "21",
+                 "22", "23" },
+      Values { "kern", "user", "mail", "daemon", "auth", "syslog", "lpr",
+               "news", "uucp", "clock", "authpriv", "ftp", "ntp", "audit",
+               "alert", "cron", "local0", "local1", "local2", "local3",
+               "local4", "local5", "local6", "local7" } ]
+    uint16 SyslogFacility;
+
+    [ Implemented(true), Description (
+          "A syslog severity level of the message, defined by RFC 5424." ),
+      ValueMap { "0", "1", "2", "3", "4", "5", "6", "7" },
+      Values { "Emergency", "Alert", "Critical", "Error", "Warning", "Notice",
+               "Informational", "Debug" } ]
+    uint16 SyslogSeverity;
+
+    [ Implemented(true), Description (
+          "A syslog identifier string, usually carrying process name that "
+          "logged the message." ) ]
+    String SyslogIdentifier;
+
+    [ Implemented(true), Description (
+          "The systemd unit name, not set when message has not been logged "
+          "natively through journald (i.e. through syslog transport)." ) ]
+    String SystemdUnit;
 };
 
 [ Version("0.4.1"), Provider("cmpi:cmpiLMI_Journald"),

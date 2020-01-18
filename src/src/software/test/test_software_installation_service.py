@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -23,11 +23,14 @@
 Unit tests for ``LMI_SoftwareInstallationService`` provider.
 """
 
-import pywbem
 import time
-import unittest
 
+from lmi.test import CIMError
+from lmi.test import unittest
+from lmi.test import wbem
 from lmi.test.lmibase import enable_lmi_exceptions
+from lmi.test.lmibase import with_connection_timeout
+
 import package
 import swbase
 import util
@@ -43,7 +46,7 @@ ENABLED_STATE_NOT_APPLICABLE = 5
 FIND_IDENTITY_FOUND = 0
 FIND_IDENTITY_NO_MATCH = 1
 HEALTH_STATE_OK = 5
-INSTALL_FROM_BYTE_STREAM_NOT_SUPPORTED = 1
+INSTALL_METHOD_NOT_SUPPORTED = 1
 INSTALL_OPTIONS_FORCE = 3
 INSTALL_OPTIONS_INSTALL = 4
 INSTALL_OPTIONS_UPDATE = 5
@@ -144,8 +147,11 @@ class TestSoftwareInstallationService(swbase.SwTestCase):
         # TODO: This should either return NOT_SUPPORTED or
         # InstallFromByteStream() should raise the same.
         # This dissimilarity is really weird.
-        self.assertRaisesCIM(pywbem.CIM_ERR_METHOD_NOT_AVAILABLE,
-                service.CheckSoftwareIdentity)
+        try:
+            rval, _, _ = service.CheckSoftwareIdentity()
+            self.assertEqual(rval, INSTALL_METHOD_NOT_SUPPORTED)
+        except CIMError as err:
+            self.assertEqual(err.args[0], wbem.CIM_ERR_METHOD_NOT_AVAILABLE)
 
     @enable_lmi_exceptions
     def test_install_from_byte_stream_method(self):
@@ -158,7 +164,7 @@ class TestSoftwareInstallationService(swbase.SwTestCase):
         # CheckSoftwareIdentity() should return NOT_SUPPORTED.
         # This dissimilarity is really weird.
         rval, _, _ = service.InstallFromByteStream()
-        self.assertEqual(rval, INSTALL_FROM_BYTE_STREAM_NOT_SUPPORTED)
+        self.assertEqual(rval, INSTALL_METHOD_NOT_SUPPORTED)
 
     @swbase.test_with_repos(**{
         'stable' : True,
@@ -197,7 +203,7 @@ class TestSoftwareInstallationService(swbase.SwTestCase):
         for repoid in ('stable', 'updates-testing'):
             for pkg in self.get_repo(repoid).packages:
                 if pkg.name.endswith('pkg2') and repoid == 'stable':
-                    # only pkg2 from updates-tesing will be present (its newer)
+                    # only pkg2 from updates-testing will be present (its newer)
                     continue
                 self.assertIn(pkg.nevra, nevra_set)
                 nevra_set.remove(pkg.nevra)
@@ -267,6 +273,8 @@ class TestSoftwareInstallationService(swbase.SwTestCase):
             nevra_set.remove(pkg.nevra)
         self.assertEqual(len(nevra_set), 0)
 
+
+    @with_connection_timeout(240)
     @swbase.test_with_repos('stable', 'updates', 'updates-testing', 'misc')
     def test_query_identity_by_repoid(self):
         """
@@ -340,12 +348,11 @@ class TestSoftwareInstallationService(swbase.SwTestCase):
         pkg = self.get_repo('stable')['pkg1']
         self.assertFalse(package.is_pkg_installed(pkg))
         service = self.make_op().to_instance()
-        rval, oparms, _ = service.SyncInstallFromSoftwareIdentity(
+        rval, _, _ = service.SyncInstallFromSoftwareIdentity(
                 Source=util.make_pkg_op(self.ns, pkg),
                 InstallOptions=[INSTALL_OPTIONS_INSTALL],
                 Target=self.system_iname)
         self.assertEqual(rval, JOB_COMPLETED_WITH_NO_ERROR)
-        self.assertEqual(len(oparms), 0)
         self.assertTrue(package.is_pkg_installed(pkg))
 
     @swbase.test_with_repos('stable')
@@ -357,13 +364,11 @@ class TestSoftwareInstallationService(swbase.SwTestCase):
         pkg = self.get_repo('stable')['pkg1']
         self.assertTrue(package.is_pkg_installed(pkg))
         service = self.make_op().to_instance()
-        rval, oparms, _ = service.SyncInstallFromSoftwareIdentity(
+        rval, _, _ = service.SyncInstallFromSoftwareIdentity(
                 Source=util.make_pkg_op(self.ns, pkg),
                 InstallOptions=[INSTALL_OPTIONS_UNINSTALL],
                 Target=self.system_iname)
         self.assertEqual(rval, JOB_COMPLETED_WITH_NO_ERROR)
-        self.assertTrue(  len(oparms) == 0
-                       or ('Job' in oparms and oparms['Job'] is None))
         self.assertFalse(package.is_pkg_installed(pkg))
 
     @swbase.test_with_repos('stable', 'updates')
@@ -375,17 +380,16 @@ class TestSoftwareInstallationService(swbase.SwTestCase):
         pkg = self.get_repo('stable')['pkg1']
         self.assertTrue(package.is_pkg_installed(pkg))
         service = self.make_op().to_instance()
-        rval, oparms, _ = service.SyncInstallFromSoftwareIdentity(
+        rval, _, _ = service.SyncInstallFromSoftwareIdentity(
                 Source=util.make_pkg_op(self.ns, pkg),
                 InstallOptions=[INSTALL_OPTIONS_UPDATE],
                 Target=self.system_iname)
         self.assertEqual(rval, JOB_COMPLETED_WITH_NO_ERROR)
-        self.assertTrue(  len(oparms) == 0
-                       or ('Job' in oparms and oparms['Job'] is None))
         self.assertFalse(package.is_pkg_installed(pkg))
         up_pkg = self.get_repo('updates')['pkg1']
         self.assertTrue(package.is_pkg_installed(up_pkg))
 
+    @enable_lmi_exceptions
     @swbase.test_with_repos('stable', 'updates')
     @swbase.test_with_packages(**{'pkg1' : False})
     def test_update_not_installed_package_sync(self):
@@ -395,17 +399,19 @@ class TestSoftwareInstallationService(swbase.SwTestCase):
         pkg = self.get_repo('stable')['pkg1']
         self.assertFalse(package.is_pkg_installed(pkg.name))
         service = self.make_op().to_instance()
-        rval, oparms, error = service.SyncInstallFromSoftwareIdentity(
-                Source=util.make_pkg_op(self.ns, pkg),
-                InstallOptions=[INSTALL_OPTIONS_UPDATE],
-                Target=self.system_iname)
-        self.assertEqual(rval, INVALID_PARAMETER)
-        self.assertGreater(len(error), 0)
-        self.assertTrue(  len(oparms) == 0
-                       or ('Job' in oparms and oparms['Job'] is None))
-        self.assertFalse(package.is_pkg_installed(pkg.name))
+        try:
+            rval, _, error = service.SyncInstallFromSoftwareIdentity(
+                    Source=util.make_pkg_op(self.ns, pkg),
+                    InstallOptions=[INSTALL_OPTIONS_UPDATE],
+                    Target=self.system_iname)
+            self.assertTrue(rval in (INVALID_PARAMETER, None))
+            self.assertGreater(len(error), 0)
+            self.assertFalse(package.is_pkg_installed(pkg.name))
+        except CIMError as err:
+            # Once the lmishell supports exception throwing of failed asynchronous
+            # jobs, this will apply.
+            self.assertEqual(err.args[0], wbem.CIM_ERR_NOT_FOUND)
 
-    @enable_lmi_exceptions
     @swbase.test_with_repos('stable')
     @swbase.test_with_packages(**{ 'pkg1' : False })
     def test_install_method_sync_without_target_and_collection(self):
@@ -424,12 +430,10 @@ class TestSoftwareInstallationService(swbase.SwTestCase):
                 [INSTALL_OPTIONS_INSTALL],
                 [INSTALL_OPTIONS_UNINSTALL],
                 [INSTALL_OPTIONS_UPDATE]):
-            rval, oparms, _ = service.SyncInstallFromSoftwareIdentity(
+            rval, _, _ = service.SyncInstallFromSoftwareIdentity(
                     Source=util.make_pkg_op(self.ns, pkg),
                     InstallOptions=opts)
-            self.assertEqual(rval, UNSPECIFIED_ERROR)
-            self.assertTrue(  len(oparms) == 0
-                           or ('Job' in oparms and oparms['Job'] is None))
+            self.assertTrue(rval in (UNSPECIFIED_ERROR, INVALID_PARAMETER))
 
     @swbase.test_with_repos('stable')
     @swbase.test_with_packages(**{ 'pkg1' : False })
@@ -449,7 +453,7 @@ class TestSoftwareInstallationService(swbase.SwTestCase):
                 [INSTALL_OPTIONS_INSTALL],
                 [INSTALL_OPTIONS_UNINSTALL],
                 [INSTALL_OPTIONS_UPDATE]):
-            rval, oparms, _ = service.SyncInstallFromSoftwareIdentity(
+            rval, _, _ = service.SyncInstallFromSoftwareIdentity(
                     Source=util.make_pkg_op(self.ns, pkg),
                     InstallOptions=opts,
                     Target=self.system_iname,
@@ -457,9 +461,7 @@ class TestSoftwareInstallationService(swbase.SwTestCase):
                         .new_instance_name({
                             "InstanceID" : "LMI:LMI_SystemSoftwareCollection"
                         }))
-            self.assertEqual(rval, UNSPECIFIED_ERROR)
-            self.assertTrue(  len(oparms) == 0
-                           or ('Job' in oparms and oparms['Job'] is None))
+            self.assertTrue(rval in (UNSPECIFIED_ERROR, INVALID_PARAMETER))
 
     @swbase.test_with_repos('stable')
     @swbase.test_with_packages(**{ 'pkg1' : False })
@@ -470,7 +472,7 @@ class TestSoftwareInstallationService(swbase.SwTestCase):
         pkg = self.get_repo('stable')['pkg1']
         self.assertFalse(package.is_pkg_installed(pkg))
         service = self.make_op().to_instance()
-        rval, oparms, _ = service.SyncInstallFromSoftwareIdentity(
+        rval, _, _ = service.SyncInstallFromSoftwareIdentity(
                 Source=util.make_pkg_op(self.ns, pkg),
                 InstallOptions=[INSTALL_OPTIONS_INSTALL],
                 Collection=self.ns.LMI_SystemSoftwareCollection \
@@ -478,8 +480,6 @@ class TestSoftwareInstallationService(swbase.SwTestCase):
                             "InstanceID" : "LMI:LMI_SystemSoftwareCollection"
                         }))
         self.assertEqual(rval, JOB_COMPLETED_WITH_NO_ERROR)
-        self.assertTrue(  len(oparms) == 0
-                       or ('Job' in oparms and oparms['Job'] is None))
         self.assertTrue(package.is_pkg_installed(pkg))
 
     @swbase.test_with_repos('stable')
@@ -496,17 +496,68 @@ class TestSoftwareInstallationService(swbase.SwTestCase):
 
         service = self.make_op().to_instance()
         time.sleep(1)
-        rval, oparms, _ = service.SyncInstallFromSoftwareIdentity(
+        rval, _, error = service.SyncInstallFromSoftwareIdentity(
                 Source=pkg_op,
                 InstallOptions=[INSTALL_OPTIONS_INSTALL, INSTALL_OPTIONS_FORCE],
                 Target=self.system_iname)
-        self.assertEqual(rval, JOB_COMPLETED_WITH_NO_ERROR)
-        self.assertTrue(  len(oparms) == 0
-                       or ('Job' in oparms and oparms['Job'] is None))
-        self.assertTrue(package.is_pkg_installed(pkg))
-        inst.refresh()
-        install_date2 = inst.InstallDate
-        self.assertGreater(install_date2, install_date)
+        if self.backend == "package-kit":
+            # PackageKit doesn't support reinstallation and downgrades as of
+            # now
+            self.assertTrue(rval in (None, wbem.CIM_ERR_NOT_SUPPORTED))
+            self.assertTrue(len(error) > 0)
+        else:
+            self.assertEqual(rval, JOB_COMPLETED_WITH_NO_ERROR)
+            self.assertTrue(package.is_pkg_installed(pkg))
+            inst.refresh()
+            install_date2 = inst.InstallDate
+            self.assertGreater(install_date2, install_date)
+
+    @swbase.test_with_repos('updates', 'stable')
+    @swbase.test_with_packages('updates#pkg2')
+    def test_downgrade_package_without_force_flag(self):
+        """
+        Try to downgrade package.
+        """
+        new = self.get_repo('updates')['pkg2']
+        old = self.get_repo('stable')['pkg2']
+        pkg_old = util.make_pkg_op(self.ns, old)
+        self.assertTrue(package.is_pkg_installed(new))
+        self.assertFalse(package.is_pkg_installed(old))
+
+        service = self.make_op().to_instance()
+        rval, _, error = service.SyncInstallFromSoftwareIdentity(
+                Source=pkg_old,
+                InstallOptions=[INSTALL_OPTIONS_INSTALL],
+                Target=self.system_iname)
+        self.assertTrue(rval in (None, wbem.CIM_ERR_FAILED))
+        self.assertTrue(len(error) > 0)
+
+    @swbase.test_with_repos('updates', 'stable')
+    @swbase.test_with_packages('updates#pkg2')
+    def test_downgrade_package_with_force_flag(self):
+        """
+        Try to downgrade package.
+        """
+        new = self.get_repo('updates')['pkg2']
+        old = self.get_repo('stable')['pkg2']
+        pkg_old = util.make_pkg_op(self.ns, old)
+        self.assertTrue(package.is_pkg_installed(new))
+        self.assertFalse(package.is_pkg_installed(old))
+
+        service = self.make_op().to_instance()
+        rval, _, error = service.SyncInstallFromSoftwareIdentity(
+                Source=pkg_old,
+                InstallOptions=[INSTALL_OPTIONS_INSTALL, INSTALL_OPTIONS_FORCE],
+                Target=self.system_iname)
+        if self.backend == "package-kit":
+            # PackageKit doesn't support reinstallation and downgrades as of
+            # now
+            self.assertTrue(rval in (None, wbem.CIM_ERR_FAILED))
+            self.assertTrue(len(error) > 0)
+        else:
+            self.assertEqual(rval, JOB_COMPLETED_WITH_NO_ERROR)
+            self.assertFalse(package.is_pkg_installed(new))
+            self.assertTrue(package.is_pkg_installed(old))
 
 def suite():
     """For unittest loaders."""

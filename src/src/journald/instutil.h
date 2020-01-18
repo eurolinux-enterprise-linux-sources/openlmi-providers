@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -42,8 +42,8 @@ bool ind_watcher(void **data);
 bool ind_gather(const IMManager *manager, CMPIInstance **old, CMPIInstance **new, void *data);
 void ind_destroy();
 
-gchar * journal_iter_new(const gchar *req_cursor, sd_journal **journal_out);
-bool    journal_iter_parse_iterator_string(const char *iter_id, gchar **out_iter_id_short, gpointer *out_iter_ptr, gchar **out_iter_cursor);
+gchar * journal_iter_new(const gchar *req_cursor, gboolean seek_tail, sd_journal **journal_out);
+bool    journal_iter_parse_iterator_string(const char *iter_id, gchar **out_iter_id_short, gpointer *out_iter_ptr, gchar **out_iter_cursor, gboolean *out_eof_set);
 bool    journal_iter_validate_id(gchar **iter_id, sd_journal **journal_out, gchar **prefix_out, const CMPIBroker *_cb, CMPIStatus *status);
 bool    journal_iter_cancel(const gchar *iter_id);
 bool    journal_iter_seek(gchar **iter_id, sd_journal *journal, gint64 position);

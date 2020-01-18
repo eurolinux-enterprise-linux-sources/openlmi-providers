@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,11 +21,7 @@
 #ifndef PROCFS_H_
 #define PROCFS_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "utils.h"
-
 
 /* Processor from /proc/cpuinfo file. */
 typedef struct _CpuinfoProcessor {
@@ -54,6 +50,5 @@ void cpuinfo_free_processor(CpuinfoProcessor *cpu);
  * @return memory size or 0 in case of a problem
  */
 unsigned long meminfo_get_memory_size();
-
 
 #endif /* PROCFS_H_ */

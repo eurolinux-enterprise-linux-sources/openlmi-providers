@@ -123,3 +123,53 @@ instance of PG_ProviderProfileCapabilities
      };
 };
 
+instance of PG_ProviderProfileCapabilities
+{
+    CapabilityID = "LMI_DiskPhysicalPackage_DMTF";
+
+    ProviderModuleName = "cmpiLMI_Hardware";
+
+    ProviderName = "LMI_DiskPhysicalPackage";
+
+    RegisteredProfile = 15;
+
+    ProfileVersion = "1.6.0";
+
+    RegisteredSubprofiles = {
+        1011
+    };
+
+    SubprofileVersions = {
+        "1.6.0"
+    };
+
+    ConformingElements = {
+       "LMI_DiskPhysicalPackage"
+     };
+};
+
+instance of PG_ProviderProfileCapabilities
+{
+    CapabilityID = "LMI_DiskDrive_DMTF";
+
+    ProviderModuleName = "cmpiLMI_Hardware";
+
+    ProviderName = "LMI_DiskDrive";
+
+    RegisteredProfile = 15;
+
+    ProfileVersion = "1.6.0";
+
+    RegisteredSubprofiles = {
+        1011
+    };
+
+    SubprofileVersions = {
+        "1.6.0"
+    };
+
+    ConformingElements = {
+       "LMI_DiskDrive"
+     };
+};
+

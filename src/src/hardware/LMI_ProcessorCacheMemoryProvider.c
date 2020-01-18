@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_ProcessorCacheMemory.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 #include "sysfs.h"
 
@@ -61,7 +60,7 @@ static CMPIStatus LMI_ProcessorCacheMemoryEnumInstances(
 {
     LMI_ProcessorCacheMemory lmi_cpu_cache;
     const char *ns = KNameSpace(cop);
-    char *error_msg = NULL, instance_id[INSTANCE_ID_LEN];
+    char *error_msg = NULL, instance_id[BUFLEN];
     unsigned i, caches = 0;
     DmiCpuCache *dmi_cpu_caches = NULL;
     unsigned dmi_cpu_caches_nb = 0;
@@ -89,11 +88,11 @@ static CMPIStatus LMI_ProcessorCacheMemoryEnumInstances(
         LMI_ProcessorCacheMemory_Init(&lmi_cpu_cache, _cb, ns);
 
         LMI_ProcessorCacheMemory_Set_SystemCreationClassName(&lmi_cpu_cache,
-                get_system_creation_class_name());
+                lmi_get_system_creation_class_name());
         LMI_ProcessorCacheMemory_Set_SystemName(&lmi_cpu_cache,
-                get_system_name());
+                lmi_get_system_name_safe(cc));
         LMI_ProcessorCacheMemory_Set_CreationClassName(&lmi_cpu_cache,
-                ORGID "_" CPU_CACHE_CLASS_NAME);
+                LMI_ProcessorCacheMemory_ClassName);
 
         LMI_ProcessorCacheMemory_Set_BlockSize(&lmi_cpu_cache, 1);
         LMI_ProcessorCacheMemory_Set_Volatile(&lmi_cpu_cache, 1);
@@ -117,8 +116,8 @@ static CMPIStatus LMI_ProcessorCacheMemoryEnumInstances(
 
         /* do we have dmidecode output? */
         if (dmi_cpu_caches_nb > 0) {
-            snprintf(instance_id, INSTANCE_ID_LEN,
-                    ORGID ":" ORGID "_" CPU_CACHE_CLASS_NAME ":%s",
+            snprintf(instance_id, BUFLEN,
+                    LMI_ORGID ":" LMI_ProcessorCacheMemory_ClassName ":%s",
                     dmi_cpu_caches[i].id);
 
             LMI_ProcessorCacheMemory_Set_DeviceID(&lmi_cpu_cache,
@@ -133,8 +132,8 @@ static CMPIStatus LMI_ProcessorCacheMemoryEnumInstances(
             LMI_ProcessorCacheMemory_Set_EnabledState(&lmi_cpu_cache,
                     get_cachestatus(dmi_cpu_caches[i].status));
         } else {
-            snprintf(instance_id, INSTANCE_ID_LEN,
-                    ORGID ":" ORGID "_" CPU_CACHE_CLASS_NAME ":%s",
+            snprintf(instance_id, BUFLEN,
+                    LMI_ORGID ":" LMI_ProcessorCacheMemory_ClassName ":%s",
                     sysfs_cpu_caches[i].id);
 
             LMI_ProcessorCacheMemory_Set_DeviceID(&lmi_cpu_cache,

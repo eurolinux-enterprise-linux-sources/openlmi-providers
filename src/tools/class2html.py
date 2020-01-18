@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -27,7 +27,7 @@ import cgi
 import sys
 
 class HtmlExporter(object):
-    
+
     def __init__(self, cliconn):
         self.classcache = {}
         self.cliconn = cliconn
@@ -65,7 +65,7 @@ class HtmlExporter(object):
                 return '%s<a href="%s">%s</a>%s' % (prefix, url, url, last)
         string2 = re.sub(re_string, do_sub, string)
         return re.sub(re_nl, "<br/>", string2)
-    
+
     def load_class(self, classname):
         if classname in self.classcache:
             return self.classcache[classname]
@@ -299,7 +299,7 @@ class HtmlExporter(object):
             self.print_file(footer)
         print >>self.file, "</body></html>"
         self.file.close()
-        
+
     def add_class(self, classname):
         self.classes.append(classname)
         print "adding", classname
@@ -343,7 +343,7 @@ class HtmlExporter(object):
         """
             Create inheritance tree of classes.
         """
-        # hash classname -> list of hash of (direct) sublasses 
+        # hash classname -> list of hash of (direct) sublasses
         subclasses = {}
         # hash classname -> nr. of its parents
         parents = {}
@@ -379,7 +379,7 @@ class HtmlExporter(object):
             self.print_file(footer)
         print >>self.file, "</body></html>"
         self.file.close()
-            
+
 description = """
 Generate HTML documentation for given CIM classes. The tool connects to specified CIMOM
 and reads class definition from there. It generates separate HTML file for each class

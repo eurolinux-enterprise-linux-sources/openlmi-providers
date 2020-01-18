@@ -1,0 +1,22 @@
+instance of PG_ProviderProfileCapabilities
+{
+    CapabilityID = "@CLASS@";
+
+    ProviderModuleName = "cmpiLMI_Software";
+
+    ProviderName = "@CLASS@";
+
+    RegisteredProfile = 0;
+
+    OtherRegisteredProfile = "OpenLMI-Software";
+    OtherProfileOrganization = "OpenLMI";
+
+    ProfileVersion = "@VERSION@";
+
+    RegisteredSubProfiles = {};
+
+    ConformingElements = {
+       "@CLASS@"
+    };
+};
+

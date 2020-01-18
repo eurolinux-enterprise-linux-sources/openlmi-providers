@@ -272,7 +272,7 @@ class Singleton(object):
 
 if __name__ == '__main__':
 
-    import unittest
+    from lmi.test import unittest
     import time
 
     class SingletonMixinPublicTestCase(unittest.TestCase):

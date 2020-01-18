@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-# Copyright(C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright(C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -15,42 +15,29 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #
-# Authors: Robin Hack <rhack@redhat.com>; Jan Grec <jgrec@redhat.com>
+# Authors: Robin Hack <rhack@redhat.com>; Jan Grec <jgrec@redhat.com>; Jan Safranek <jsafrane@redhat.com>
 #
 
-import unittest
+from lmi.test import unittest
 import subprocess
 
-import lmi.shell as lmishell
+from lmi.test import CIMError
+from lmi.test import lmibase
 import os
 import shutil
 import time
-import pywbem # for CIMError
-
-HOST =      os.environ.get("LMI_CIMOM_URL", "localhost")
-USER =      os.environ.get("LMI_CIMOM_USERNAME", "root")
-PASSWD =    os.environ.get("LMI_CIMOM_PASSWORD", "blank")
-BROKER =    os.environ.get("LMI_CIMOM_BROKER", "tog-pegasus")
 
 DEV_NULL = open("/dev/null", 'w')
 
 # NOTES
 # - systemd/service status returns code 3 for stopped (dead) services on Fedora
 
-class TestServiceProvider(unittest.TestCase):
+class TestServiceProvider(lmibase.LmiTestCase):
     """
     TestCase class testing OpenLMI service functionality.
     """
 
-    def setUp(self):
-        """Set up and check connection to remote server."""
-        self.conn = lmishell.connect(HOST, USER, PASSWD)
-        self.assertTrue(isinstance(self.conn, lmishell.LMIConnection), "Couldn't connect to remote provider")
-
-
-    def tearDown(self):
-        pass
-
+    CLASS_NAME = "LMI_Service"
 
     def test_list_services(self):
         """
@@ -64,7 +51,7 @@ class TestServiceProvider(unittest.TestCase):
             service.Started returns correct value for each service against systemctl
         """
         # Get list of services from OpenLMI service provider
-        lmi_services_insts = self.conn.root.cimv2.LMI_Service.instances()
+        lmi_services_insts = self.cim_class.instances()
         self.assertTrue(lmi_services_insts, "No services returned")
 
         lmi_services = dict((s.Name, s.Started) for (s) in lmi_services_insts)
@@ -116,7 +103,7 @@ class TestServiceProvider(unittest.TestCase):
         service_status_ret = subprocess.call("service cups status".split())
         self.assertEqual(service_status_ret, 3)
 
-        service = self.conn.root.cimv2.LMI_Service.first_instance({"Name": "cups.service"})
+        service = self.cim_class.first_instance({"Name": "cups.service"})
 
         self.assertFalse(service.Started, "Service is not in stopped state")
 
@@ -161,7 +148,7 @@ class TestServiceProvider(unittest.TestCase):
         service_pid_before = 0
 
         # Try to start up the service by using RestartService()
-        service = self.conn.root.cimv2.LMI_Service.first_instance({"Name": "cups.service"})
+        service = self.cim_class.first_instance({"Name": "cups.service"})
         service.RestartService()
         service.refresh()
         self.assertTrue(service.Started, "Service couldn't be started BACK after RestartService() [OpenLMI]")
@@ -192,7 +179,7 @@ class TestServiceProvider(unittest.TestCase):
         service_pid_before = subprocess.check_output("pidof cupsd".split())
 
         # Try to restart the service by using RestartService()
-        service = self.conn.root.cimv2.LMI_Service.first_instance({"Name": "cups.service"})
+        service = self.cim_class.first_instance({"Name": "cups.service"})
         service.RestartService()
 
         self.assertTrue(service.Started, "Service couldn't be started UP after RestartService() [OpenLMI]")
@@ -222,17 +209,19 @@ class TestServiceProvider(unittest.TestCase):
         cmd = "service " + service_evil_name + " status"
         cmd = cmd.split()
         service_status = subprocess.call(cmd)
-        self.assertEqual(service_status, 3)
+        # on RHEL6 and older /bin/service returns '1'
+        # on RHEL7 (=systemd) it returns '3'
+        self.assertIn(service_status, (1,3))
 
         # Try to get ..!non_exists">" service from OpenLMI
-        service = self.conn.root.cimv2.LMI_Service.first_instance({"Name": service_evil_name + ".service"})
+        service = self.cim_class.first_instance({"Name": service_evil_name + ".service"})
         self.assertEqual(service, None, "Non None object returned of non-existing service")
 
     def test_restart_service_broker(self):
         """
         Test if is possible to restart broker over OpenLMI
         """
-        service = self.conn.root.cimv2.LMI_Service.first_instance({"Name": BROKER + ".service"})
+        service = self.cim_class.first_instance({"Name": self.cimom + ".service"})
         service.RestartService()
 
         # Wait up to 10 seconds for the CIMOM to start
@@ -240,10 +229,10 @@ class TestServiceProvider(unittest.TestCase):
         while timer > 0:
             time.sleep(1)
             try:
-                service = self.conn.root.cimv2.LMI_Service.first_instance({"Name": BROKER + ".service"})
+                service = self.cim_class.first_instance({"Name": self.cimom + ".service"})
                 if service is not None:
                     break
-            except pywbem.CIMError:
+            except CIMError:
                 pass
             timer -= 1
         self.assertGreater(timer, 0, "Timeout while waiting for the cimom to restart.")
@@ -251,7 +240,7 @@ class TestServiceProvider(unittest.TestCase):
         self.assertTrue (service.Started)
 
         # now try to cumunicate with broker
-        servicecups = self.conn.root.cimv2.LMI_Service.first_instance({"Name": "cups.service"})
+        servicecups = self.cim_class.first_instance({"Name": "cups.service"})
         self.assertNotEqual(servicecups, None)
         servicecups.RestartService()
         servicecups.refresh()
@@ -268,7 +257,7 @@ class TestServiceProvider(unittest.TestCase):
         Cases:
             the "null" service can't be initialized (returned from LMI_Service)
         """
-        service = self.conn.root.cimv2.LMI_Service.first_instance({"Name": "\0"})
+        service = self.cim_class.first_instance({"Name": "\0"})
         self.assertEqual(service, None, "Non None object returned of non-existing service")
 
 
@@ -286,7 +275,7 @@ class TestServiceProvider(unittest.TestCase):
         service_status = subprocess.call("service cups stop".split())
         self.assertEqual(service_status, 0, "Service is not stopped or is in unknown state")
 
-        service = self.conn.root.cimv2.LMI_Service.first_instance({"Name": "cups.service"})
+        service = self.cim_class.first_instance({"Name": "cups.service"})
         self.assertFalse(service_status, "Service is not in stopped state")
 
         # Check that service can't be started by using TryRestartService()
@@ -314,7 +303,7 @@ class TestServiceProvider(unittest.TestCase):
 
         # Try the TryRestartService and check that pid has changed - service
         # war physically restarted
-        service = self.conn.root.cimv2.LMI_Service.first_instance({"Name": "cups.service"})
+        service = self.cim_class.first_instance({"Name": "cups.service"})
         service.TryRestartService()
         self.assertTrue(service.Started, "Try-restarted service NOT running")
 
@@ -341,7 +330,7 @@ class TestServiceProvider(unittest.TestCase):
         service_status = subprocess.call("service cups stop".split())
         self.assertEqual(service_status, 0, "Service is not stopped or is in unknown state")
 
-        service = self.conn.root.cimv2.LMI_Service.first_instance({"Name": "cups.service"})
+        service = self.cim_class.first_instance({"Name": "cups.service"})
         self.assertFalse(service.Started, "Service is not in stopped state")
 
         # Make sure the service is running and try to get status
@@ -370,10 +359,10 @@ class TestServiceProvider(unittest.TestCase):
         self.assertEqual(service_status, 0, "Service is not stopped or is in unknown state")
 
         # Get two instances of the same service and check both statuses are False - not running
-        service = self.conn.root.cimv2.LMI_Service.first_instance({"Name": "cups.service"})
+        service = self.cim_class.first_instance({"Name": "cups.service"})
         self.assertFalse(service.Started, "Service is not in stopped state")
 
-        service2 = self.conn.root.cimv2.LMI_Service.first_instance({"Name": "cups.service"})
+        service2 = self.cim_class.first_instance({"Name": "cups.service"})
         self.assertFalse(service2.Started, "Service is not in stopped state")
 
         # Start up one service instance and check both statuses are True - running
@@ -397,7 +386,7 @@ class TestServiceProvider(unittest.TestCase):
         """
         # Start the service, disable it and check if it's disabled
         # and service is still running
-        service = self.conn.root.cimv2.LMI_Service.first_instance({"Name": "cups.service"})
+        service = self.cim_class.first_instance({"Name": "cups.service"})
         service.StartService()
         service.refresh()
         service.TurnServiceOff()
@@ -429,10 +418,12 @@ class TestServiceProvider(unittest.TestCase):
                          "Service is not stopped after enabled [systemctl]")
 
 
-class TestServiceProviderFailingService(unittest.TestCase):
+class TestServiceProviderFailingService(lmibase.LmiTestCase):
     """
     TestCase class testing LMI_Service functionality against constantly failing service.
     """
+
+    CLASS_NAME = "LMI_Service"
 
     def setUp(self):
         """
@@ -440,8 +431,6 @@ class TestServiceProviderFailingService(unittest.TestCase):
 
         Failing service is copied to systemd and systemctl is reloaded.
         """
-        self.conn = lmishell.connect(HOST, USER, PASSWD)
-        self.assertTrue(isinstance(self.conn, lmishell.LMIConnection), "Couldn't connect to remote provider")
         shutil.copy2(os.path.dirname(os.path.abspath(__file__)) + "/failing.service", "/etc/systemd/system/failing.service")
         subprocess.call ("systemctl daemon-reload".split())
 
@@ -466,7 +455,7 @@ class TestServiceProviderFailingService(unittest.TestCase):
             failing service is not running after TryRestartService
         """
         # Try to start failing service and check OpenLMI knows it failed
-        service = self.conn.root.cimv2.LMI_Service.first_instance({"Name": "failing.service"})
+        service = self.cim_class.first_instance({"Name": "failing.service"})
         service.StartService()
         self.assertFalse (service.Started)
         service_status = subprocess.call("service failing status".split())
@@ -502,7 +491,7 @@ class TestServiceProviderFailingService(unittest.TestCase):
         """
         # Get the failing service instance from LMI_Service, unlink
         # the service from systemd and reload the daemon
-        service = self.conn.root.cimv2.LMI_Service.first_instance({"Name": "failing.service"})
+        service = self.cim_class.first_instance({"Name": "failing.service"})
         os.unlink ("/etc/systemd/system/failing.service")
         subprocess.call ("systemctl daemon-reload".split())
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,11 +20,10 @@
 
 #include <konkret/konkret.h>
 #include "LMI_JournalMessageLog.h"
-
 #include <glib.h>
 #include <systemd/sd-journal.h>
 
-#include "globals.h"
+
 #include "journal.h"
 #include "instutil.h"
 
@@ -228,7 +227,32 @@ KUint32 LMI_JournalMessageLog_PositionToFirstRecord(
 
     KSetStatus(status, OK);
 
-    if ((iter_id = journal_iter_new(NULL, NULL)) == NULL) {
+    if ((iter_id = journal_iter_new(NULL, FALSE, NULL)) == NULL) {
+        KUint32_Set(&result, CIM_MESSAGELOG_ITERATOR_RESULT_FAILED);
+        return result;
+    }
+
+    KString_Set(IterationIdentifier, _cb, iter_id);
+    KUint32_Set(&result, CIM_MESSAGELOG_ITERATOR_RESULT_SUCCESS);
+    g_free(iter_id);
+
+    return result;
+}
+
+KUint32 LMI_JournalMessageLog_PositionToLastRecord(
+    const CMPIBroker* cb,
+    CMPIMethodMI* mi,
+    const CMPIContext* context,
+    const LMI_JournalMessageLogRef* self,
+    KString* IterationIdentifier,
+    CMPIStatus* status)
+{
+    KUint32 result = KUINT32_INIT;
+    gchar *iter_id;
+
+    KSetStatus(status, OK);
+
+    if ((iter_id = journal_iter_new(NULL, TRUE, NULL)) == NULL) {
         KUint32_Set(&result, CIM_MESSAGELOG_ITERATOR_RESULT_FAILED);
         return result;
     }
@@ -393,7 +417,7 @@ KUint32 LMI_JournalMessageLog_CancelIteration(
         return result;
     }
 
-    if (! journal_iter_parse_iterator_string(IterationIdentifier->chars, &iter_id_short, NULL, NULL)) {
+    if (! journal_iter_parse_iterator_string(IterationIdentifier->chars, &iter_id_short, NULL, NULL, NULL)) {
         KSetStatus2(_cb, status, ERR_INVALID_PARAMETER, "Malformed IterationIdentifier argument");
         KUint32_Set(&result, CIM_MESSAGELOG_ITERATOR_RESULT_FAILED);
         return result;

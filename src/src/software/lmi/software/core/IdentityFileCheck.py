@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -952,9 +952,9 @@ def file_check2model(file_check, keys_only=True, model=None, job=None):
 
     if not keys_only:
         model.path.update(  #pylint: disable=E1103
-            {k: None for k in ("Name", "SoftwareElementID",
+            dict((k, None) for k in ("Name", "SoftwareElementID",
             "SoftwareElementState", "TargetOperatingSystem", "Version",
-            "CheckID")})
+            "CheckID")))
 
     model['Name'] = file_check.path
     model['SoftwareElementID'] = file_check.pkg_info.nevra

@@ -1,4 +1,4 @@
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -20,4 +20,4 @@
 Common utilities for OpenLMI python projects.
 """
 
-__version__ = "0.4.1"
+__version__ = "0.5.0"

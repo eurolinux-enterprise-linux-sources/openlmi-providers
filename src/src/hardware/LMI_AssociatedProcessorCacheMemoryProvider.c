@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,8 +21,7 @@
 #include <konkret/konkret.h>
 #include "LMI_AssociatedProcessorCacheMemory.h"
 #include "LMI_Processor.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 #include "lscpu.h"
 #include "sysfs.h"
@@ -40,15 +39,15 @@ static void LMI_AssociatedProcessorCacheMemoryInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_AssociatedProcessorCacheMemoryCleanup( 
+static CMPIStatus LMI_AssociatedProcessorCacheMemoryCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_AssociatedProcessorCacheMemoryEnumInstanceNames( 
+static CMPIStatus LMI_AssociatedProcessorCacheMemoryEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -58,12 +57,12 @@ static CMPIStatus LMI_AssociatedProcessorCacheMemoryEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_AssociatedProcessorCacheMemoryEnumInstances( 
+static CMPIStatus LMI_AssociatedProcessorCacheMemoryEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_AssociatedProcessorCacheMemory lmi_assoc_cache;
     LMI_ProcessorCacheMemoryRef lmi_cpu_cache;
@@ -134,10 +133,10 @@ static CMPIStatus LMI_AssociatedProcessorCacheMemoryEnumInstances(
 
             LMI_ProcessorRef_Init(&lmi_cpu, _cb, ns);
             LMI_ProcessorRef_Set_SystemCreationClassName(&lmi_cpu,
-                    get_system_creation_class_name());
-            LMI_ProcessorRef_Set_SystemName(&lmi_cpu, get_system_name());
+                    lmi_get_system_creation_class_name());
+            LMI_ProcessorRef_Set_SystemName(&lmi_cpu, lmi_get_system_name_safe(cc));
             LMI_ProcessorRef_Set_CreationClassName(&lmi_cpu,
-                    ORGID "_" CPU_CLASS_NAME);
+                    LMI_Processor_ClassName);
             LMI_ProcessorRef_Set_DeviceID(&lmi_cpu, dmi_cpus[i].id);
 
             /* loop caches */
@@ -151,11 +150,11 @@ static CMPIStatus LMI_AssociatedProcessorCacheMemoryEnumInstances(
 
                     LMI_ProcessorCacheMemoryRef_Init(&lmi_cpu_cache, _cb, ns);
                     LMI_ProcessorCacheMemoryRef_Set_SystemCreationClassName(
-                            &lmi_cpu_cache, get_system_creation_class_name());
+                            &lmi_cpu_cache, lmi_get_system_creation_class_name());
                     LMI_ProcessorCacheMemoryRef_Set_SystemName(&lmi_cpu_cache,
-                            get_system_name());
+                            lmi_get_system_name_safe(cc));
                     LMI_ProcessorCacheMemoryRef_Set_CreationClassName(
-                            &lmi_cpu_cache, ORGID "_" CPU_CACHE_CLASS_NAME);
+                            &lmi_cpu_cache, LMI_ProcessorCacheMemory_ClassName);
                     LMI_ProcessorCacheMemoryRef_Set_DeviceID(
                             &lmi_cpu_cache, dmi_cpu_caches[j].id);
 
@@ -215,11 +214,11 @@ static CMPIStatus LMI_AssociatedProcessorCacheMemoryEnumInstances(
 
             LMI_ProcessorCacheMemoryRef_Init(&lmi_cpu_cache, _cb, ns);
             LMI_ProcessorCacheMemoryRef_Set_SystemCreationClassName(
-                    &lmi_cpu_cache, get_system_creation_class_name());
+                    &lmi_cpu_cache, lmi_get_system_creation_class_name());
             LMI_ProcessorCacheMemoryRef_Set_SystemName(&lmi_cpu_cache,
-                    get_system_name());
+                    lmi_get_system_name_safe(cc));
             LMI_ProcessorCacheMemoryRef_Set_CreationClassName(&lmi_cpu_cache,
-                    ORGID "_" CPU_CACHE_CLASS_NAME);
+                    LMI_ProcessorCacheMemory_ClassName);
             LMI_ProcessorCacheMemoryRef_Set_DeviceID(&lmi_cpu_cache,
                     sysfs_cpu_caches[i].id);
 
@@ -228,10 +227,10 @@ static CMPIStatus LMI_AssociatedProcessorCacheMemoryEnumInstances(
 
             LMI_ProcessorRef_Init(&lmi_cpu, _cb, ns);
             LMI_ProcessorRef_Set_SystemCreationClassName(&lmi_cpu,
-                    get_system_creation_class_name());
-            LMI_ProcessorRef_Set_SystemName(&lmi_cpu, get_system_name());
+                    lmi_get_system_creation_class_name());
+            LMI_ProcessorRef_Set_SystemName(&lmi_cpu, lmi_get_system_name_safe(cc));
             LMI_ProcessorRef_Set_CreationClassName(&lmi_cpu,
-                    ORGID "_" CPU_CLASS_NAME);
+                    LMI_Processor_ClassName);
 
             if (dmi_cpus_nb > 0) {
                 LMI_ProcessorRef_Set_DeviceID(&lmi_cpu, dmi_cpus[j].id);
@@ -301,62 +300,62 @@ done:
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_AssociatedProcessorCacheMemoryGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_AssociatedProcessorCacheMemoryGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_AssociatedProcessorCacheMemoryCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_AssociatedProcessorCacheMemoryModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_AssociatedProcessorCacheMemoryCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_AssociatedProcessorCacheMemoryDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_AssociatedProcessorCacheMemoryModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_AssociatedProcessorCacheMemoryDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_AssociatedProcessorCacheMemoryExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_AssociatedProcessorCacheMemoryAssociationCleanup( 
+static CMPIStatus LMI_AssociatedProcessorCacheMemoryAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -624,13 +623,13 @@ CMPIUint16 get_cache_associativity_sysfs(const unsigned ways_of_assoc)
     return 1; /* Other */
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_AssociatedProcessorCacheMemory,
     LMI_AssociatedProcessorCacheMemory,
     _cb,
     LMI_AssociatedProcessorCacheMemoryInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_AssociatedProcessorCacheMemory,
     LMI_AssociatedProcessorCacheMemory,
     _cb,

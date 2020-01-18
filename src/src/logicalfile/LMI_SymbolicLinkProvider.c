@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -65,12 +65,12 @@ static CMPIStatus LMI_SymbolicLinkGetInstance(
     CMPIStatus st = {.rc = CMPI_RC_OK};
     logicalfile_t logicalfile;
 
-    st = lmi_check_required(_cb, cc, cop);
-    check_status(st);
+    st = lmi_check_required_properties(_cb, cc, cop, "CSCreationClassName", "CSName");
+    lmi_return_if_status_not_ok(st);
 
     LMI_SymbolicLink_InitFromObjectPath(&logicalfile.lf.symboliclink, _cb, cop);
     st = stat_logicalfile_and_fill(_cb, &logicalfile, S_IFLNK, "No such symlink: %s");
-    check_status(st);
+    lmi_return_if_status_not_ok(st);
 
     KReturnInstance(cr, logicalfile.lf.symboliclink);
     return st;
@@ -83,7 +83,31 @@ static CMPIStatus LMI_SymbolicLinkCreateInstance(
     const CMPIObjectPath* cop,
     const CMPIInstance* ci)
 {
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+    CMPIStatus st = {.rc = CMPI_RC_OK};
+    CMPIObjectPath *iop = CMGetObjectPath(ci, &st);
+    lmi_return_if_status_not_ok(st);
+    st = lmi_check_required_properties(_cb, cc, iop, "CSCreationClassName", "CSName");
+    lmi_return_if_status_not_ok(st);
+
+    const char *path = lmi_get_string_property_from_instance(ci, "Name");
+    const char *target = lmi_get_string_property_from_instance(ci, "TargetFile");
+
+    bool allow = lmi_read_config_boolean("LMI_SymbolicLink", "AllowSymlink");
+
+    if (allow && symlink(target, path) < 0) {
+        char errmsg[BUFLEN];
+        char strerr[BUFLEN];
+        snprintf(errmsg, BUFLEN, "Can't create symlink: %s pointing to %s (%s)",
+                 path, target,
+                 strerror_r(errno, strerr, BUFLEN));
+        CMReturnWithChars(_cb, CMPI_RC_ERR_FAILED, errmsg);
+    }
+    if (allow == false) {
+        CMReturnWithChars(_cb, CMPI_RC_ERR_FAILED,
+                          "Can't create symlink: disabled by provider configuration");
+    }
+
+    return CMReturnObjectPath(cr, iop);
 }
 
 static CMPIStatus LMI_SymbolicLinkModifyInstance(
@@ -158,4 +182,5 @@ KONKRET_REGISTRATION(
 /* vi: set et: */
 /* Local Variables: */
 /* indent-tabs-mode: nil */
+/* c-basic-offset: 4 */
 /* End: */

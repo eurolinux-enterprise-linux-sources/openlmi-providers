@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,7 +22,6 @@
 #include <konkret/konkret.h>
 #include "LMI_FanSensor.h"
 #include "fan.h"
-#include "globals.h"
 
 static const CMPIBroker* _cb = NULL;
 
@@ -58,7 +57,7 @@ static CMPIStatus LMI_FanSensorEnumInstances(
     const char** properties)
 {
     CMPIStatus status;
-    char buf[200];
+    char buf[BUFLEN];
     struct cim_fan *sptr = NULL;
     struct fanlist *lptr = NULL, *fans = NULL;
     if (enum_all_fans(&fans) != 0 ) {
@@ -72,13 +71,13 @@ static CMPIStatus LMI_FanSensorEnumInstances(
         LMI_FanSensor w;
         LMI_FanSensor_Init(&w, _cb, KNameSpace(cop));
         LMI_FanSensor_Set_CreationClassName(&w, "LMI_FanSensor");
-        LMI_FanSensor_Set_SystemCreationClassName(&w, get_system_creation_class_name());
-        LMI_FanSensor_Set_SystemName(&w, get_system_name());
+        LMI_FanSensor_Set_SystemCreationClassName(&w, lmi_get_system_creation_class_name());
+        LMI_FanSensor_Set_SystemName(&w, lmi_get_system_name_safe(cc));
         LMI_FanSensor_Set_DeviceID(&w, sptr->device_id);
 
         LMI_FanSensor_Set_Caption(&w, "Computer's fan");
         LMI_FanSensor_Set_Description(&w,"Computer's fan.");
-        snprintf(buf, 200, "Fan \"%s\" on chip \"%s\"", sptr->name, sptr->chip_name);
+        snprintf(buf, BUFLEN, "Fan \"%s\" on chip \"%s\"", sptr->name, sptr->chip_name);
         LMI_FanSensor_Set_ElementName(&w, buf);
 
         // ManagedSystemElement
@@ -99,7 +98,7 @@ static CMPIStatus LMI_FanSensorEnumInstances(
                 " Thus the measurement for this channel should not be trusted."
                 : "Fan seems to be functioning correctly.");
         if (sptr->alarm || sptr->alarm_min || sptr->alarm_max) {
-            snprintf(buf, 200, "These alarm flags are set by the fan's chip:"
+            snprintf(buf, BUFLEN, "These alarm flags are set by the fan's chip:"
                      "  alarm=%s, min_alarm=%s, max_alarm=%s",
                      sptr->alarm ? "1":"0",
                      sptr->alarm_min ? "1":"0",
@@ -132,7 +131,7 @@ static CMPIStatus LMI_FanSensorEnumInstances(
         LMI_FanSensor_Set_Caption(&w, "Fan's tachometer");
         LMI_FanSensor_Set_Description(&w,"Associated sensor of fan. Giving information about its speed.");
 
-        snprintf(buf, 200, "Tachometer of fan \"%s\" on chip \"%s\"", sptr->name, sptr->chip_name);
+        snprintf(buf, BUFLEN, "Tachometer of fan \"%s\" on chip \"%s\"", sptr->name, sptr->chip_name);
         LMI_FanSensor_Set_ElementName(&w, buf);
 
         // Sensor

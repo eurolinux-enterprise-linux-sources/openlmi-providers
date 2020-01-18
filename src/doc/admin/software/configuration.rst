@@ -3,7 +3,7 @@ Configuration
 There are various options affecting behaviour of *OpenLMI Software* provider.
 All of them can be fine-tuned using two configuration files. The main one is
 located at: ::
-    
+
     /etc/openlmi/software/software.conf
 
 The other one is a global configuration file for all providers in *OpenLMI*
@@ -78,7 +78,7 @@ Options related to the use of *YUM* API and its configuration.
 
     ``[Yum] Level`` : defaults to ``ERROR``
         Can be set to one of the following:
-        
+
             * ``CRITICAL``
             * ``ERROR``
             * ``WARNING``
@@ -135,7 +135,7 @@ logging configuration needs to be configured extra.
         This is an absolute or relative path to a file, where the logging
         will be done. Without this option set, logging of ``YumWorker`` is
         disabled (assuming the ``[YumWorkerLog] FileConfig`` option is also
-        unset). 
+        unset).
 
     ``[YumWorkerLog] Level`` : defaults to ``DEBUG``
         This has generally the same meaning as ``Level`` in previous section

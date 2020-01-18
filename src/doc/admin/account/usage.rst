@@ -20,6 +20,9 @@ from following classes:
 
 Some common use cases are described in the following parts
 
+.. note::
+    Examples are written for ``lmishell`` version ``0.9``.
+
 List users
 ----------
 List of users are provided by :ref:`LMI_Account <LMI-Account>`. Each one object
@@ -55,13 +58,16 @@ by :ref:`LMI_AssignedAccountIdentity <LMI-AssignedAccountIdentity>` with
 
     # Get users from root group
     # 1) Get root group object
-    root_group = c.root.cimv2.LMI_Group.first_instance({"Name": "root")
+    root_group = c.root.cimv2.LMI_Group.first_instance({"Name": "root"})
     # 2) Get LMI_Identity objects associated with root group
-    identities = root_group.associators(ResultClass="LMI_Identity", AssocClass="LMI_MemberOfGroup")
+    identities = root_group.associators(
+         AssocClass="LMI_MemberOfGroup", ResultClass="LMI_Identity")
     # 3) go through all identites, get LMI_Account associated with identity and print user name
     # Note: associators returns a list, but there is just one LMI_Account
     for i in identities:
-        print i.first_associator(ResultClass="LMI_Account").Name
+        print i.first_associator(
+                AssocClass="LMI_AssignedAccountIdentity",
+                ResultClass="LMI_Account").Name
 
 Create user
 -----------
@@ -140,13 +146,15 @@ to :ref:`LMI_Group <LMI-Group>` and :ref:`LMI_Identity <LMI-Identity>`::
 
     # We will add root user to pegasus group
     # get group pegasus
-    grp = c.root.cimv2.LMI_Group.first_instance({"Name": "pegasus"})
+    grp = c.root.cimv2.LMI_Group.first_instance_name({"Name": "pegasus"})
     # get user root
     acc = c.root.cimv2.LMI_Account.first_instance({"Name": "root"})
     # get identity of root user
-    identity = acc.first_associator(ResultClass="LMI_Identity")
+    identity = acc.first_associator_name(
+            AssocClass='LMI_AssignedAccountIdentity',
+            ResultClass="LMI_Identity")
     # create instance of LMI_MemberOfGroup with the above references
-    c.root.cimv2.LMI_MemberOfGroup.create_instance({"Member":identity.path, "Collection":grp.path})
+    c.root.cimv2.LMI_MemberOfGroup.create_instance({"Member":identity, "Collection":grp})
 
 Remove user from group
 ----------------------
@@ -155,14 +163,16 @@ on the desired :ref:`LMI_MemberOfGroup <LMI-MemberOfGroup>` object::
 
     # We will remove root user from pegasus group
     # get group pegasus
-    grp = c.root.cimv2.LMI_Group.first_instance({"Name": "pegasus"})
+    grp = c.root.cimv2.LMI_Group.first_instance_name({"Name": "pegasus"})
     # get user root
     acc = c.root.cimv2.LMI_Account.first_instance({"Name": "root"})
     # get identity of root user
-    identity = acc.associators(ResultClass="LMI_Identity")[0]
+    identity = acc.first_associator(
+            AssocClass="LMI_AssignedAccountIdentity",
+            ResultClass="LMI_Identity")
     # iterate through all LMI_MemberOfGroup associated with identity and remove the one with our group
     for mog in identity.references(ResultClass="LMI_MemberOfGroup"):
-        if mog.Collection == grp.path:
+        if mog.Collection == grp:
             mog.delete()
 
 Modify user
@@ -184,7 +194,7 @@ OpenLMI Account supports the following indications:
 
 * :ref:`LMI_AccountInstanceDeletionIndication <LMI-AccountInstanceDeletionIndication>`
 
-Both indications works only on the following classes:
+Both indications work only on the following classes:
 
 * :ref:`LMI_Account <LMI-Account>`
 
@@ -192,7 +202,7 @@ Both indications works only on the following classes:
 
 * :ref:`LMI_Identity <LMI-Identity>`
 
-See more below.
+Please see `LMIShell Indications API reference <http://pythonhosted.org/openlmi-tools/shell/indications.html>`_ for an overview how indications work.
 
 Creation Indication
 ^^^^^^^^^^^^^^^^^^^
@@ -200,22 +210,14 @@ Client can be notified when instance of class has been created. It is done with
 :ref:`LMI_AccountInstanceCreationIndication <LMI-AccountInstanceCreationIndication>`. The indication filter query must be in the following form:
 ``SELECT * FROM LMI_AccountInstanceCreationIndication WHERE SOURCEINSTANCE ISA class_name``, where ``class_name`` is one of the allowed classes.
 
-The following example creates filter, handler and subscription (lmi shell do it in one step), which will notify client when user is created:
+The following example creates filter, handler and subscription (lmi shell does that in one step), which will notify client when user is created:
 
 ::
 
     # Notify when a user is created
     c.subscribe_indication(
-        FilterCreationClassName="CIM_IndicationFilter",
-        FilterSystemCreationClassName="CIM_ComputerSystem",
-        FilterSourceNamespace="root/cimv2",
-        QueryLanguage="DMTF:CQL",
-        Query='SELECT * FROM LMI_AccountInstanceCreationIndication WHERE SOURCEINSTANCE ISA LMI_Account',
         Name="account_creation",
-        CreationNamespace="root/interop",
-        SubscriptionCreationClassName="CIM_IndicationSubscription",
-        HandlerCreationClassName="CIM_IndicationHandlerCIMXML",
-        HandlerSystemCreationClassName="CIM_ComputerSystem",
+        Query='SELECT * FROM LMI_AccountInstanceCreationIndication WHERE SOURCEINSTANCE ISA LMI_Account',
         Destination="http://192.168.122.1:5988" # this is the destination computer, where all the indications will be delivered
     )
 
@@ -228,18 +230,52 @@ Client can be notified when instance is deleted. The same rules like in `Creatio
 
     # Notify when a user is deleted
     c.subscribe_indication(
-        FilterCreationClassName="CIM_IndicationFilter",
-        FilterSystemCreationClassName="CIM_ComputerSystem",
-        FilterSourceNamespace="root/cimv2",
-        QueryLanguage="DMTF:CQL",
-        Query='SELECT * FROM LMI_AccountInstanceDeletionIndication WHERE SOURCEINSTANCE ISA LMI_Account',
         Name="account_deletion",
-        CreationNamespace="root/interop",
-        SubscriptionCreationClassName="CIM_IndicationSubscription",
-        HandlerCreationClassName="CIM_IndicationHandlerCIMXML",
-        HandlerSystemCreationClassName="CIM_ComputerSystem",
+        Query='SELECT * FROM LMI_AccountInstanceDeletionIndication WHERE SOURCEINSTANCE ISA LMI_Account',
         Destination="http://192.168.122.1:5988" # this is the destination computer, where all the indications will be delivered
     )
 
 .. note::
-   Both indications uses indication manager and polling.
+   Both indications use the indication manager and polling.
+
+Creation Indication example
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The following code snippet illustrates usage of indication listener and subscription. It is a complete minimal example of user creation. Once a new account is added, simple informational message is printed on the standard output.
+
+::
+
+    #!/usr/bin/lmishell
+    
+    from lmi.shell import LMIIndicationListener
+    import socket
+    import time
+    import random
+    
+    def ind_handler(indication, **kwargs):
+        print "User '%s' added" % indication["SourceInstance"]["Name"]
+    
+    c = connect("localhost", "pegasus", "test")
+    
+    indication_port = random.randint(12000, 13000)
+    listener = LMIIndicationListener("0.0.0.0", indication_port)
+    uniquename = listener.add_handler("account_watch-XXXXXXXX", ind_handler)
+    listener.start()
+    
+    c.subscribe_indication(
+        Name=uniquename,
+        Query="select * from LMI_AccountInstanceCreationIndication where SourceInstance isa LMI_Account",
+        Destination="http://%s:%d" % (socket.gethostname(), indication_port)
+    )
+    
+    try:
+        while True:
+            time.sleep(0.1)
+            pass
+    
+    except KeyboardInterrupt:
+        pass
+    
+    c.unsubscribe_indication(uniquename)
+
+.. note::
+   Press Ctrl+C to terminate the script. Also, remember to change the login credentials! The example picks a random port in the 12000 - 13000 range, no check for port occupancy is made, a conflict on a busy system is possible.

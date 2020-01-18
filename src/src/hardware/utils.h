@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,12 +26,13 @@
 #include <string.h>
 #include <errno.h>
 #include <stdarg.h>
-#include "globals.h"
 
-#define LONG_INT_LEN 21     /* 64 bit unsigned int can has 20 decimals + \0 */
+#include "openlmi.h"
 
-#define WHITESPACES " \f\n\r\t\v"
+#define LONG_INT_LEN 21     /* 64 bit unsigned int can have 20 decimals + \0 */
 
+const char *provider_name;
+const ConfigEntry *provider_config_defaults;
 
 /*
  * Read given file pointer and save it's output in buffer. Number of lines read
@@ -61,7 +62,8 @@ void free_2d_buffer(char ***buffer, unsigned *buffer_size);
  * @param command to be run
  * @param buffer
  * @param buffer_size number of lines in buffer
- * @return 0 if success, negative value otherwise
+ * @return negative value if problem occurred. In this case, buffer is freed.
+ *          0 and positive value represent return code of command.
  */
 short run_command(const char *command, char ***buffer, unsigned *buffer_size);
 
@@ -120,5 +122,15 @@ short explode(const char *str, const char *delims, char ***buffer, unsigned *buf
  */
 char *append_str(char *str, ...);
 
+/*
+ * Return part of the string following string in after param and ending before
+ * string in until param.
+ * @param str input string
+ * @param after left boundary of returned string
+ * @param until right boundary of returned string
+ * @return trimmed string allocated with malloc or NULL if allocation failed
+ *      or string wasn't found
+ */
+char *get_part_of_string_between(const char *str, const char *after, const char *until);
 
 #endif /* UTILS_H_ */

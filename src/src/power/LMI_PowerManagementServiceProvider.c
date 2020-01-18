@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,9 +19,7 @@
  */
 
 #include "LMI_PowerManagementService.h"
-
 #include "power.h"
-#include "globals.h"
 
 static const CMPIBroker* _cb = NULL;
 
@@ -69,9 +67,9 @@ static CMPIStatus LMI_PowerManagementServiceEnumInstances(
 
     LMI_PowerManagementService_Init(&w, _cb, KNameSpace(cop));
     LMI_PowerManagementService_Set_CreationClassName(&w, "LMI_PowerManagementService");
-    LMI_PowerManagementService_Set_Name(&w, get_system_name());
-    LMI_PowerManagementService_Set_SystemCreationClassName(&w, get_system_creation_class_name());
-    LMI_PowerManagementService_Set_SystemName(&w, get_system_name());
+    LMI_PowerManagementService_Set_Name(&w, lmi_get_system_name_safe(cc));
+    LMI_PowerManagementService_Set_SystemCreationClassName(&w, lmi_get_system_creation_class_name());
+    LMI_PowerManagementService_Set_SystemName(&w, lmi_get_system_name_safe(cc));
 
     /* EnabledState is an integer enumeration that indicates the enabled
      * and disabled states of an element. It can also indicate the transitions

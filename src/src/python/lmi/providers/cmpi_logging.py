@@ -1,6 +1,6 @@
 # -*- Coding:utf-8 -*-
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -94,7 +94,7 @@ class CMPILogHandler(logging.Handler):
 
     def __init__(self, cmpi_logger, *args, **kwargs):
         self.cmpi_logger = cmpi_logger
-        super(CMPILogHandler, self).__init__(*args, **kwargs)
+        logging.Handler.__init__(self, *args, **kwargs)
 
     def emit(self, record):
         msg = self.format(record)

@@ -1,6 +1,6 @@
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -18,3 +18,31 @@
 #
 # Authors: Michal Minar <miminar@redhat.com>
 #
+
+# hack to use lmi.test.unittest as common module for unittest or unittest2,
+# based on python version
+import sys
+if sys.version_info[0] > 2 or sys.version_info[1] > 6:
+    import unittest
+else:
+    import unittest2 as unittest
+
+# If lmiwbem is not available, fallback to pywbem.
+try:
+    import lmiwbem as wbem
+except ImportError:
+    import pywbem as wbem
+
+# Ensure that CIMError is defined.
+# Two possible cases:
+#   1. We use newer lmi.shell on top of lmiwbem that exports its own CIMError.
+#   2. We use older lmi.shell without its own CIMError.
+try:
+    # Prefer LMIShell's abstraction.
+    from lmi.shell.LMIExceptions import CIMError
+except ImportError:
+    # Fallback to wbem's CIMError
+    try:
+        from lmiwbem import CIMError
+    except ImportError:
+        from pywbem import CIMError

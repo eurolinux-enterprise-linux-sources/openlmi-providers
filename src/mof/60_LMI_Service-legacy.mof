@@ -1,0 +1,71 @@
+/*
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Authors: Vitezslav Crhonek <vcrhonek@redhat.com>
+ */
+
+[ Version("0.2.0"),
+  Description("Class representing Linux Service"),
+  Provider("cmpi:cmpiLMI_Service") ]
+class LMI_Service: CIM_Service
+{
+    [ Override("StartService"),
+      Description("Start (activate) the service.") ]
+    uint32 StartService();
+
+    [ Override("StopService"),
+      Description("Stop (deactivate) the service.") ]
+    uint32 StopService();
+
+    [ Description("Reload configuration of the service.") ]
+    uint32 ReloadService();
+
+    [ Description("Restart the service. If the service is "
+                  "not running yet, it will be started.") ]
+    uint32 RestartService();
+
+    [ Description("Restart the service if the service is running. "
+                  "This does nothing if the service is not running.") ]
+    uint32 TryRestartService();
+
+    [ Description("Equivalent to the TryRestartService() method.") ]
+    uint32 CondRestartService();
+
+    [ Description("Reload the service if it supports it. If not, "
+                  "restart the service instead. If the service is not "
+                  "running yet, it will be started.") ]
+    uint32 ReloadOrRestartService();
+
+    [ Description("Reload the service if it supports it. If not, "
+                  "restart the service instead. This does nothing if "
+                  "the service is not running.") ]
+    uint32 ReloadOrTryRestartService();
+
+    [ Description("Enable the service persistently. The service will start "
+                  "on the next boot of the system. Note that this method "
+                  "does not have the effect of also starting the service "
+                  "being enabled. If this is desired, a separate StartService "
+                  "method call must be invoked for the service.") ]
+    uint32 TurnServiceOn();
+
+    [ Description("Disable the service. The service will not start on the "
+                  "next boot of the system. Note that this method does not "
+                  "implicitly stop the service that is being disabled. If "
+                  "this is desired, an additional StopService method call "
+                  "command should be executed afterwards.") ]
+    uint32 TurnServiceOff();
+};

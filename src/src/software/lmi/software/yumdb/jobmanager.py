@@ -1,6 +1,6 @@
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -58,13 +58,16 @@ def job_handler(job_from_target=True):
     """
     Decorator for JobManager methods serving as handlers for control jobs.
 
+    If job_from_target is True, 'job' MUST be the first parameter of decorated
+    method!
+
     Decorator locks the :py:attr:`JobManager._job_lock` of manager's instance.
     """
     def _wrapper_jft(method):
         """
-        It consumes "target" keyword argument (which is job's id) and makes
-        it an instance of YumJob. The method is then called with "job" argument
-        instead of "target".
+        It consumes "job" keyword argument (which is job's id) and makes
+        it an instance of YumJob. The method is then called with the instance
+        of YumJob instead of job id.
         """
         logged = cmpi_logging.trace_method(method, frame_level=2)
 
@@ -72,15 +75,20 @@ def job_handler(job_from_target=True):
         def _new_func(self, *args, **kwargs):
             """Wrapper around method."""
             if 'target' in kwargs:
-                kwargs['job'] = kwargs.pop('target')
-            callargs = inspect.getcallargs(method, self, *args, **kwargs)
-            target = callargs.pop('job')
+                target = kwargs.pop('target')
+            elif 'job' in kwargs:
+                target = kwargs.pop('job')
+            else:
+                # 'job' is not in kwargs, it _must_ be in args then
+                assert len(args) > 0
+                target = args[0]
+                args = args[1:]
+
             with self._job_lock:
                 if not target in self._async_jobs:
                     raise errors.JobNotFound(target)
                 job = self._async_jobs[target]
-                callargs['job'] = job
-                return logged(**callargs)
+                return logged(self, job, *args, **kwargs)
         return _new_func
 
     def _simple_wrapper(method):
@@ -168,7 +176,7 @@ class JobIndicationSender(object):
         :param list indication_ids: Can be even single id.
         """
         if isinstance(indication_ids, basestring):
-            indication_ids = set([indication_ids])
+            indication_ids = set((indication_ids,))
         self._indications = set(indication_ids)
 
     @cmpi_logging.trace_method
@@ -177,7 +185,7 @@ class JobIndicationSender(object):
         Add filter IDs.
         """
         if isinstance(indication_ids, basestring):
-            indication_ids = set([indication_ids])
+            indication_ids = set((indication_ids,))
         self._indications.update(indication_ids)
 
     @cmpi_logging.trace_method

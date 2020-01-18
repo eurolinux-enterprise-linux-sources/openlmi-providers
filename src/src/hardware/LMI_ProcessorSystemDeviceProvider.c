@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_ProcessorSystemDevice.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 static const CMPIBroker* _cb;
@@ -31,15 +30,15 @@ static void LMI_ProcessorSystemDeviceInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_ProcessorSystemDeviceCleanup( 
+static CMPIStatus LMI_ProcessorSystemDeviceCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_ProcessorSystemDeviceEnumInstanceNames( 
+static CMPIStatus LMI_ProcessorSystemDeviceEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -49,12 +48,12 @@ static CMPIStatus LMI_ProcessorSystemDeviceEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_ProcessorSystemDeviceEnumInstances( 
+static CMPIStatus LMI_ProcessorSystemDeviceEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_ProcessorSystemDevice lmi_cpu_sys_device;
     LMI_ProcessorRef lmi_cpu;
@@ -72,14 +71,14 @@ static CMPIStatus LMI_ProcessorSystemDeviceEnumInstances(
 
         LMI_ProcessorRef_Init(&lmi_cpu, _cb, ns);
         LMI_ProcessorRef_Set_SystemCreationClassName(&lmi_cpu,
-                get_system_creation_class_name());
-        LMI_ProcessorRef_Set_SystemName(&lmi_cpu, get_system_name());
+                lmi_get_system_creation_class_name());
+        LMI_ProcessorRef_Set_SystemName(&lmi_cpu, lmi_get_system_name_safe(cc));
         LMI_ProcessorRef_Set_CreationClassName(&lmi_cpu,
-                ORGID "_" CPU_CLASS_NAME);
+                LMI_Processor_ClassName);
         LMI_ProcessorRef_Set_DeviceID(&lmi_cpu, dmi_cpus[i].id);
 
         LMI_ProcessorSystemDevice_SetObjectPath_GroupComponent(
-                &lmi_cpu_sys_device, lmi_get_computer_system());
+                &lmi_cpu_sys_device, lmi_get_computer_system_safe(cc));
         LMI_ProcessorSystemDevice_Set_PartComponent(&lmi_cpu_sys_device,
                 &lmi_cpu);
 
@@ -92,62 +91,62 @@ done:
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_ProcessorSystemDeviceGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_ProcessorSystemDeviceGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_ProcessorSystemDeviceCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_ProcessorSystemDeviceModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_ProcessorSystemDeviceCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_ProcessorSystemDeviceDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_ProcessorSystemDeviceModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_ProcessorSystemDeviceDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_ProcessorSystemDeviceExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_ProcessorSystemDeviceAssociationCleanup( 
+static CMPIStatus LMI_ProcessorSystemDeviceAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -240,13 +239,13 @@ static CMPIStatus LMI_ProcessorSystemDeviceReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_ProcessorSystemDevice,
     LMI_ProcessorSystemDevice,
     _cb,
     LMI_ProcessorSystemDeviceInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_ProcessorSystemDevice,
     LMI_ProcessorSystemDevice,
     _cb,

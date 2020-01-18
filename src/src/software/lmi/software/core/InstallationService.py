@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -34,7 +34,7 @@ from lmi.software.core import SystemCollection
 from lmi.software.yumdb import errors
 from lmi.software.yumdb import YumDB
 
-JOB_METHOD_SRC_PARAM_NAMES = ["URI", "Source", "Image", "Source"]
+JOB_METHOD_SRC_PARAM_NAMES = ["Source", "URI", "Image", "Source"]
 
 LOG = cmpi_logging.get_logger(__name__)
 
@@ -175,13 +175,13 @@ class Values(object):
                 13 : "ScheduleInstallAt",
             }
 
-        InstallOptions.supported = {
+        InstallOptions.supported = set((
             InstallOptions.Install,
             InstallOptions.Update,
             InstallOptions.Uninstall,
             InstallOptions.Force_installation,
             InstallOptions.Repair,
-        }
+        ))
 
 
     class CheckSoftwareIdentity(object):
@@ -672,6 +672,13 @@ def _install_or_remove_check_params(
     supported_options = values.InstallOptions.supported.copy()
     if method == Job.JOB_METHOD_INSTALL_FROM_URI:
         supported_options.remove(values.InstallOptions.Uninstall)
+        if not isinstance(source, basestring):
+            raise InstallationError(values.Unspecified_Error,
+                "Expected URI string as an URI parameter.")
+    else:
+        if not isinstance(source, pywbem.CIMInstanceName):
+            raise InstallationError(values.Unspecified_Error,
+                "Expected CIM object path as a Source parameter.")
 
     if not source:
         raise InstallationError(values.Unspecified_Error,
@@ -681,7 +688,7 @@ def _install_or_remove_check_params(
     elif not isinstance(install_options, list):
         raise InstallationError(values.Unspecified_Error,
                 "InstallOptions must be a list of uint16 values.")
-    options = {p for p in install_options}
+    options = set(p for p in install_options)
 
     if options - supported_options:
         raise InstallationError(values.Unspecified_Error,
@@ -700,10 +707,10 @@ def _install_or_remove_check_params(
                         "install option \"%s\" can not have any"
                         " associated value: %s" % (opt, val))
     _check_target_and_collection(env, method, target, collection)
-    exclusive = [opt for opt in options if opt in {
+    exclusive = [opt for opt in options if opt in (
         values.InstallOptions.Install,
         values.InstallOptions.Update,
-        values.InstallOptions.Uninstall }]
+        values.InstallOptions.Uninstall )]
     if len(exclusive) > 1:
         raise InstallationError(values.Unspecified_Error,
             "specified more than one mutually exclusive option at once: {%s}" %

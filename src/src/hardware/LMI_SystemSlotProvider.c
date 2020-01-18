@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_SystemSlot.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 CMPIUint16 get_connectorlayout_slot(const char *dmi_val);
@@ -62,7 +61,7 @@ static CMPIStatus LMI_SystemSlotEnumInstances(
     LMI_SystemSlot lmi_slot;
     const char *ns = KNameSpace(cop);
     CMPIUint16 conn_layout, maxlinkwidth;
-    char instance_id[INSTANCE_ID_LEN];
+    char instance_id[BUFLEN];
     unsigned i;
     DmiSystemSlot *dmi_slots = NULL;
     unsigned dmi_slots_nb = 0;
@@ -75,15 +74,15 @@ static CMPIStatus LMI_SystemSlotEnumInstances(
         LMI_SystemSlot_Init(&lmi_slot, _cb, ns);
 
         LMI_SystemSlot_Set_CreationClassName(&lmi_slot,
-                ORGID "_" SYSTEM_SLOT_CLASS_NAME);
+                LMI_SystemSlot_ClassName);
         LMI_SystemSlot_Set_Caption(&lmi_slot, "System Slot");
         LMI_SystemSlot_Set_Description(&lmi_slot,
                 "This object represents one system slot.");
         LMI_SystemSlot_Set_ConnectorGender(&lmi_slot,
                 LMI_SystemSlot_ConnectorGender_Female);
 
-        snprintf(instance_id, INSTANCE_ID_LEN,
-                ORGID ":" ORGID "_" SYSTEM_SLOT_CLASS_NAME ":%s",
+        snprintf(instance_id, BUFLEN,
+                LMI_ORGID ":" LMI_SystemSlot_ClassName ":%s",
                 dmi_slots[i].name);
         conn_layout = get_connectorlayout_slot(dmi_slots[i].type);
         maxlinkwidth = get_maxlinkwidth(dmi_slots[i].link_width);

@@ -1,0 +1,79 @@
+fullname: OpenLMI
+description: OpenLMI assistant will help you create an OpenLMI provider and install necessary dependencies.
+
+dependencies:
+- use: super.dependencies
+- rpm: ['gcc', 'glibc-devel', 'openlmi-providers-devel', 'openlmi-indicationmanager-libs-devel', 'python-sphinx-theme-openlmi', 'cmake', 'sblim-cmpi-devel', 'konkretcmpi-devel']
+
+dependencies_eclipse:
+- use: eclipse.dependencies_c
+
+dependencies_vim:
+- use: vim.dependencies
+
+args:
+#   name:
+#     use: common_args
+
+  vim:
+    use: vim
+
+  eclipse:
+    use: eclipse
+
+  github:
+    use: common_args
+
+files:
+  csources: &csources
+    source: .
+
+run:
+- $dirname~: $(dirname "$name")
+- $basename~: $(basename "$name")
+- $lbasename~: $(basename "$name" | tr '[A-Z]' '[a-z]')
+- log_i: "Project name will be converted to lowercase letters ($lbasename)"
+- $lowername: $dirname/$lbasename
+- if not $(ls "$lowername"):
+  - log_i: 'Copying c source tree to project destination'
+  - cl_i: mkdir -p "$lowername"
+  - dda_c: "$lowername"
+  - jinja_render_dir:
+      template: *csources
+      destination: "$lowername"
+      data:
+        PROJECT_NAME: $basename
+  - cl: cd "$lowername"
+  - cl: chmod a+x src/cmpiLMI_{{PROJECT_NAME}}-cimprovagt
+  - cl: for j in `find -name '*{{PROJECT_NAME}}*'`; do mv "$j" "`echo $j | sed 's/{{PROJECT_NAME}}/$basename/'`"; done
+  - use: git_init_add_commit.run
+- else:
+  - cl: cd "$lowername"
+  - log_i: 'Project already exists'
+
+- log_i: 'Running cmake'
+- cl_i: mkdir -p build
+- cl_i: cd build
+- cl_i: cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_VERBOSE_MAKEFILE=0
+- cl_i: make clean
+- log_i: 'Compiling sources'
+- cl_i: make
+- cl_i: cd ..
+- if defined $vim:
+  - use: vim.run
+- if $eclipse:
+  - use: eclipse.run_c
+- if defined $github:
+  - log_i: "Push to GitHub repository"
+  - github: create_and_push
+
+- log_i: 'OpenLMI provider sources have been generated, remember it''s just a skeleton'
+- log_i: 'that should be filled in order to make the provider usable. Specifically classes'
+- log_i: 'in MOF files and corresponding code in the generated skeleton.'
+- log_i: ''
+- log_i: 'Have a look at http://www.openlmi.org/development website for further instructions'
+- log_i: 'and examples.'
+- log_i: ''
+- log_i: 'To install the sources, run "make install" in the build directory. Provider'
+- log_i: 'registration is need to be done as a next step, have a look at "make help" and'
+- log_i: 'related "register-XXX" and "unregister-XXX" make targets.'

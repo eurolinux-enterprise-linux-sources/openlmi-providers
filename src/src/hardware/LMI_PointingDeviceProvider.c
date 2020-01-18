@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_PointingDevice.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 CMPIUint16 get_pointingtype(const char *dmi_val);
@@ -60,7 +59,7 @@ static CMPIStatus LMI_PointingDeviceEnumInstances(
 {
     LMI_PointingDevice lmi_dev;
     const char *ns = KNameSpace(cop);
-    char instance_id[INSTANCE_ID_LEN];
+    char instance_id[BUFLEN];
     unsigned i;
     DmiPointingDevice *dmi_dev = NULL;
     unsigned dmi_dev_nb = 0;
@@ -73,16 +72,16 @@ static CMPIStatus LMI_PointingDeviceEnumInstances(
         LMI_PointingDevice_Init(&lmi_dev, _cb, ns);
 
         LMI_PointingDevice_Set_SystemCreationClassName(&lmi_dev,
-                get_system_creation_class_name());
-        LMI_PointingDevice_Set_SystemName(&lmi_dev, get_system_name());
+                lmi_get_system_creation_class_name());
+        LMI_PointingDevice_Set_SystemName(&lmi_dev, lmi_get_system_name_safe(cc));
         LMI_PointingDevice_Set_CreationClassName(&lmi_dev,
-                ORGID "_" POINTING_DEVICE_CLASS_NAME);
+                LMI_PointingDevice_ClassName);
         LMI_PointingDevice_Set_Caption(&lmi_dev, "Pointing Device");
         LMI_PointingDevice_Set_Description(&lmi_dev,
                 "This object represents one pointing device.");
 
-        snprintf(instance_id, INSTANCE_ID_LEN,
-                ORGID ":" ORGID "_" POINTING_DEVICE_CLASS_NAME ":%s",
+        snprintf(instance_id, BUFLEN,
+                LMI_ORGID ":" LMI_PointingDevice_ClassName ":%s",
                 dmi_dev[i].type);
 
         LMI_PointingDevice_Set_DeviceID(&lmi_dev, dmi_dev[i].type);

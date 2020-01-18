@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -23,12 +23,13 @@ Unit tests for ``LMI_SoftwareIdentityChecks`` provider.
 """
 
 import os
-import pywbem
-import subprocess
-import unittest
 
+from lmi.test import unittest
+from lmi.test import wbem
 from lmi.test.lmibase import enable_lmi_exceptions
+
 import package
+import reposetup
 import swbase
 import util
 
@@ -97,7 +98,7 @@ class TestSoftwareIdentityChecks(swbase.SwTestCase):
         """
         pkg = self.get_repo('stable')['pkg1']
         objpath = self.make_op(pkg, '/not-installed-file')
-        self.assertRaisesCIM(pywbem.CIM_ERR_NOT_FOUND, objpath.to_instance)
+        self.assertRaisesCIM(wbem.CIM_ERR_NOT_FOUND, objpath.to_instance)
 
     @enable_lmi_exceptions
     def test_enum_instance_names(self):
@@ -105,7 +106,7 @@ class TestSoftwareIdentityChecks(swbase.SwTestCase):
         Test ``EnumInstanceNames()`` call on ``LMI_SoftwareIdentityChecks``.
         Should not be supported.
         """
-        self.assertRaisesCIM(pywbem.CIM_ERR_NOT_SUPPORTED,
+        self.assertRaisesCIM(wbem.CIM_ERR_NOT_SUPPORTED,
                 self.cim_class.instance_names)
 
     @swbase.test_with_packages('stable#pkg3')
@@ -126,6 +127,39 @@ class TestSoftwareIdentityChecks(swbase.SwTestCase):
                 ResultClass="LMI_SoftwareIdentityFileCheck")
         self.assertEqual(len(refs), len(pkg))
         self.assertEqual(len(refs), 10, "there are 10 files in %s" % pkg.name)
+        pkg_names = set(pkg.files)
+        for ref in refs:
+            self.assertIn(ref.Name, set(r.Name for r in refs))
+            self.assertEqual(sorted(ref.path.key_properties()),
+                ["CheckID", "Name", "SoftwareElementID",
+                    "SoftwareElementState",
+                    "TargetOperatingSystem", "Version"])
+            self.assertEqual(ref.SoftwareElementID, pkg.nevra)
+            self.assertIn(ref.Name, pkg_names)
+            self.assertEqual(ref.FailedFlags, [],
+                    "FailedFlags are empty for unmodified file %s:%s"
+                    % (pkg, filepath))
+            pkg_names.remove(ref.Name)
+        self.assertEqual(len(pkg_names), 0)
+
+    @swbase.test_with_packages('misc#unicode-chars')
+    def test_package_file_checks_unicode(self):
+        """
+        Try to get file checks associated with package. With utf-8 characters.
+        """
+        pkg = self.get_repo('misc')['unicode-chars']
+        filepath = '/usr/share/openlmi-sw-test-unicode-chars'
+        objpath = self.make_op(pkg, filepath)
+        inst = objpath.Element.to_instance()
+        self.assertNotEqual(inst, None,
+                "get instance on %s:%s succeeds" % (pkg, filepath))
+        refs = inst.associators(
+                AssocClass=self.CLASS_NAME,
+                Role="Element",
+                ResultRole="Check",
+                ResultClass="LMI_SoftwareIdentityFileCheck")
+        self.assertEqual(len(refs), len(pkg))
+        self.assertEqual(len(refs), 2, "there are 2 files in %s" % pkg.name)
         pkg_names = set(pkg.files)
         for ref in refs:
             self.assertIn(ref.Name, set(r.Name for r in refs))
@@ -170,7 +204,7 @@ class TestSoftwareIdentityChecks(swbase.SwTestCase):
     @swbase.test_with_packages('stable#pkg3')
     def test_file_check_package(self):
         """
-        Try to get package assocatied to file check.
+        Try to get package associated to file check.
         """
         pkg = self.get_repo('stable')['pkg3']
         filepath = '/usr/share/openlmi-sw-test-pkg3/README'
@@ -191,6 +225,38 @@ class TestSoftwareIdentityChecks(swbase.SwTestCase):
 
         # try with removed file
         os.remove(filepath)
+        refs = objpath.Check.to_instance().associators(
+                AssocClass=self.CLASS_NAME,
+                Role="Check",
+                ResultRole="Element",
+                ResultClass="LMI_SoftwareIdentity")
+        self.assertEqual(len(refs), 1)
+
+    @swbase.test_with_packages('misc#unicode-chars')
+    def test_file_check_package_unicode(self):
+        """
+        Try to get package associated to file check.
+        """
+        pkg = self.get_repo('misc')['unicode-chars']
+        filepath = os.path.join('/usr/share/openlmi-sw-test-unicode-chars',
+                reposetup.UTF8_TEST_FILE_NAME)
+        objpath = self.make_op(pkg, filepath)
+        inst = objpath.Check.to_instance()
+        self.assertNotEqual(inst, None,
+                "get instance for %s:%s succeeds" % (pkg, filepath))
+        refs = inst.associators(
+                AssocClass=self.CLASS_NAME,
+                Role="Check",
+                ResultRole="Element",
+                ResultClass="LMI_SoftwareIdentity")
+        self.assertEqual(len(refs), 1)
+        ref = refs[0]
+        self.assertCIMNameEqual(ref.path, objpath.Element)
+        self.assertEqual(ref.ElementName, pkg.nevra)
+        self.assertEqual(ref.VersionString, pkg.evra)
+
+        # try with removed file
+        os.remove(filepath.encode('utf-8'))
         refs = objpath.Check.to_instance().associators(
                 AssocClass=self.CLASS_NAME,
                 Role="Check",

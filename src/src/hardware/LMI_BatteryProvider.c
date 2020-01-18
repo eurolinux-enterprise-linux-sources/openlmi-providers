@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_Battery.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 CMPIUint16 get_chemistry(const char *dmi_val);
@@ -60,7 +59,7 @@ static CMPIStatus LMI_BatteryEnumInstances(
 {
     LMI_Battery lmi_batt;
     const char *ns = KNameSpace(cop);
-    char instance_id[INSTANCE_ID_LEN];
+    char instance_id[BUFLEN];
     unsigned i;
     DmiBattery *dmi_batt = NULL;
     unsigned dmi_batt_nb = 0;
@@ -73,10 +72,10 @@ static CMPIStatus LMI_BatteryEnumInstances(
         LMI_Battery_Init(&lmi_batt, _cb, ns);
 
         LMI_Battery_Set_SystemCreationClassName(&lmi_batt,
-                get_system_creation_class_name());
-        LMI_Battery_Set_SystemName(&lmi_batt, get_system_name());
+                lmi_get_system_creation_class_name());
+        LMI_Battery_Set_SystemName(&lmi_batt, lmi_get_system_name_safe(cc));
         LMI_Battery_Set_CreationClassName(&lmi_batt,
-                ORGID "_" BATTERY_CLASS_NAME);
+                LMI_Battery_ClassName);
         LMI_Battery_Set_BatteryStatus(&lmi_batt,
                 LMI_Battery_BatteryStatus_Unknown);
         LMI_Battery_Init_OperationalStatus(&lmi_batt, 1);
@@ -86,12 +85,12 @@ static CMPIStatus LMI_BatteryEnumInstances(
                 LMI_Battery_HealthState_Unknown);
         LMI_Battery_Set_EnabledState(&lmi_batt,
                 LMI_Battery_EnabledState_Unknown);
-        LMI_Battery_Set_Caption(&lmi_batt, BATTERY_CLASS_NAME);
+        LMI_Battery_Set_Caption(&lmi_batt, "Battery");
         LMI_Battery_Set_Description(&lmi_batt,
                 "This object represents one battery in system.");
 
-        snprintf(instance_id, INSTANCE_ID_LEN,
-                ORGID ":" ORGID "_" BATTERY_CLASS_NAME ":%s",
+        snprintf(instance_id, BUFLEN,
+                LMI_ORGID ":" LMI_Battery_ClassName ":%s",
                 dmi_batt[i].name);
 
         LMI_Battery_Set_DeviceID(&lmi_batt, dmi_batt[i].name);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_MemoryPhysicalPackageInConnector.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 static const CMPIBroker* _cb;
@@ -31,15 +30,15 @@ static void LMI_MemoryPhysicalPackageInConnectorInitialize(const CMPIContext *ct
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_MemoryPhysicalPackageInConnectorCleanup( 
+static CMPIStatus LMI_MemoryPhysicalPackageInConnectorCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_MemoryPhysicalPackageInConnectorEnumInstanceNames( 
+static CMPIStatus LMI_MemoryPhysicalPackageInConnectorEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -49,12 +48,12 @@ static CMPIStatus LMI_MemoryPhysicalPackageInConnectorEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_MemoryPhysicalPackageInConnectorEnumInstances( 
+static CMPIStatus LMI_MemoryPhysicalPackageInConnectorEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_MemoryPhysicalPackageInConnector lmi_phys_mem_pkg_in_conn;
     LMI_MemoryPhysicalPackageRef lmi_phys_mem_pkg;
@@ -75,7 +74,7 @@ static CMPIStatus LMI_MemoryPhysicalPackageInConnectorEnumInstances(
 
         LMI_MemoryPhysicalPackageRef_Init(&lmi_phys_mem_pkg, _cb, ns);
         LMI_MemoryPhysicalPackageRef_Set_CreationClassName(&lmi_phys_mem_pkg,
-                ORGID "_" MEMORY_PHYS_PKG_CLASS_NAME);
+                LMI_MemoryPhysicalPackage_ClassName);
         LMI_MemoryPhysicalPackageRef_Set_Tag(&lmi_phys_mem_pkg,
                 dmi_memory.modules[i].serial_number);
 
@@ -85,7 +84,7 @@ static CMPIStatus LMI_MemoryPhysicalPackageInConnectorEnumInstances(
                         dmi_memory.slots[j].slot_number);
                 LMI_MemorySlotRef_Init(&lmi_mem_slot, _cb, ns);
                 LMI_MemorySlotRef_Set_CreationClassName(&lmi_mem_slot,
-                        ORGID "_" MEMORY_SLOT_CLASS_NAME);
+                        LMI_MemorySlot_ClassName);
                 LMI_MemorySlotRef_Set_Tag(&lmi_mem_slot, tag);
 
                 LMI_MemoryPhysicalPackageInConnector_Set_Antecedent(
@@ -105,62 +104,62 @@ done:
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_MemoryPhysicalPackageInConnectorGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_MemoryPhysicalPackageInConnectorGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_MemoryPhysicalPackageInConnectorCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_MemoryPhysicalPackageInConnectorModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_MemoryPhysicalPackageInConnectorCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_MemoryPhysicalPackageInConnectorDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_MemoryPhysicalPackageInConnectorModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_MemoryPhysicalPackageInConnectorDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_MemoryPhysicalPackageInConnectorExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_MemoryPhysicalPackageInConnectorAssociationCleanup( 
+static CMPIStatus LMI_MemoryPhysicalPackageInConnectorAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -253,13 +252,13 @@ static CMPIStatus LMI_MemoryPhysicalPackageInConnectorReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_MemoryPhysicalPackageInConnector,
     LMI_MemoryPhysicalPackageInConnector,
     _cb,
     LMI_MemoryPhysicalPackageInConnectorInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_MemoryPhysicalPackageInConnector,
     LMI_MemoryPhysicalPackageInConnector,
     _cb,

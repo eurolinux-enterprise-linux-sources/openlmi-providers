@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,6 +18,7 @@
  * Authors: Roman Rakus <rrakus@redhat.com>
  */
 
+#include <shadow.h>
 #include <konkret/konkret.h>
 #include "LMI_Identity.h"
 
@@ -25,7 +26,6 @@
 #include <libuser/user.h>
 
 #include "macros.h"
-#include "globals.h"
 #include "aux_lu.h"
 #include "account_globals.h"
 
@@ -86,7 +86,7 @@ static CMPIStatus LMI_IdentityEnumInstances(
         LMI_Identity_Init(&li, _cb, nameSpace);
 
         /* Need to convert long int UID to the string */
-        asprintf(&instanceid, ORGID":UID:%ld",
+        asprintf(&instanceid, LMI_ORGID":UID:%ld",
           aux_lu_get_long(lue, LU_UIDNUMBER));
         LMI_Identity_Set_InstanceID(&li, instanceid);
           free(instanceid);
@@ -108,7 +108,7 @@ static CMPIStatus LMI_IdentityEnumInstances(
         LMI_Identity_Init(&li, _cb, nameSpace);
 
         /* Need to convert long int UID to the string */
-        asprintf(&instanceid, ORGID":GID:%ld",
+        asprintf(&instanceid, LMI_ORGID":GID:%ld",
           aux_lu_get_long(lue, LU_GIDNUMBER));
         LMI_Identity_Set_InstanceID(&li, instanceid);
         free(instanceid);
@@ -172,14 +172,21 @@ static CMPIStatus LMI_IdentityDeleteInstance(
     struct lu_ent *lue = NULL;
     char *errmsg = NULL;
     CMPIrc rc = CMPI_RC_OK;
+    int pwdlockres;
 
     LMI_Identity_InitFromObjectPath(&identity, _cb, cop);
     instance_id = identity.InstanceID.chars;
     id = atol(rindex(instance_id, ':') + 1);
 
+    pwdlockres = lckpwdf();
+    if (pwdlockres != 0)
+        lmi_warn("Cannot acquire passwd file lock\n");
+
     luc = lu_start(NULL, 0, NULL, NULL, lu_prompt_console_quiet, NULL, &error);
     if (!luc)
       {
+        if (pwdlockres == 0)
+            ulckpwdf();
         KReturn2(_cb, ERR_FAILED,
                  "Unable to initialize libuser: %s\n", lu_strerror(error));
       }
@@ -227,6 +234,8 @@ static CMPIStatus LMI_IdentityDeleteInstance(
 fail:
     lu_ent_free(lue);
     lu_end(luc);
+    if (pwdlockres == 0)
+        ulckpwdf();
     if (errmsg) {
         CMPIString *errstr = CMNewString(_cb, errmsg, NULL);
         free(errmsg);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_PortPhysicalConnectorContainer.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 static const CMPIBroker* _cb;
@@ -31,15 +30,15 @@ static void LMI_PortPhysicalConnectorContainerInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_PortPhysicalConnectorContainerCleanup( 
+static CMPIStatus LMI_PortPhysicalConnectorContainerCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_PortPhysicalConnectorContainerEnumInstanceNames( 
+static CMPIStatus LMI_PortPhysicalConnectorContainerEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -49,12 +48,12 @@ static CMPIStatus LMI_PortPhysicalConnectorContainerEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_PortPhysicalConnectorContainerEnumInstances( 
+static CMPIStatus LMI_PortPhysicalConnectorContainerEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_PortPhysicalConnectorContainer lmi_port_container;
     LMI_PortPhysicalConnectorRef lmi_port;
@@ -74,7 +73,7 @@ static CMPIStatus LMI_PortPhysicalConnectorContainerEnumInstances(
 
     LMI_ChassisRef_Init(&lmi_chassis, _cb, ns);
     LMI_ChassisRef_Set_CreationClassName(&lmi_chassis,
-            ORGID "_" CHASSIS_CLASS_NAME);
+            LMI_Chassis_ClassName);
     LMI_ChassisRef_Set_Tag(&lmi_chassis, dmi_get_chassis_tag(&dmi_chassis));
 
     for (i = 0; i < dmi_ports_nb; i++) {
@@ -82,7 +81,7 @@ static CMPIStatus LMI_PortPhysicalConnectorContainerEnumInstances(
 
         LMI_PortPhysicalConnectorRef_Init(&lmi_port, _cb, ns);
         LMI_PortPhysicalConnectorRef_Set_CreationClassName(&lmi_port,
-                ORGID "_" PORT_PHYS_CONN_CLASS_NAME);
+                LMI_PortPhysicalConnector_ClassName);
         LMI_PortPhysicalConnectorRef_Set_Tag(&lmi_port, dmi_ports[i].name);
 
         LMI_PortPhysicalConnectorContainer_Set_GroupComponent(
@@ -100,62 +99,62 @@ done:
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_PortPhysicalConnectorContainerGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_PortPhysicalConnectorContainerGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_PortPhysicalConnectorContainerCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_PortPhysicalConnectorContainerModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_PortPhysicalConnectorContainerCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_PortPhysicalConnectorContainerDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_PortPhysicalConnectorContainerModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_PortPhysicalConnectorContainerDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_PortPhysicalConnectorContainerExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_PortPhysicalConnectorContainerAssociationCleanup( 
+static CMPIStatus LMI_PortPhysicalConnectorContainerAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -248,13 +247,13 @@ static CMPIStatus LMI_PortPhysicalConnectorContainerReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_PortPhysicalConnectorContainer,
     LMI_PortPhysicalConnectorContainer,
     _cb,
     LMI_PortPhysicalConnectorContainerInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_PortPhysicalConnectorContainer,
     LMI_PortPhysicalConnectorContainer,
     _cb,

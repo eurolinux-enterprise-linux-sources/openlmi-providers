@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,8 +23,7 @@
 #include <string.h>
 #include <sys/utsname.h>
 #include "LMI_Processor.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 #include "lscpu.h"
 #include "procfs.h"
@@ -86,7 +85,7 @@ static CMPIStatus LMI_ProcessorEnumInstances(
     unsigned i, j, cpus_nb = 0;
     char *other_family = NULL, *architecture = NULL, *cpu_name = NULL,
             *stepping = NULL, *error_msg = NULL,
-            instance_id[INSTANCE_ID_LEN];
+            instance_id[BUFLEN];
     short ret1, ret2;
     struct utsname utsname_buf;
     DmiProcessor *dmi_cpus = NULL;
@@ -126,12 +125,12 @@ static CMPIStatus LMI_ProcessorEnumInstances(
         LMI_Processor_Init(&lmi_cpu, _cb, ns);
 
         LMI_Processor_Set_SystemCreationClassName(&lmi_cpu,
-                get_system_creation_class_name());
-        LMI_Processor_Set_SystemName(&lmi_cpu, get_system_name());
-        LMI_Processor_Set_CreationClassName(&lmi_cpu, ORGID "_" CPU_CLASS_NAME);
-        LMI_Processor_Set_Caption(&lmi_cpu, CPU_CLASS_NAME);
+                lmi_get_system_creation_class_name());
+        LMI_Processor_Set_SystemName(&lmi_cpu, lmi_get_system_name_safe(cc));
+        LMI_Processor_Set_CreationClassName(&lmi_cpu, LMI_Processor_ClassName);
+        LMI_Processor_Set_Caption(&lmi_cpu, "Processor");
         LMI_Processor_Set_Description(&lmi_cpu,
-                "This object represents one processor in system.");
+                "This object represents one physical processor in system.");
 
         /* do we have output from dmidecode program? */
         if (dmi_cpus_nb > 0) {
@@ -149,8 +148,8 @@ static CMPIStatus LMI_ProcessorEnumInstances(
             cpu_name = dmi_cpus[i].name;
             enabled_cores = dmi_cpus[i].enabled_cores;
             stepping = dmi_cpus[i].stepping;
-            snprintf(instance_id, INSTANCE_ID_LEN,
-                    ORGID ":" ORGID "_" CPU_CLASS_NAME ":%s", dmi_cpus[i].id);
+            snprintf(instance_id, BUFLEN,
+                    LMI_ORGID ":" LMI_Processor_ClassName ":%s", dmi_cpus[i].id);
 
             LMI_Processor_Set_DeviceID(&lmi_cpu, dmi_cpus[i].id);
             LMI_Processor_Set_Family(&lmi_cpu, family);
@@ -183,18 +182,24 @@ static CMPIStatus LMI_ProcessorEnumInstances(
         } else {
             char cpu_id[LONG_INT_LEN];
             snprintf(cpu_id, LONG_INT_LEN, "%u", i);
-            snprintf(instance_id, INSTANCE_ID_LEN,
-                    ORGID ":" ORGID "_" CPU_CLASS_NAME ":%s", cpu_id);
+            snprintf(instance_id, BUFLEN,
+                    LMI_ORGID ":" LMI_Processor_ClassName ":%s", cpu_id);
             cpustatus = get_cpustatus("Enabled");
             enabledstate = get_enabledstate(cpustatus);
             if (enabledstate == LMI_Processor_EnabledState_Enabled) {
                 current_speed = lscpu.current_speed;
             }
-            cpu_name = proc_cpu.model_name;
             enabled_cores = lscpu.cores;
-            stepping = lscpu.stepping;
 
             LMI_Processor_Set_DeviceID(&lmi_cpu, cpu_id);
+        }
+
+        if (!cpu_name || !strlen(cpu_name)
+                || !strcmp(cpu_name, "Not Specified")) {
+            cpu_name = proc_cpu.model_name;
+        }
+        if (!stepping || !strlen(stepping)) {
+            stepping = lscpu.stepping;
         }
 
         LMI_Processor_Set_InstanceID(&lmi_cpu, instance_id);

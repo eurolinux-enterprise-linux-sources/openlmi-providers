@@ -253,7 +253,7 @@ texinfo_documents = [
 epub_title = u'OpenLMI'
 epub_author = u'OpenLMI authors'
 epub_publisher = u'OpenLMI authors'
-epub_copyright = u'2013, OpenLMI authors'
+epub_copyright = u'2013-2014, OpenLMI authors'
 
 # The language of the text. It defaults to the language option
 # or en if the language is not set.

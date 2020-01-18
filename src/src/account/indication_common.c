@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -32,7 +32,6 @@
 #include <errno.h>
 
 #include "indication_common.h"
-#include <globals.h>
 
 #define EVENT_SIZE (sizeof(struct inotify_event))
 #define BUF_LEN (10 * EVENT_SIZE + NAME_MAX + 1)
@@ -104,23 +103,32 @@ void watcher_destroy(AccountIndication *ind)
 bool watcher(AccountIndication *ind, void **data)
 {
     struct timespec curr_pwd, curr_grp;
-    char buffer[BUF_LEN];
+    char errbuf[BUFLEN];
 
     if (ind->inotify_fd < 0)
         return false;
 
+    char buffer[BUF_LEN];
     do {
-        int len = 0, i = 0;
-        if ((len = read(ind->inotify_fd, buffer, BUF_LEN)) < 0 || len > (int) BUF_LEN) {
-            warn("account watcher: error reading from inotify fd: %s", strerror(errno));
+        const int len = read(ind->inotify_fd, buffer, BUF_LEN);
+        if (len < 0) {
+            lmi_warn("account watcher: error reading from inotify fd: %s", strerror_r(errno, errbuf, sizeof(errbuf)));
             watcher_destroy(ind);
             watcher_init(ind);
             return false;
         }
+        if (len == 0) {
+            // We are at the eof
+            watcher_destroy(ind);
+            watcher_init(ind);
+            return true;
+        }
+
+        int i = 0;
         while (i + (ssize_t) EVENT_SIZE < len) {
             struct inotify_event *event = (struct inotify_event *) &buffer[i];
             if (i + (ssize_t) EVENT_SIZE + event->len > len) {
-                error("Unable to create watcher, inotify initialization failed");
+                lmi_error("Unable to create watcher, inotify initialization failed");
                 watcher_destroy(ind);
                 watcher_init(ind);
                 return false;

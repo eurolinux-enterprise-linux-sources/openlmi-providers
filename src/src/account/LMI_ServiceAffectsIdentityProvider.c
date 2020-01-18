@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,7 +24,6 @@
 #include "LMI_Identity.h"
 
 #include "macros.h"
-#include "globals.h"
 #include "aux_lu.h"
 #include "account_globals.h"
 
@@ -38,15 +37,15 @@ static void LMI_ServiceAffectsIdentityInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_ServiceAffectsIdentityCleanup( 
+static CMPIStatus LMI_ServiceAffectsIdentityCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_ServiceAffectsIdentityEnumInstanceNames( 
+static CMPIStatus LMI_ServiceAffectsIdentityEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -56,12 +55,12 @@ static CMPIStatus LMI_ServiceAffectsIdentityEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_ServiceAffectsIdentityEnumInstances( 
+static CMPIStatus LMI_ServiceAffectsIdentityEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_IdentityRef liref;
     LMI_AccountManagementServiceRef lamsref;
@@ -75,12 +74,12 @@ static CMPIStatus LMI_ServiceAffectsIdentityEnumInstances(
     char *id = NULL;
 
     const char *nameSpace = KNameSpace(cop);
-    const char *hostname = get_system_name();
+    const char *hostname = lmi_get_system_name_safe(cc);
 
     LMI_AccountManagementServiceRef_Init(&lamsref, _cb, nameSpace);
     LMI_AccountManagementServiceRef_Set_Name(&lamsref, LAMSNAME);
     LMI_AccountManagementServiceRef_Set_SystemCreationClassName(&lamsref,
-      get_system_creation_class_name());
+      lmi_get_system_creation_class_name());
     LMI_AccountManagementServiceRef_Set_SystemName(&lamsref, hostname);
     LMI_AccountManagementServiceRef_Set_CreationClassName(&lamsref,
       LMI_AccountManagementService_ClassName);
@@ -100,7 +99,7 @@ static CMPIStatus LMI_ServiceAffectsIdentityEnumInstances(
         lue = g_ptr_array_index(accounts, i);
 
         LMI_IdentityRef_Init(&liref, _cb, nameSpace);
-        asprintf(&id, ORGID":UID:%ld", aux_lu_get_long(lue, LU_UIDNUMBER));
+        asprintf(&id, LMI_ORGID":UID:%ld", aux_lu_get_long(lue, LU_UIDNUMBER));
         LMI_IdentityRef_Set_InstanceID(&liref, id);
         free(id);
 
@@ -127,7 +126,7 @@ static CMPIStatus LMI_ServiceAffectsIdentityEnumInstances(
         lue = g_ptr_array_index(accounts, i);
 
         LMI_IdentityRef_Init(&liref, _cb, nameSpace);
-        asprintf(&id, ORGID":GID:%ld", aux_lu_get_long(lue, LU_GIDNUMBER));
+        asprintf(&id, LMI_ORGID":GID:%ld", aux_lu_get_long(lue, LU_GIDNUMBER));
         LMI_IdentityRef_Set_InstanceID(&liref, id);
         free(id);
 
@@ -153,62 +152,62 @@ static CMPIStatus LMI_ServiceAffectsIdentityEnumInstances(
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_ServiceAffectsIdentityGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_ServiceAffectsIdentityGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_ServiceAffectsIdentityCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_ServiceAffectsIdentityModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_ServiceAffectsIdentityCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_ServiceAffectsIdentityDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_ServiceAffectsIdentityModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_ServiceAffectsIdentityDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_ServiceAffectsIdentityExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_ServiceAffectsIdentityAssociationCleanup( 
+static CMPIStatus LMI_ServiceAffectsIdentityAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -301,13 +300,13 @@ static CMPIStatus LMI_ServiceAffectsIdentityReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_ServiceAffectsIdentity,
     LMI_ServiceAffectsIdentity,
     _cb,
     LMI_ServiceAffectsIdentityInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_ServiceAffectsIdentity,
     LMI_ServiceAffectsIdentity,
     _cb,

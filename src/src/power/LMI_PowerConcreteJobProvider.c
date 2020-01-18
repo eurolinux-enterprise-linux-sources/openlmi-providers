@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,7 +21,6 @@
 #include <konkret/konkret.h>
 #include <stdint.h>
 #include "LMI_PowerConcreteJob.h"
-#include "globals.h"
 
 static const CMPIBroker* _cb = NULL;
 
@@ -80,7 +79,7 @@ static CMPIStatus LMI_PowerConcreteJobEnumInstances(
         powerStateChangeJob = plist->data;
         LMI_PowerConcreteJob concreteJob;
         LMI_PowerConcreteJob_Init(&concreteJob, _cb, ns);
-        if (asprintf(&instanceid, ORGID ":LMI_PowerConcreteJob:%ld", job_id(powerStateChangeJob)) < 0) {
+        if (asprintf(&instanceid, LMI_ORGID ":LMI_PowerConcreteJob:%ld", job_id(powerStateChangeJob)) < 0) {
             KReturn2(_cb, ERR_FAILED, "Memory allocation failed");
         }
         LMI_PowerConcreteJob_Set_InstanceID(&concreteJob, instanceid);

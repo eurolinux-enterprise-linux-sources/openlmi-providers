@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,14 +21,10 @@
 #ifndef SYSFS_H_
 #define SYSFS_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <dirent.h>
-#include <errno.h>
-#include <limits.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
 #include "utils.h"
 #include "dmidecode.h"
 #include "lscpu.h"
@@ -36,7 +32,7 @@
 #define SYSFS_PATH "/sys/devices/system"
 #define SYSFS_CPU_PATH SYSFS_PATH "/cpu"
 #define SYSFS_KERNEL_MM "/sys/kernel/mm"
-
+#define SYSFS_BLOCK_PATH "/sys/class/block"
 
 /* Transparent memory huge pages statuses. */
 typedef enum _ThpStatus {
@@ -58,6 +54,21 @@ typedef struct _SysfsCpuCache {
     unsigned line_size;         /* Cache Line Size */
 } SysfsCpuCache;
 
+/*
+ * Read unsigned value from file.
+ * @param path of file
+ * @param result
+ * @return 0 if success, negative value otherwise
+ */
+short path_get_unsigned(const char *path, unsigned *result);
+
+/*
+ * Read string value from file.
+ * @param path of file
+ * @param result
+ * @return 0 if success, negative value otherwise
+ */
+short path_get_string(const char *path, char **result);
 
 /*
  * Get array of processor caches from sysfs.
@@ -94,6 +105,5 @@ short sysfs_get_sizes_of_hugepages(unsigned **sizes, unsigned *sizes_nb);
  * @return ThpStatus
  */
 ThpStatus sysfs_get_transparent_hugepages_status();
-
 
 #endif /* SYSFS_H_ */

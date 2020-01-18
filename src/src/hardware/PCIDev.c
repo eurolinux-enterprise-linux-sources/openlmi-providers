@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -61,16 +61,21 @@ void cleanup_pci_access(struct pci_access **acc)
 
 void get_subid(struct pci_dev *d, u16 *subvp, u16 *subdp)
 {
+    *subvp = *subdp = 0xffff;
     u8 htype = pci_read_byte(d, PCI_HEADER_TYPE) & 0x7f;
 
     if (htype == PCI_HEADER_TYPE_NORMAL) {
         *subvp = pci_read_word(d, PCI_SUBSYSTEM_VENDOR_ID);
         *subdp = pci_read_word(d, PCI_SUBSYSTEM_ID);
+    } else if (htype == PCI_HEADER_TYPE_BRIDGE) {
+        struct pci_cap *cap = pci_find_cap(d, PCI_CAP_ID_SSVID, PCI_CAP_NORMAL);
+        if (cap) {
+            *subvp = pci_read_word(d, cap->addr + PCI_SSVID_VENDOR);
+            *subdp = pci_read_word(d, cap->addr + PCI_SSVID_DEVICE);
+        }
     } else if (htype == PCI_HEADER_TYPE_CARDBUS) {
         *subvp = pci_read_word(d, PCI_CB_SUBSYSTEM_VENDOR_ID);
         *subdp = pci_read_word(d, PCI_CB_SUBSYSTEM_ID);
-    } else {
-        *subvp = *subdp = 0xffff;
     }
 }
 

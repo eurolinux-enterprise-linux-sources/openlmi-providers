@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -21,8 +21,7 @@
 """
 Unit tests for ``LMI_HostedSoftwareIdentityResource`` provider.
 """
-
-import unittest
+from lmi.test import unittest
 
 import swbase
 
@@ -101,8 +100,7 @@ class TestHostedSoftwareIdentityResource(swbase.SwTestCase):
 
     def test_enum_instances(self):
         """
-        Test ``EnumInstanceNames()`` call on
-        ``LMI_HostedSoftwareIdentityResource``.
+        Enumerate instances of LMI_HostedSoftwareIdentityResource.
         """
         insts = self.cim_class.instances()
         repos = set(r for r in self.repodb)
@@ -156,14 +154,19 @@ class TestHostedSoftwareIdentityResource(swbase.SwTestCase):
             objpath = self.make_op(repo)
             self.assertCIMNameEqual(ref.path, objpath.Dependent)
             self.assertEqual(set(ref.path.key_properties()),
-                    set(["CreationClassName", "Name",
-                          "SystemCreationClassName", "SystemName"]))
-            if repo.status:
-                self.assertEqual(ref.EnabledState, ENABLED_STATE_ENABLED,
-                        "EnabledState does not match for repo %s" % repo.repoid)
-            else:
-                self.assertEqual(ref.EnabledState, ENABLED_STATE_DISABLED,
-                        "EnabledState does not match for repo %s" % repo.repoid)
+                    set(("CreationClassName", "Name",
+                          "SystemCreationClassName", "SystemName",)))
+            # Skip debuginfo repos as in certain situations, yum can see debuginfo
+            # repos enabled while they are disabled in config file (this can happen
+            # when auto-update-debuginfo yum plugin and some debuginfo packages are
+            # installed.
+            if '-debuginfo' not in repo.repoid:
+                if repo.status:
+                    self.assertEqual(ref.EnabledState, ENABLED_STATE_ENABLED,
+                            "EnabledState does not match for repo %s" % repo.repoid)
+                else:
+                    self.assertEqual(ref.EnabledState, ENABLED_STATE_DISABLED,
+                            "EnabledState does not match for repo %s" % repo.repoid)
             repos.remove(ref.Name)
         self.assertEqual(len(repos), 0)
 
@@ -195,8 +198,8 @@ class TestHostedSoftwareIdentityResource(swbase.SwTestCase):
             objpath = self.make_op(repo)
             self.assertCIMNameEqual(objpath.Dependent, ref)
             self.assertEqual(set(ref.key_properties()),
-                    set(["CreationClassName", "Name",
-                          "SystemCreationClassName", "SystemName"]))
+                    set(("CreationClassName", "Name",
+                          "SystemCreationClassName", "SystemName",)))
             repos.remove(ref.Name)
         self.assertEqual(len(repos), 0)
 

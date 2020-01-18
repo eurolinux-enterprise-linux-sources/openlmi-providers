@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -22,7 +22,7 @@ Just a common functionality related to SoftwareInstallationJob
 and SoftwareVerificationJob.
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 import pywbem
 import time
 
@@ -572,7 +572,7 @@ def _fill_nonkeys(job, model):
             jobs.YumJob.COMPLETED  : (Values.JobState.Completed
                 , [ Values.OperationalStatus.OK
                   , Values.OperationalStatus.Completed]
-                , 'Finished successfully')
+                , 'Completed successfully')
             }[job.state]
     except KeyError:
         LOG().error('unknown job state: %s', job.state)
@@ -580,13 +580,12 @@ def _fill_nonkeys(job, model):
                 type='uint16', value=None)
         model['OperationalStatus'] = [Values.OperationalStatus.Unknown]
         model['JobStatus'] = 'Unknown'
-    # TODO: uncomment this, when Pegasus propertly supports instances of
-    # unknown classes
-    #model["JobInParameters"] = make_method_params(
-    #    job, "__JobInParameters", True, False)
     method_name = JOB_METHOD_NAMES[job.metadata["method"]]
-    model["JobOutParameters"] = make_method_params(
-        job, "__MethodParameters_"+method_name+"_Result", False, True)
+    model["JobInParameters"] = make_method_params(
+        job, "__MethodParameters_"+method_name, True, False)
+    if job.state == job.COMPLETED:
+        model["JobOutParameters"] = make_method_params(
+            job, "__MethodParameters_"+method_name+"_Result", False, True)
     if 'method' in job.metadata:
         model['MethodName'] = method_name
     else:
@@ -600,14 +599,11 @@ def _fill_nonkeys(job, model):
             0))
     model['Priority'] = pywbem.Uint32(job.priority)
     if job.started:
-        model['StartTime'] = pywbem.CIMDateTime(datetime.fromtimestamp(
-                job.started))
+        model['StartTime'] = util.date_time_to_cim_tz_aware(job.started)
     model['TimeBeforeRemoval'] = pywbem.CIMDateTime(timedelta(
             seconds=job.time_before_removal))
-    model['TimeOfLastStateChange'] = pywbem.CIMDateTime(datetime.fromtimestamp(
-            job.last_change))
-    model['TimeSubmitted'] = pywbem.CIMDateTime(datetime.fromtimestamp(
-            job.created))
+    model['TimeOfLastStateChange'] = util.date_time_to_cim_tz_aware(job.last_change)
+    model['TimeSubmitted'] = util.date_time_to_cim_tz_aware(job.created)
 
 @cmpi_logging.trace_function
 def job2model(job, class_name=None, keys_only=True, model=None):
@@ -672,8 +668,8 @@ def object_path2job(op):
                 "Missing InstanceID key property.")
     instid = op['InstanceID']
     match = util.RE_INSTANCE_ID.match(instid)
-    if not match or match.group('clsname').lower() not in {
-            c.lower() for c in JOB_CLASS_NAMES}:
+    if not match or match.group('clsname').lower() not in set(
+            c.lower() for c in JOB_CLASS_NAMES):
         raise pywbem.CIMError(pywbem.CIM_ERR_INVALID_PARAMETER,
             "InstanceID must start with one of {%s} prefixes."
             " And end with positive integer." % (
@@ -709,8 +705,8 @@ def modify_instance(instance):
             "deleteoncompletion" : "delete_on_completion",
             "timebeforeremoval"  : "time_before_removal"
     }
-    metadata_props = {"name"}
-    reschedule_props = {"delete_on_completion", "time_before_removal"}
+    metadata_props = set(("name",))
+    reschedule_props = set(("delete_on_completion", "time_before_removal",))
     for name, prop in instance.properties.items():
         if prop is None:
             LOG().warn('property "%s" is None', name)
@@ -780,5 +776,6 @@ def job2error(env, job):
                     CIMStatusCode.CIM_ERR_ALREADY_EXISTS
         kwargs['message'] = getattr(errortup[1], 'message',
                 str(errortup[1]))
+        kwargs['error_source'] = job2model(job)
         value = Error.make_instance(env, **kwargs)
         return value

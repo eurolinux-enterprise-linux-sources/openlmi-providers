@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,7 +27,7 @@
 #include <glib.h>
 #include <systemd/sd-journal.h>
 
-#include "globals.h"
+
 #include "journal.h"
 #include "instutil.h"
 
@@ -42,12 +42,13 @@ static void LMI_JournalLogRecordInitialize(const CMPIContext *ctx)
 {
     sd_journal *journal;
     int r;
+    char errbuf[BUFLEN];
 
     lmi_init(JOURNAL_CIM_LOG_NAME, _cb, ctx, provider_config_defaults);
 
     r = sd_journal_open(&journal, 0);
     if (r < 0) {
-        error("Error opening journal: %s\n", strerror(-r));
+        lmi_error("Error opening journal: %s\n", strerror_r(-r, errbuf, sizeof(errbuf)));
         return;
     }
     journal_iter = journal;
@@ -76,16 +77,17 @@ static CMPIStatus LMI_JournalLogRecordEnumInstanceNames(
     int r;
     LMI_JournalLogRecordRef log_record_ref;
     unsigned long count = 0;
+    char errbuf[BUFLEN];
 
     /* Open our own journal instance to prevent losing cursor position in the global instance */
     r = sd_journal_open(&journal, 0);
     if (r < 0)
-        KReturn2(_cb, ERR_FAILED, "Error opening journal: %s\n", strerror(-r));
+        KReturn2(_cb, ERR_FAILED, "Error opening journal: %s\n", strerror_r(-r, errbuf, sizeof(errbuf)));
 
     r = sd_journal_seek_tail(journal);
     if (r < 0) {
         sd_journal_close(journal);
-        KReturn2(_cb, ERR_NOT_FOUND, "Failed to seek to the end of the journal: %s\n", strerror(-r));
+        KReturn2(_cb, ERR_NOT_FOUND, "Failed to seek to the end of the journal: %s\n", strerror_r(-r, errbuf, sizeof(errbuf)));
     }
 
     SD_JOURNAL_FOREACH_BACKWARDS(journal) {
@@ -99,7 +101,7 @@ static CMPIStatus LMI_JournalLogRecordEnumInstanceNames(
 
         /* Instance number limiter */
         count++;
-        if (JOURNAL_MAX_INSTANCES_NUM > 0 && count > JOURNAL_MAX_INSTANCES_NUM)
+        if (JOURNAL_MAX_INSTANCES_NUM > 0 && count >= JOURNAL_MAX_INSTANCES_NUM)
             break;
     }
     sd_journal_close(journal);
@@ -143,6 +145,7 @@ static CMPIStatus LMI_JournalLogRecordGetInstance(
 {
     LMI_JournalLogRecord log_record;
     int r;
+    char errbuf[BUFLEN];
 
     LMI_JournalLogRecord_InitFromObjectPath(&log_record, _cb, cop);
 
@@ -151,15 +154,15 @@ static CMPIStatus LMI_JournalLogRecordGetInstance(
 
     r = sd_journal_seek_cursor(journal_iter, log_record.RecordID.chars);
     if (r < 0)
-        KReturn2(_cb, ERR_NOT_FOUND, "Failed to seek to the requested position: %s\n", strerror(-r));
+        KReturn2(_cb, ERR_NOT_FOUND, "Failed to seek to the requested position: %s\n", strerror_r(-r, errbuf, sizeof(errbuf)));
 
     r = sd_journal_next(journal_iter);
     if (r < 0)
-        KReturn2(_cb, ERR_FAILED, "Failed to seek next to the cursor: %s\n", strerror(-r));
+        KReturn2(_cb, ERR_FAILED, "Failed to seek next to the cursor: %s\n", strerror_r(-r, errbuf, sizeof(errbuf)));
 
     r = create_LMI_JournalLogRecord(journal_iter, &log_record, _cb);
     if (r <= 0)
-        KReturn2(_cb, ERR_FAILED, "Failed to create instance: %s\n", strerror(-r));
+        KReturn2(_cb, ERR_FAILED, "Failed to create instance: %s\n", strerror_r(-r, errbuf, sizeof(errbuf)));
 
     KReturnInstance(cr, log_record);
     KReturn(OK);
@@ -181,7 +184,7 @@ get_string_property(const char *property_name, const CMPIInstance* ci)
 #define J_RESULT_CHECK(r,j,msg) \
             if (r < 0) { \
                 sd_journal_close(j); \
-                KReturn2(_cb, ERR_FAILED, msg ": %s\n", strerror(-r)); \
+                KReturn2(_cb, ERR_FAILED, msg ": %s\n", strerror_r(-r, errbuf, sizeof(errbuf))); \
              }
 
 static CMPIStatus LMI_JournalLogRecordCreateInstance(
@@ -199,6 +202,7 @@ static CMPIStatus LMI_JournalLogRecordCreateInstance(
     int r;
     CMPIrc rc;
     bool found;
+    char errbuf[BUFLEN];
 
     cr_cl_n = get_string_property("CreationClassName", ci);
     log_cr_cl_n = get_string_property("LogCreationClassName", ci);
@@ -215,7 +219,7 @@ static CMPIStatus LMI_JournalLogRecordCreateInstance(
 
     r = sd_journal_open(&journal, 0);
     if (r < 0) {
-        KReturn2(_cb, ERR_FAILED, "Error opening journal: %s\n", strerror(-r));
+        KReturn2(_cb, ERR_FAILED, "Error opening journal: %s\n", strerror_r(-r, errbuf, sizeof(errbuf)));
     }
 
     r = sd_journal_seek_tail(journal);
@@ -250,9 +254,6 @@ static CMPIStatus LMI_JournalLogRecordCreateInstance(
 
             LMI_JournalLogRecord_InitFromObjectPath(&log_record, _cb, cop);
             LMI_JournalLogRecord_Set_DataFormat(&log_record, data_format);
-            LMI_JournalLogRecord_Set_CreationClassName(&log_record, LMI_JournalLogRecord_ClassName);
-            LMI_JournalLogRecord_Set_LogCreationClassName(&log_record, LMI_JournalMessageLog_ClassName);
-            LMI_JournalLogRecord_Set_LogName(&log_record, JOURNAL_MESSAGE_LOG_NAME);
 
             /* Get stable cursor string */
             r = sd_journal_get_cursor(journal, &cursor);
@@ -263,7 +264,7 @@ static CMPIStatus LMI_JournalLogRecordCreateInstance(
             r = create_LMI_JournalLogRecord(journal, &log_record, _cb);
             if (r <= 0) {
                 sd_journal_close(journal);
-                KReturn2(_cb, ERR_FAILED, "Failed to create instance: %s\n", strerror(-r));
+                KReturn2(_cb, ERR_FAILED, "Failed to create instance: %s\n", strerror_r(-r, errbuf, sizeof(errbuf)));
             }
 
             CMReturnObjectPath(cr, LMI_JournalLogRecord_ToObjectPath(&log_record, NULL));

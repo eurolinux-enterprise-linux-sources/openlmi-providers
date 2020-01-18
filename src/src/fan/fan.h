@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,7 +21,6 @@
 #ifndef LINUX_FAN_H_
 #define LINUX_FAN_H_
 
-#include <stdbool.h>
 #include "openlmi.h"
 
 /** accessible features of fan
@@ -44,7 +43,7 @@ const ConfigEntry *provider_config_defaults;
 
 /**
  * Descriptions of attributes are taken from:
- * sysfs-interface documentation of hwmon 
+ * sysfs-interface documentation of hwmon
  */
 struct cim_fan{
     char const * chip_name;
@@ -117,7 +116,7 @@ struct cim_fan{
      * true  : alarm
      * Each channel or limit may have an associated alarm file, containing a
      * boolean value. 1 means that an alarm condition exists, 0 means no alarm.
-     * 
+     *
      * Usually a given chip will either use channel-related alarms, or
      * limit-related alarms, not both. The driver should just reflect the
      * hardware implementation.

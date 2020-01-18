@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,8 +26,7 @@
 #include "aux_lu.h"
 #include "macros.h"
 #include "account_globals.h"
-#include "globals.h"
- 
+
 #include <libuser/entity.h>
 #include <libuser/user.h>
 
@@ -38,15 +37,15 @@ static void LMI_AssignedGroupIdentityInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_AssignedGroupIdentityCleanup( 
+static CMPIStatus LMI_AssignedGroupIdentityCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_AssignedGroupIdentityEnumInstanceNames( 
+static CMPIStatus LMI_AssignedGroupIdentityEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -56,12 +55,12 @@ static CMPIStatus LMI_AssignedGroupIdentityEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_AssignedGroupIdentityEnumInstances( 
+static CMPIStatus LMI_AssignedGroupIdentityEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_IdentityRef liref;
     LMI_GroupRef lgref;
@@ -92,7 +91,7 @@ static CMPIStatus LMI_AssignedGroupIdentityEnumInstances(
         LMI_GroupRef_Set_Name(&lgref, aux_lu_get_str(lue, LU_GROUPNAME));
 
         LMI_IdentityRef_Init(&liref, _cb, nameSpace);
-        asprintf(&gid, ORGID":GID:%ld", aux_lu_get_long(lue, LU_GIDNUMBER));
+        asprintf(&gid, LMI_ORGID":GID:%ld", aux_lu_get_long(lue, LU_GIDNUMBER));
         LMI_IdentityRef_Set_InstanceID(&liref, gid);
         free(gid);
 
@@ -108,62 +107,62 @@ static CMPIStatus LMI_AssignedGroupIdentityEnumInstances(
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_AssignedGroupIdentityGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_AssignedGroupIdentityGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_AssignedGroupIdentityCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_AssignedGroupIdentityModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_AssignedGroupIdentityCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_AssignedGroupIdentityDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_AssignedGroupIdentityModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_AssignedGroupIdentityDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_AssignedGroupIdentityExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_AssignedGroupIdentityAssociationCleanup( 
+static CMPIStatus LMI_AssignedGroupIdentityAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -256,13 +255,13 @@ static CMPIStatus LMI_AssignedGroupIdentityReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_AssignedGroupIdentity,
     LMI_AssignedGroupIdentity,
     _cb,
     LMI_AssignedGroupIdentityInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_AssignedGroupIdentity,
     LMI_AssignedGroupIdentity,
     _cb,

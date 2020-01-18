@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -40,26 +40,26 @@ static CMPIStatus associators(
     CMPIInstance *ci;
     CMPIStatus st;
     const char *ns = KNameSpace(cop);
-    const char *comp_ccname = get_system_creation_class_name();
-    const char *path = get_string_property_from_op(cop, "Name");
-    char *fsname;
-    char *fsclassname;
+    const char *comp_ccname = lmi_get_system_creation_class_name();
+    const char *path = lmi_get_string_property_from_objectpath(cop, "Name");
+    char *fsname = NULL;
+    char *fsclassname = NULL;
     const char *systemname = lmi_get_system_creation_class_name();
 
-    st = check_assoc_class(_cb, ns, assocClass, LMI_RootDirectory_ClassName);
-    check_class_check_status(st);
+    st = lmi_class_path_is_a(_cb, ns, LMI_RootDirectory_ClassName, assocClass);
+    lmi_return_if_class_check_not_ok(st);
 
     st = get_fsinfo_from_path(_cb, "/", &fsclassname, &fsname);
-    check_status(st);
+    lmi_return_if_status_not_ok(st);
 
     if (CMClassPathIsA(_cb, cop, LMI_UnixDirectory_ClassName, &st)) {
         /* got LMI_UnixDirectory - PartComponent */
-        st = check_assoc_class(_cb, ns, resultClass, comp_ccname);
-        check_class_check_status(st);
-        if (role && strcmp(role, PART_COMPONENT) != 0) {
+        st = lmi_class_path_is_a(_cb, ns, comp_ccname, resultClass);
+        lmi_return_if_class_check_not_ok(st);
+        if (role && strcmp(role, LMI_PART_COMPONENT) != 0) {
             CMReturn(CMPI_RC_OK);
         }
-        if (resultRole && strcmp(resultRole, GROUP_COMPONENT) != 0) {
+        if (resultRole && strcmp(resultRole, LMI_GROUP_COMPONENT) != 0) {
             CMReturn(CMPI_RC_OK);
         }
         /* ignore this association if the directory is not root */
@@ -68,25 +68,25 @@ static CMPIStatus associators(
         }
 
         if (names) {
-            CMReturnObjectPath(cr, lmi_get_computer_system());
+            CMReturnObjectPath(cr, lmi_get_computer_system_safe(cc));
         } else {
-            ci = _cb->bft->getInstance(_cb, cc, lmi_get_computer_system(), properties, &st);
+            ci = _cb->bft->getInstance(_cb, cc, lmi_get_computer_system_safe(cc), properties, &st);
             CMReturnInstance(cr, ci);
         }
     } else if (CMClassPathIsA(_cb, cop, systemname, &st)) {
         /* got CIM_ComputerSystem - GroupComponent */
-        st = check_assoc_class(_cb, ns, resultClass, LMI_UnixDirectory_ClassName);
-        check_class_check_status(st);
-        if (role && strcmp(role, GROUP_COMPONENT) != 0) {
+        st = lmi_class_path_is_a(_cb, ns, LMI_UnixDirectory_ClassName, resultClass);
+        lmi_return_if_class_check_not_ok(st);
+        if (role && strcmp(role, LMI_GROUP_COMPONENT) != 0) {
             CMReturn(CMPI_RC_OK);
         }
-        if (resultRole && strcmp(resultRole, PART_COMPONENT) != 0) {
+        if (resultRole && strcmp(resultRole, LMI_PART_COMPONENT) != 0) {
             CMReturn(CMPI_RC_OK);
         }
 
         LMI_UnixDirectory lmi_ud;
         LMI_UnixDirectory_Init(&lmi_ud, _cb, ns);
-        fill_logicalfile(LMI_UnixDirectory, &lmi_ud, "/", fsclassname, fsname, LMI_UnixDirectory_ClassName);
+        fill_logicalfile(cc, LMI_UnixDirectory, &lmi_ud, "/", fsclassname, fsname, LMI_UnixDirectory_ClassName);
         o = LMI_UnixDirectory_ToObjectPath(&lmi_ud, &st);
         if (names) {
             CMReturnObjectPath(cr, o);
@@ -96,11 +96,9 @@ static CMPIStatus associators(
         }
     } else {
         /* this association does not associate with given 'cop' class */
-        free(fsname);
         CMReturn(CMPI_RC_OK);
     }
 
-    free(fsname);
     CMReturn(CMPI_RC_OK);
 }
 
@@ -119,51 +117,50 @@ static CMPIStatus references(
     CMPIInstance *ci;
     CMPIStatus st;
     const char *ns = KNameSpace(cop);
-    const char *path = get_string_property_from_op(cop, "Name");
+    const char *path = lmi_get_string_property_from_objectpath(cop, "Name");
     char ccname[BUFLEN];
-    get_class_from_path(path, ccname);
+    get_logfile_class_from_path(path, ccname);
     const char *systemname = lmi_get_system_creation_class_name();
 
-    st = check_assoc_class(_cb, ns, assocClass, LMI_RootDirectory_ClassName);
-    check_class_check_status(st);
+    st = lmi_class_path_is_a(_cb, ns, LMI_RootDirectory_ClassName, assocClass);
+    lmi_return_if_class_check_not_ok(st);
 
-    char *fsname;
-    char *fsclassname;
+    char *fsname = NULL;
+    char *fsclassname = NULL;
     st = get_fsinfo_from_path(_cb, "/", &fsclassname, &fsname);
-    check_status(st);
+    lmi_return_if_status_not_ok(st);
 
     LMI_RootDirectory_Init(&lmi_rd, _cb, ns);
 
     if (strcmp(ccname, LMI_UnixDirectory_ClassName) == 0) {
         /* got UnixDirectory - PartComponent */
-        if (role && strcmp(role, PART_COMPONENT) != 0) {
+        if (role && strcmp(role, LMI_PART_COMPONENT) != 0) {
             CMReturn(CMPI_RC_OK);
         }
         /* ignore this association if the directory is not root */
         if (strcmp(path, "/") != 0) {
             CMReturn(CMPI_RC_OK);
         }
-        st = lmi_check_required(_cb, cc, cop);
-        check_status(st);
+        st = lmi_check_required_properties(_cb, cc, cop, "CSCreationClassName", "CSName");
+        lmi_return_if_status_not_ok(st);
         LMI_RootDirectory_SetObjectPath_PartComponent(&lmi_rd, cop);
 
         LMI_RootDirectory_SetObjectPath_GroupComponent(&lmi_rd,
-                lmi_get_computer_system());
+                lmi_get_computer_system_safe(cc));
     } else if (CMClassPathIsA(_cb, cop, systemname, &st)) {
         /* got CIM_ComputerSystem - GroupComponent */
-        if (role && strcmp(role, GROUP_COMPONENT) != 0) {
+        if (role && strcmp(role, LMI_GROUP_COMPONENT) != 0) {
             CMReturn(CMPI_RC_OK);
         }
         LMI_RootDirectory_SetObjectPath_GroupComponent(&lmi_rd, cop);
 
         LMI_UnixDirectory lmi_ud;
         LMI_UnixDirectory_Init(&lmi_ud, _cb, ns);
-        fill_logicalfile(LMI_UnixDirectory, &lmi_ud, "/", fsclassname, fsname, LMI_UnixDirectory_ClassName);
+        fill_logicalfile(cc, LMI_UnixDirectory, &lmi_ud, "/", fsclassname, fsname, LMI_UnixDirectory_ClassName);
         o = LMI_UnixDirectory_ToObjectPath(&lmi_ud, &st);
         LMI_RootDirectory_SetObjectPath_PartComponent(&lmi_rd, o);
     } else {
         /* this association does not associate with given 'cop' class */
-        free(fsname);
         CMReturn(CMPI_RC_OK);
     }
 
@@ -174,7 +171,6 @@ static CMPIStatus references(
         ci = LMI_RootDirectory_ToInstance(&lmi_rd, &st);
         CMReturnInstance(cr, ci);
     }
-    free(fsname);
     CMReturn(CMPI_RC_OK);
 }
 
@@ -210,24 +206,23 @@ static CMPIStatus LMI_RootDirectoryEnumInstances(
 {
     CMPIObjectPath *o;
     CMPIStatus st;
-    char *fsname;
-    char *fsclassname;
+    char *fsname = NULL;
+    char *fsclassname = NULL;
     const char *ns = KNameSpace(cop);
 
     LMI_RootDirectory lmi_rd;
     LMI_RootDirectory_Init(&lmi_rd, _cb, ns);
 
-    LMI_RootDirectory_SetObjectPath_GroupComponent(&lmi_rd, lmi_get_computer_system());
+    LMI_RootDirectory_SetObjectPath_GroupComponent(&lmi_rd, lmi_get_computer_system_safe(cc));
 
     LMI_UnixDirectory lmi_ud;
     LMI_UnixDirectory_Init(&lmi_ud, _cb, ns);
     st = get_fsinfo_from_path(_cb, "/", &fsclassname, &fsname);
-    check_status(st);
-    fill_logicalfile(LMI_UnixDirectory, &lmi_ud, "/", fsclassname, fsname, LMI_UnixDirectory_ClassName);
+    lmi_return_if_status_not_ok(st);
+    fill_logicalfile(cc, LMI_UnixDirectory, &lmi_ud, "/", fsclassname, fsname, LMI_UnixDirectory_ClassName);
     o = LMI_UnixDirectory_ToObjectPath(&lmi_ud, NULL);
     LMI_RootDirectory_SetObjectPath_PartComponent(&lmi_rd, o);
 
-    free(fsname);
     return CMReturnInstance(cr, LMI_RootDirectory_ToInstance(&lmi_rd, NULL));
 }
 
@@ -363,4 +358,5 @@ KONKRET_REGISTRATION(
 /* vi: set et: */
 /* Local Variables: */
 /* indent-tabs-mode: nil */
+/* c-basic-offset: 4 */
 /* End: */

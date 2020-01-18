@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# coding=utf-8
 #
 # Copyright (C) 2012 Red Hat, Inc.  All rights reserved.
 #
@@ -369,24 +370,36 @@ class HtmlExporter(object):
             c = self.queue.pop()
             self.print_page(c, header, footer)
 
-    def _do_print_tree(self, name, subtree, level):
+    def _do_print_tree(self, name, subtree, level, prefix=" ", last=True):
         nbsp=" |nbsp| "
         if level:
-            print >>self.file, "|    "  + ("\\|"+nbsp*7)*(level-1) + "\\|---",
+            if last:
+                print >>self.file, "|"  + prefix + u"└──".encode('utf8'),
+            else:
+                print >>self.file, "|"  + prefix + u"├──".encode('utf8'),
         else:
-            print >>self.file, "|",
-        if name in self.classes:
-            print >>self.file, "\*",
+            print >>self.file, "| ",
         link = self.link(name)
         print >>self.file, ":ref:`%s <%s>`" % (name, link)
-        for n in subtree.keys():
-            self._do_print_tree(n, subtree[n], level+1)
+
+        if level > 0:
+            if last:
+                new_prefix = prefix + 10*nbsp
+            else:
+                new_prefix = prefix + u"│".encode('utf8')+8*nbsp
+        else:
+            new_prefix = "  "
+
+        keys = subtree.keys()
+        for n in keys:
+            last = n == keys[-1]
+            self._do_print_tree(n, subtree[n], level+1, new_prefix, last)
 
     def print_tree(self):
         """
             Create inheritance tree of classes.
         """
-        # hash classname -> list of hash of (direct) sublasses 
+        # hash classname -> list of hash of (direct) sublasses
         subclasses = {}
         # hash classname -> nr. of its parents
         parents = {}
@@ -408,12 +421,13 @@ class HtmlExporter(object):
         for c in self.queue:
             if parents[c.name] == 0:
                 self._do_print_tree(c.name, subclasses[c.name], 0)
+                print >>self.file, "|   "
 
     def print_index(self):
         """
             Create table of content.
         """
-        # hash classname -> list of hash of (direct) sublasses 
+        # hash classname -> list of hash of (direct) sublasses
         print >>self.file, ".. toctree::"
         print >>self.file, "    :maxdepth: 1"
         print >>self.file, ""

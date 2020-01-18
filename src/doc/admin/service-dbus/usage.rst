@@ -44,3 +44,34 @@ Disable and enable 'cups' service, print EnabledDefault property::
     print cups.EnabledDefault
     cups.TurnServiceOn()
     print cups.EnabledDefault
+
+Indications
+-----------
+OpenLMI Service provider is able (using indication manager and polling) to emit indication
+event upon service (i. e. :ref:`LMI_Service <LMI-Service>` instance) property modification
+(:ref:`LMI_ServiceInstanceModificationIndication <LMI-ServiceInstanceModificationIndication>`).
+
+This is useful mainly for being notified when a service has changed state (has been started,
+or stopped).
+
+In order to receive indications, create instances of CIM_IndicationFilter (which indications
+should be delivered), CIM_IndicationHandler (what to do with those indications) and
+CIM_IndicationSubscription (links filter and handler together).
+
+The following example in LMIShell does it all in one step::
+
+    c.subscribe_indication(
+        Name="service_modification",
+        QueryLanguage="DMTF:CQL",
+        Query="SELECT * FROM LMI_ServiceInstanceModificationIndication WHERE SOURCEINSTANCE ISA LMI_Service",
+        CreationNamespace="root/interop",
+        SubscriptionCreationClassName="CIM_IndicationSubscription",
+        FilterCreationClassName="CIM_IndicationFilter",
+        FilterSystemCreationClassName="CIM_ComputerSystem",
+        FilterSourceNamespace="root/cimv2",
+        HandlerCreationClassName="CIM_IndicationHandlerCIMXML",
+        HandlerSystemCreationClassName="CIM_ComputerSystem",
+        Destination="http://localhost:12121"
+    )
+
+Indications are sent to the location specified in 'Destination' argument.

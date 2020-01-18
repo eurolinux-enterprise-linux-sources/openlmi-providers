@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -431,11 +431,8 @@ def make_instance(
     for param in ('status_code', 'probable_cause', 'error_type'):
         if not isinstance(locals()[param], (int, long)):
             raise TypeError('%s must be integer'%param)
-    if error_source is None:
-        # this is a cyclic dependency
-        from lmi.software.core import InstallationService
-        error_source = InstallationService.get_path(env)
-    if not isinstance(error_source, pywbem.CIMInstanceName):
+    if error_source is not None \
+            and not isinstance(error_source, pywbem.CIMInstanceName):
         raise TypeError('error_source must be a CIMInstanceName')
 
     inst = pywbem.CIMInstance(classname="CIM_Error",
@@ -444,8 +441,9 @@ def make_instance(
     if status_code_description is not None:
         inst['CIMStatusCodeDescription'] = status_code_description
     inst['ErrorType'] = pywbem.Uint16(error_type)
-    inst['ErrorSource'] = str(error_source)
-    inst['ErrorSourceFormat'] = Values.ErrorSourceFormat.CIMObjectPath
+    if error_source:
+        inst['ErrorSource'] = str(error_source)
+        inst['ErrorSourceFormat'] = Values.ErrorSourceFormat.CIMObjectPath
     if message is not None:
         inst['Message'] = message
     if message_arguments is not None:

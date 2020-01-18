@@ -23,8 +23,6 @@ rdcp_error_code_to_string(rdcp_error_codes ec);
 #define LMI_REALMD_RESULT_DOMAIN_DOES_NOT_SUPPORT_PROVIDED_CREDENTIALS 3
 #define LMI_REALMD_RESULT_DOMAIN_DOES_NOT_SUPPORT_JOINING              4
 
-#define DEFAULT_STATUS_MSG_SIZE 128
-
 CMPIStatus
 handle_g_error(GError **g_error, const CMPIBroker* cb, CMPIStatus* status, CMPIrc rc,
                const gchar *format, ...)

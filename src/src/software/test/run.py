@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- Coding:utf-8 -*-
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -27,18 +27,20 @@ Preferably a ``suite()`` function should be defined there as well.
 They must be named according to shell regexp: ``"test_*.py"``.
 """
 
-import argparse
+import optparse
 import copy
 import getpass
 import inspect
-import pywbem
 import os
 import sys
 import tempfile
-import unittest
+
+from lmi.test import unittest
+from lmi.test import wbem
 
 import reposetup
 import swbase
+import util
 
 class NotFound(Exception):
     """Raised when test of particular name could no be found."""
@@ -52,61 +54,63 @@ def parse_cmd_line():
     :returns: ``(parsed arguments object, arguments for unittest.main())``.
     :rtype: tuple
     """
-    parser = argparse.ArgumentParser(
-            add_help=False,     # handle help message ourselves
+    parser = optparse.OptionParser(
+            add_help_option=False,     # handle help message ourselves
             description="Test OpenLMI Software providers. Arguments"
             " for unittest main function can be added after \"--\""
             " switch.")
-    parser.add_argument("--url",
-            default=os.environ.get("LMI_CIMOM_URL", "http://localhost:5988"),
+    parser.add_option("--url",
+            default=util.get_env('url'),
             help="Network port to use for tests")
-    parser.add_argument("-u", "--user",
-            default=os.environ.get("LMI_CIMOM_USERNAME", ''),
+    parser.add_option("-u", "--user",
+            default=util.get_env('username'),
             help="User for broker authentication.")
-    parser.add_argument("-p", "--password",
-            default=os.environ.get("LMI_CIMOM_PASSWORD", ''),
+    parser.add_option("-p", "--password",
+            default=util.get_env('password'),
             help="User's password.")
 
-    dangerous_group = parser.add_mutually_exclusive_group()
-    dangerous_group.add_argument("--run-dangerous", action="store_true",
-            default=(os.environ.get('LMI_RUN_DANGEROUS', '0') == '1'),
+    parser.add_option('-b', '--backend',
+	    default=util.get_env('backend'),
+	    choices=('yum', 'package-kit'),
+	    help="What backend provider uses.")
+
+    parser.add_option("--run-dangerous", action="store_true",
+            default=util.get_env('run_dangerous'),
             help="Run also tests dangerous for this machine"
                  " (tests, that manipulate with software database)."
                  " Overrides environment variable LMI_RUN_DANGEROUS.")
-    dangerous_group.add_argument('--no-dangerous', action="store_false",
+    parser.add_option('--no-dangerous', action="store_false",
             dest="run_dangerous",
-            default=os.environ.get('LMI_RUN_DANGEROUS', '0') == '1',
+            default=util.get_env('run_dangerous'),
             help="Disable dangerous tests.")
 
-    tedious_group = parser.add_mutually_exclusive_group()
-    tedious_group.add_argument("--run-tedious", action="store_true",
-            default=(os.environ.get('LMI_RUN_TEDIOUS', '0') == '1'),
+    parser.add_option("--run-tedious", action="store_true",
+            default=util.get_env('run_tedious'),
             help="Run also tedious (long running) for this machine."
                  " Overrides environment variable LMI_RUN_TEDIOUS.")
-    tedious_group.add_argument('--no-tedious', action="store_false",
+    parser.add_option('--no-tedious', action="store_false",
             dest="run_tedious",
-            default=os.environ.get('LMI_RUN_TEDIOUS', '0') == '1',
+            default=util.get_env('run_tedious'),
             help="Disable tedious tests.")
 
-    cleanup_group = parser.add_mutually_exclusive_group()
-    cleanup_group.add_argument("--cleanup-cache", action="store_true",
-            default=os.environ.get('LMI_SOFTWARE_CLEANUP_CACHE', '1') == '1',
+    parser.add_option("--cleanup-cache", action="store_true",
+            default=util.get_env('cleanup_cache'),
             help="Clean up all temporary files created for testing purposes."
             " If LMI_SOFTWARE_DB_CACHE is set and this is set to False, next"
             " run will be much faster because testing database won't need to"
             " be generated again. Overrides environment variable"
             " LMI_SOFTWARE_CLEANUP_CACHE.")
-    cleanup_group.add_argument('--no-cleanup', action="store_false",
+    parser.add_option('--no-cleanup', action="store_false",
             dest="cleanup_cache",
-            default=os.environ.get('LMI_SOFTWARE_CLEANUP_CACHE', '1') == '1',
+            default=util.get_env('cleanup_cache'),
             help="Do not delete database cache file and created repositories."
             " This speeds up testing because testing repositories don't need"
             " to be recreated upon next run. This applies only when"
             " LMI_SOFTWARE_DB_CACHE is set.")
 
-    parser.add_argument('-l', '--list-tests', action="store_true",
+    parser.add_option('-l', '--list-tests', action="store_true",
             help="List all possible test names.")
-    parser.add_argument('-h', '--help', action="store_true",
+    parser.add_option('-h', '--help', action="store_true",
             help="Show help message.")
 
     argv = copy.copy(sys.argv)
@@ -115,7 +119,7 @@ def parse_cmd_line():
         index = argv.index('--')
         argv = argv[:index]
         rest = sys.argv[index + 1:]
-    args, unknown_args = parser.parse_known_args(argv)
+    args, unknown_args = parser.parse_args(argv)
     if args.help:
         parser.print_help()
         print
@@ -129,24 +133,18 @@ def parse_cmd_line():
 def try_connection(args):
     """
     Try to connect to cim broker. If authentication fails, ask
-    the user for credentials in loop.
-
-    :returns: ``(user, password)``
-    :rtype: tuple
+    the user for credentials.
     """
     user = args.user
     password = args.password
-    while False:
-        try:
-            pywbem.WBEMConnection(args.url, (user, password))
-            break
-        except pywbem.cim_http.AuthError as exc:
-            user = args.user
-            sys.stderr.write("Authentication error\n")
-            if exc.args[0] == pywbem.CIM_ERR_ACCESS_DENIED:
-                if not user:
-                    user = raw_input("User: ")
-                password = getpass.getpass()
+    try:
+        wbem.WBEMConnection(args.url, (user, password))
+    except wbem.ConnectionError as exc:
+        user = args.user
+        sys.stderr.write("Authentication error\n")
+        if not user:
+            user = raw_input("User: ")
+        password = getpass.getpass()
 
 def prepare_environment(args):
     """
@@ -162,13 +160,14 @@ def prepare_environment(args):
             '1' if args.run_dangerous else '0')
     os.environ["LMI_RUN_TEDIOUS"] = (
             '1' if args.run_tedious else '0')
-    db_cache = os.environ.get("LMI_SOFTWARE_DB_CACHE", None)
+    db_cache = util.get_env('db_cache')
     needs_cleanup = args.cleanup_cache or not bool(db_cache)
     if not db_cache or not os.path.exists(db_cache):
         repos_dir = tempfile.mkdtemp()
         repodb, other_repos = reposetup.make_object_database(repos_dir)
         db_cache = reposetup.save_test_database(
                 repos_dir, repodb, other_repos, db_cache)
+    os.environ["LMI_SOFTWARE_BACKEND"] = args.backend
     os.environ["LMI_SOFTWARE_DB_CACHE"] = db_cache
     os.environ['LMI_SOFTWARE_CLEANUP_CACHE'] = (
             '1' if needs_cleanup else '0')

@@ -43,10 +43,11 @@ target_link_libraries(${LIBRARY_NAME}
                       )
 
 # Create registration file
-cim_registration(${PROVIDER_NAME} ${LIBRARY_NAME} ${MOF} share/openlmi-providers)
-
 set(TARGET_MOF "${CMAKE_BINARY_DIR}/mof/90_LMI_Realmd_Profile.mof")
 profile_mof_generate("90_LMI_Realmd_Profile.mof.skel" "${TARGET_MOF}" "${CIM_CLASSES}")
+
+cim_registration(${PROVIDER_NAME} ${LIBRARY_NAME} ${MOF} share/openlmi-providers "${TARGET_MOF}")
+
 
 install(TARGETS ${LIBRARY_NAME} DESTINATION lib${LIB_SUFFIX}/cmpi/)
 install(PROGRAMS ${CIMPROVAGT_SCRIPT} DESTINATION libexec/pegasus)

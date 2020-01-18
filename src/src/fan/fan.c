@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,17 +23,13 @@
 #include <string.h>
 #include <libgen.h>
 #include <errno.h>
-#include <stdbool.h>
 #include <sensors/sensors.h>
 #include <sensors/error.h>
 
 #include "fan.h"
-#include "globals.h"
 
 const char *provider_name = "fan";
 const ConfigEntry *provider_config_defaults = NULL;
-
-#define MAX_CHIP_NAME_LENGTH 200
 
 //* constants *****************************************************************
 static bool MODULE_INITIALIZED = false;
@@ -96,11 +92,12 @@ static cim_fan_error_t libsensors2cim_fan_error(int err) {
 }
 
 static const char * sprintf_chip_name(sensors_chip_name const *name) {
-    /** @return NULL on error, cstring otherwise */
-    static char buf[MAX_CHIP_NAME_LENGTH];
-    if (sensors_snprintf_chip_name(buf, MAX_CHIP_NAME_LENGTH, name) < 0)
+    /** @return NULL on error, cstring otherwise, it needs to be freed */
+    int charcnt;
+    char buf[BUFLEN];
+    if ((charcnt = sensors_snprintf_chip_name(buf, BUFLEN, name)) < 0)
         return NULL;
-    return buf;
+    return strndup(buf, charcnt);
 }
 
 static cim_fan_error_t reload_config_file(char const * fp) {
@@ -109,16 +106,17 @@ static cim_fan_error_t reload_config_file(char const * fp) {
      * @return 0 on success */
     FILE *config_file = NULL;
     int err;
+    char errbuf[BUFLEN];
 
     if (fp) {
         if (!(config_file = fopen(fp, "r"))) {
-            error("Cound not open config file \"%s\": %s\n",
-                    fp, strerror(errno));
+            lmi_error("Cound not open config file \"%s\": %s\n",
+                      fp, strerror_r(errno, errbuf, sizeof(errbuf)));
         }
     }
     err = sensors_init(config_file);
     if (err) {
-        error("sensors_init: %s\n", sensors_strerror(err));
+        lmi_error("sensors_init: %s\n", sensors_strerror(err));
         if (config_file) fclose(config_file);
     }else {
         if (config_file) fclose(config_file);
@@ -222,7 +220,6 @@ static struct cim_fan * _load_fan_data( sensors_chip_name const *chip
                                       , sensors_feature const *feature)
 {
     struct cim_fan *f;
-    char const *chip_name;
     char * tmp;
     int length;
     int const sfs[] = {
@@ -249,17 +246,13 @@ static struct cim_fan * _load_fan_data( sensors_chip_name const *chip
     if (!(f = calloc(1, sizeof(struct cim_fan)))) {
         return NULL;
     }
-    if (!(chip_name = sprintf_chip_name(chip))) {
-        error("could not get chip name\n");
-        goto lab_err_free_fan;
-    }
-    if (!(f->chip_name = strdup(chip_name))) {
-        perror("strdup");
+    if (!(f->chip_name = sprintf_chip_name(chip))) {
+        lmi_error("could not get chip name\n");
         goto lab_err_free_fan;
     }
     f->sys_path = chip->path;
     if (!(f->name = sensors_get_label(chip, feature))) {
-        error("could not get fan name for chip: %s\n",
+        lmi_error("could not get fan name for chip: %s\n",
                 f->chip_name);
         goto lab_err_chip_name;
     }

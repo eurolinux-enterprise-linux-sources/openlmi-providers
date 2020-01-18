@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  * Authors: Roman Rakus <rrakus@redhat.com>
  */
 
@@ -24,7 +24,6 @@
 #include <stdbool.h>
 
 #include "macros.h"
-#include "globals.h"
 #include "account_globals.h"
 
 #define NAME LAMCNAME
@@ -68,7 +67,7 @@ static CMPIStatus LMI_AccountManagementCapabilitiesEnumInstances(
     LMI_AccountManagementCapabilities_Init(&lamc, _cb, KNameSpace(cop));
     LMI_AccountManagementCapabilities_Set_ElementNameEditSupported(
       &lamc, false);
-    LMI_AccountManagementCapabilities_Set_InstanceID(&lamc, ORGID":"LAMCNAME);
+    LMI_AccountManagementCapabilities_Set_InstanceID(&lamc, LMI_ORGID":"LAMCNAME);
     LMI_AccountManagementCapabilities_Set_ElementName(&lamc, NAME);
 
     LMI_AccountManagementCapabilities_Init_OperationsSupported(&lamc, 3);

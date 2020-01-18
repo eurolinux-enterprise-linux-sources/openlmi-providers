@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -29,8 +29,6 @@
 
 #include "serviceutil.h"
 
-#define OPERATION_BUFSIZE 300
-#define STATUS_BUFSIZE 2000
 #define MAX_SLIST_CNT 1000
 
 char *suscript = "/usr/libexec/serviceutil.sh";
@@ -63,7 +61,7 @@ Service_Free_SList(SList *slist)
 SList *
 Service_Find_All(void)
 {
-  char svname[256];
+  char svname[BUFLEN];
   Control *cc = malloc(sizeof(Control));
   SList *slist;
 
@@ -101,18 +99,18 @@ Service_Find_All(void)
 void *
 Service_Begin_Enum(const char *service)
 {
-  char cmdbuffer[STATUS_BUFSIZE];
+  char cmdbuffer[BUFLEN];
   Control *cc = malloc(sizeof(Control));
 
   memset(&cmdbuffer, '\0', sizeof(cmdbuffer));
 
   if (cc)
   {
-    snprintf(cmdbuffer, STATUS_BUFSIZE, "%s status %s", suscript, service);
+    snprintf(cmdbuffer, BUFLEN, "%s status %s", suscript, service);
     cc->fp = popen(cmdbuffer, "r");
     if (cc->fp)
     {
-      snprintf(cmdbuffer, STATUS_BUFSIZE, "%s is-enabled %s", suscript, service);
+      snprintf(cmdbuffer, BUFLEN, "%s is-enabled %s", suscript, service);
       cc->fp2 = popen(cmdbuffer, "r");
       if (!cc->fp2)
       {
@@ -124,18 +122,18 @@ Service_Begin_Enum(const char *service)
     else
     {
       free(cc);
-      cc=NULL;           
-    }                    
-  }                      
-                         
-  return cc;             
+      cc=NULL;
+    }
+  }
+
+  return cc;
 }
 
 int
 Service_Next_Enum(void *handle, Service* svc, const char *service)
 {
-  char result[2000];
-  char svname[256];
+  char result[BUFLEN];
+  char svname[BUFLEN];
   int pid = 0;
   Control *cc = (Control *) handle;
   int state = 0, ret = 0;
@@ -161,7 +159,7 @@ Service_Next_Enum(void *handle, Service* svc, const char *service)
       }
     }
     svc->svName = strdup(service);
-    
+
     while (fgets(result, sizeof(result), cc->fp2) != NULL)
     {
       if (strncmp(result, "enabled", 7) == 0)
@@ -204,23 +202,27 @@ unsigned int
 Service_Operation(const char *service, const char *method, char *result, int resultlen)
 {
   int res = 0;
-  char cmdbuffer[OPERATION_BUFSIZE];
-  FILE *fcmdout = NULL;
-  char *cmdout = strdup("/tmp/Service_OperationXXXXXX");
-  cmdout = mktemp(cmdout);
+  char cmdbuffer[BUFLEN];
+  const char *const proc_path = "/proc/self/fd/";
+  char template[] = "/tmp/Service_OperationXXXXXX";
 
-  snprintf(cmdbuffer, OPERATION_BUFSIZE, "%s %s %s > %s", suscript, method, service, cmdout);
-  if (system(cmdbuffer) == 0)
-  {
-    /* we got some output? */
-    if ((fcmdout = fopen(cmdout, "r")) == NULL)
-    {
-      result = fgets(result, resultlen, fcmdout);
-      fclose(fcmdout);
-      res = 0;
-    }
+  int tfd = mkstemp(template);
+  if (tfd == -1) {
+    return -1;
   }
-  unlink(cmdout);
-  free(cmdout);
-  return res;
+  unlink(template);
+
+  const int cmd_size = snprintf(NULL, 0, "%s%ul", proc_path, tfd);
+  char cmd[cmd_size];
+  snprintf(cmd, cmd_size, "%s%ul", proc_path, tfd);
+
+  snprintf(cmdbuffer, BUFLEN, "%s %s %s > %s", suscript, method, service, cmd);
+
+  res = system(cmdbuffer);
+
+  /* we got some output? */
+  read(tfd, result, resultlen);
+  close(tfd);
+
+  return WEXITSTATUS(res);
 }

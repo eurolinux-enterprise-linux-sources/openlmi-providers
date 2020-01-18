@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -126,8 +126,8 @@ class RepoFilterSetter(object):
         self._prev_states = None
 
     def __enter__(self):
-        self._prev_states = {   r.id: r.enabled
-                            for r in self._yum_base.repos.repos.values()}
+        self._prev_states = dict((   r.id, r.enabled)
+                            for r in self._yum_base.repos.repos.values())
         if isinstance(self._exclude, (list, tuple, set)):
             exclude = ",".join(self._exclude)
         else:
@@ -266,7 +266,7 @@ class YumWorker(Process):
         """
         Release the yum base object to safe memory.
         """
-        LOG.info("freing database")
+        LOG.info("freeing database")
         self._pkg_cache.clear()
         self._yum_base = None
         self._state = YumWorker.STATE_IDLE
@@ -611,13 +611,30 @@ class YumWorker(Process):
             kind = 'available'
             exclude_repos = '*'
             include_repos = filters.pop('repoid')
-        pkglist = self._handle_get_package_list(kind, allow_duplicates, False,
+        duplicates = allow_duplicates
+        if any(filters.get(f, False) for f in (
+                'nevra', 'envra', 'evra', 'version', 'epoch', 'release')):
+            # Override duplicates in case we match package version. Otherwise
+            # we might fail in finding the package because we will get just the
+            # newest ones if `allow_duplicates` is False.
+            duplicates = True
+        pkglist = self._handle_get_package_list(kind, duplicates, False,
                 include_repos=include_repos, exclude_repos=exclude_repos,
                 transform=False)
         matches = _get_package_filter_function(filters, exact_match)
         result = [p for p in pkglist if matches(p)]
-        if sort is True:
+        if sort is True or (duplicates and not allow_duplicates):
             result.sort()
+        if duplicates and not allow_duplicates:
+            # Result may contain duplicates but no duplicates were requested.
+            # Filter them out.
+            new_result = []
+            for i in xrange(len(result)):
+                if len(new_result) > 0 and new_result[-1].name == result[i].name \
+                        and new_result[-1].arch == result[i].arch:
+                    continue
+                new_result.append(result[i])
+            result = new_result
         LOG.debug("%d packages matching", len(result))
         if transform is True:
             # caching has been already done by _handle_get_package_list()
@@ -631,8 +648,7 @@ class YumWorker(Process):
         @return installed package instance
         """
         if isinstance(pkg, basestring):
-            pkgs = self._handle_filter_packages(
-                    'available' if force else 'avail_notinst',
+            pkgs = self._handle_filter_packages('available',
                     allow_duplicates=False, sort=True,
                     transform=False, nevra=pkg)
             if len(pkgs) < 1:
@@ -650,6 +666,17 @@ class YumWorker(Process):
             action = "reinstall"
         else:
             action = "install"
+            # Check whether a downgrade is requested. Downgrade will be done
+            # only with a Force flag.
+            installed = self._handle_filter_packages('installed',
+                    allow_duplicates=False, sort=True, transform=False,
+                    name=pkg_desired.name, arch=pkg_desired.arch)
+            if installed and installed[-1] > pkg_desired:
+                if force is False:
+                    raise errors.TransactionBuildError(
+                            "Newer package of the same name (%s) is already installed."
+                            "Rerun with Force flag to downgrade." % pkg_desired.name)
+                action = 'downgrade'
         getattr(self._yum_base, action)(pkg_desired)
         self._run_transaction(action)
         installed = self._handle_filter_packages("installed", False, False,
@@ -714,6 +741,7 @@ class YumWorker(Process):
         Handler for package update job.
         @return updated package instance
         """
+        pkg_orig = pkg
         if isinstance(pkg, basestring):
             pkgs = self._handle_filter_packages('installed',
                     allow_duplicates=False, sort=False,
@@ -744,7 +772,7 @@ class YumWorker(Process):
         if len(installed) < 1:
             raise errors.TransactionExecutionFailed(
                     "Failed to update package %s." % pkg)
-        return installed[0]
+        return pkg_orig, installed[0]
 
     @_needs_database
     def _handle_check_package(self, pkg, file_name=None):

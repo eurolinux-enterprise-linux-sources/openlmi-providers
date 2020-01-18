@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -45,61 +45,61 @@ static CMPIStatus associators(
     const char *ns = KNameSpace(cop);
     const char *path;
     char fileclass[BUFLEN];
-    char *fsname;
-    char *fsclassname;
+    char *fsname = NULL;
+    char *fsclassname = NULL;
 
-    st = check_assoc_class(_cb, ns, assocClass, LMI_FileIdentity_ClassName);
-    check_class_check_status(st);
+    st = lmi_class_path_is_a(_cb, ns, LMI_FileIdentity_ClassName, assocClass);
+    lmi_return_if_class_check_not_ok(st);
 
     if (CMClassPathIsA(_cb, cop, LMI_UnixFile_ClassName, &st)) {
         /* got UnixFile - SameElement */
-        st = lmi_check_required(_cb, cc, cop);
-        check_status(st);
+        st = lmi_check_required_properties(_cb, cc, cop, "CSCreationClassName", "CSName");
+        lmi_return_if_status_not_ok(st);
 
-        path = get_string_property_from_op(cop, "LFName");
-        get_class_from_path(path, fileclass);
+        path = lmi_get_string_property_from_objectpath(cop, "LFName");
+        get_logfile_class_from_path(path, fileclass);
         st = get_fsinfo_from_path(_cb, path, &fsclassname, &fsname);
-        check_status(st);
+        lmi_return_if_status_not_ok(st);
 
-        st = check_assoc_class(_cb, ns, resultClass, fileclass);
-        check_class_check_status(st);
-        if (role && strcmp(role, SAME_ELEMENT) != 0) {
+        st = lmi_class_path_is_a(_cb, ns, fileclass, resultClass);
+        lmi_return_if_class_check_not_ok(st);
+        if (role && strcmp(role, LMI_SAME_ELEMENT) != 0) {
             CMReturn(CMPI_RC_OK);
         }
-        if (resultRole && strcmp(resultRole, SYSTEM_ELEMENT) != 0) {
+        if (resultRole && strcmp(resultRole, LMI_SYSTEM_ELEMENT) != 0) {
             CMReturn(CMPI_RC_OK);
         }
 
         CIM_LogicalFileRef cim_lfr;
         CIM_LogicalFileRef_Init(&cim_lfr, _cb, ns);
-        fill_logicalfile(CIM_LogicalFileRef, &cim_lfr, path, fsclassname, fsname, fileclass);
+        fill_logicalfile(cc, CIM_LogicalFileRef, &cim_lfr, path, fsclassname, fsname, fileclass);
         o = CIM_LogicalFileRef_ToObjectPath(&cim_lfr, &st);
         CMSetClassName(o, fileclass);
     } else if (CMClassPathIsA(_cb, cop, CIM_LogicalFile_ClassName, &st)) {
         /* got LogicalFile - SystemElement */
-        st = lmi_check_required(_cb, cc, cop);
-        check_status(st);
+        st = lmi_check_required_properties(_cb, cc, cop, "CSCreationClassName", "CSName");
+        lmi_return_if_status_not_ok(st);
 
-        path = get_string_property_from_op(cop, "Name");
+        path = lmi_get_string_property_from_objectpath(cop, "Name");
 
-        st = check_assoc_class(_cb, ns, resultClass, LMI_UnixFile_ClassName);
-        check_class_check_status(st);
-        if (role && strcmp(role, SYSTEM_ELEMENT) != 0) {
+        st = lmi_class_path_is_a(_cb, ns, LMI_UnixFile_ClassName, resultClass);
+        lmi_return_if_class_check_not_ok(st);
+        if (role && strcmp(role, LMI_SYSTEM_ELEMENT) != 0) {
             CMReturn(CMPI_RC_OK);
         }
-        if (resultRole && strcmp(resultRole, SAME_ELEMENT) != 0) {
+        if (resultRole && strcmp(resultRole, LMI_SAME_ELEMENT) != 0) {
             CMReturn(CMPI_RC_OK);
         }
 
-        get_class_from_path(path, fileclass);
+        get_logfile_class_from_path(path, fileclass);
         st = get_fsinfo_from_path(_cb, path, &fsclassname, &fsname);
-        check_status(st);
+        lmi_return_if_status_not_ok(st);
 
         LMI_UnixFile lmi_uf;
         LMI_UnixFile_Init(&lmi_uf, _cb, ns);
         LMI_UnixFile_Set_LFName(&lmi_uf, path);
-        LMI_UnixFile_Set_CSCreationClassName(&lmi_uf, get_system_creation_class_name());
-        LMI_UnixFile_Set_CSName(&lmi_uf, get_system_name());
+        LMI_UnixFile_Set_CSCreationClassName(&lmi_uf, lmi_get_system_creation_class_name());
+        LMI_UnixFile_Set_CSName(&lmi_uf, lmi_get_system_name_safe(cc));
         LMI_UnixFile_Set_FSCreationClassName(&lmi_uf, fsclassname);
         LMI_UnixFile_Set_FSName(&lmi_uf, fsname);
         LMI_UnixFile_Set_LFCreationClassName(&lmi_uf, fileclass);
@@ -115,7 +115,6 @@ static CMPIStatus associators(
         ci = _cb->bft->getInstance(_cb, cc, o, properties, &st);
         res = CMReturnInstance(cr, ci);
     }
-    free(fsname);
     return res;
 }
 
@@ -136,11 +135,11 @@ static CMPIStatus references(
     CMPIObjectPath *o;
     const char *path;
     char fileclass[BUFLEN];
-    char *fsname;
-    char *fsclassname;
+    char *fsname = NULL;
+    char *fsclassname = NULL;
 
-    st = check_assoc_class(_cb, ns, assocClass, LMI_FileIdentity_ClassName);
-    check_class_check_status(st);
+    st = lmi_class_path_is_a(_cb, ns, LMI_FileIdentity_ClassName, assocClass);
+    lmi_return_if_class_check_not_ok(st);
 
     LMI_FileIdentity_Init(&lmi_fi, _cb, ns);
 
@@ -148,24 +147,24 @@ static CMPIStatus references(
         /* got UnixFile - SameElement */
         LMI_FileIdentity_SetObjectPath_SameElement(&lmi_fi, cop);
 
-        st = lmi_check_required(_cb, cc, cop);
+        st = lmi_check_required_properties(_cb, cc, cop, "CSCreationClassName", "CSName");
         if (st.rc != CMPI_RC_OK) {
             return st;
         }
 
-        path = get_string_property_from_op(cop, "LFName");
-        get_class_from_path(path, fileclass);
+        path = lmi_get_string_property_from_objectpath(cop, "LFName");
+        get_logfile_class_from_path(path, fileclass);
         st = get_fsinfo_from_path(_cb, path, &fsclassname, &fsname);
-        check_status(st);
+        lmi_return_if_status_not_ok(st);
 
-        if (role && strcmp(role, SAME_ELEMENT) != 0) {
+        if (role && strcmp(role, LMI_SAME_ELEMENT) != 0) {
             CMReturn(CMPI_RC_OK);
         }
 
         /* SystemElement */
         CIM_LogicalFileRef lmi_lfr;
         CIM_LogicalFileRef_Init(&lmi_lfr, _cb, ns);
-        fill_logicalfile(CIM_LogicalFileRef, &lmi_lfr, path, fsclassname, fsname, fileclass);
+        fill_logicalfile(cc, CIM_LogicalFileRef, &lmi_lfr, path, fsclassname, fsname, fileclass);
 
         o = CIM_LogicalFileRef_ToObjectPath(&lmi_lfr, &st);
         CMSetClassName(o, fileclass);
@@ -174,25 +173,25 @@ static CMPIStatus references(
         /* got LogicalFile - SystemElement */
         LMI_FileIdentity_SetObjectPath_SystemElement(&lmi_fi, cop);
 
-        st = lmi_check_required(_cb, cc, cop);
+        st = lmi_check_required_properties(_cb, cc, cop, "CSCreationClassName", "CSName");
         if (st.rc != CMPI_RC_OK) {
             return st;
         }
 
-        if (role && strcmp(role, SYSTEM_ELEMENT) != 0) {
+        if (role && strcmp(role, LMI_SYSTEM_ELEMENT) != 0) {
             CMReturn(CMPI_RC_OK);
         }
-        path = get_string_property_from_op(cop, "Name");
-        get_class_from_path(path, fileclass);
+        path = lmi_get_string_property_from_objectpath(cop, "Name");
+        get_logfile_class_from_path(path, fileclass);
         st = get_fsinfo_from_path(_cb, path, &fsclassname, &fsname);
-        check_status(st);
+        lmi_return_if_status_not_ok(st);
 
         /* SameElement */
         LMI_UnixFile lmi_uf;
         LMI_UnixFile_Init(&lmi_uf, _cb, ns);
         LMI_UnixFile_Set_LFName(&lmi_uf, path);
-        LMI_UnixFile_Set_CSCreationClassName(&lmi_uf, get_system_creation_class_name());
-        LMI_UnixFile_Set_CSName(&lmi_uf, get_system_name());
+        LMI_UnixFile_Set_CSCreationClassName(&lmi_uf, lmi_get_system_creation_class_name());
+        LMI_UnixFile_Set_CSName(&lmi_uf, lmi_get_system_name_safe(cc));
         LMI_UnixFile_Set_FSCreationClassName(&lmi_uf, fsclassname);
         LMI_UnixFile_Set_FSName(&lmi_uf, fsname);
         LMI_UnixFile_Set_LFCreationClassName(&lmi_uf, fileclass);
@@ -210,7 +209,6 @@ static CMPIStatus references(
         ci = LMI_FileIdentity_ToInstance(&lmi_fi, &st);
         res = CMReturnInstance(cr, ci);
     }
-    free(fsname);
     return res;
 }
 
@@ -378,4 +376,5 @@ KONKRET_REGISTRATION(
 /* vi: set et: */
 /* Local Variables: */
 /* indent-tabs-mode: nil */
+/* c-basic-offset: 4 */
 /* End: */

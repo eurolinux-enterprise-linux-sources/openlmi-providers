@@ -35,7 +35,7 @@ endif (WITH-JOURNALD)
 if (WITH-LOGICALFILE)
     set(PROVIDERS ${PROVIDERS} "logicalfile")
     set(PROVIDER_CAPTIONS ${PROVIDER_CAPTIONS} "Logical File")
-    set(PROVIDER_MOFS ${PROVIDER_MOFS} "60_LMI_LogicalFile.mof")
+    set(PROVIDER_MOFS ${PROVIDER_MOFS} "50_LMI_LogicalFile.mof")
 endif (WITH-LOGICALFILE)
 
 if (WITH-POWER)
@@ -59,8 +59,20 @@ endif (WITH-SERVICE)
 if (WITH-SOFTWARE)
     set(PROVIDERS ${PROVIDERS} "software")
     set(PROVIDER_CAPTIONS ${PROVIDER_CAPTIONS} "Software")
-    set(PROVIDER_MOFS ${PROVIDER_MOFS} "60_LMI_Software.mof")
+    set(PROVIDER_MOFS ${PROVIDER_MOFS} "${CMAKE_BINARY_DIR}/mof/60_LMI_Software.mof")
 endif (WITH-SOFTWARE)
+
+if (WITH-LOCALE)
+    set(PROVIDERS ${PROVIDERS} "locale")
+    set(PROVIDER_CAPTIONS ${PROVIDER_CAPTIONS} "Locale")
+    set(PROVIDER_MOFS ${PROVIDER_MOFS} "60_LMI_Locale.mof")
+endif (WITH-LOCALE)
+
+if (WITH-SSSD)
+    set(PROVIDERS ${PROVIDERS} "sssd")
+    set(PROVIDER_CAPTIONS ${PROVIDER_CAPTIONS} "SSSD")
+    set(PROVIDER_MOFS ${PROVIDER_MOFS} "60_LMI_SSSD.mof")
+endif (WITH-SSSD)
 
 list(LENGTH PROVIDERS LEN)
 math(EXPR LEN '${LEN}-1')
@@ -83,16 +95,24 @@ foreach(I RANGE ${LEN})
         COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/${PROVIDER}/pic
     )
 
+    if(IS_ABSOLUTE ${MOF})
+        set(MOF_PATH "${MOF}")
+    else(IS_ABSOLUTE ${MOF})
+        set(MOF_PATH "${CMAKE_SOURCE_DIR}/mof/${MOF}")
+    endif(IS_ABSOLUTE ${MOF})
+
     add_custom_target(${PROVIDER}-doc-mof
         COMMAND $(CMAKE_SOURCE_DIR)/tools/openlmi-doc-class2rst
                 -H ${CMAKE_CURRENT_SOURCE_DIR}/header.txt
                 --schema /usr/share/mof/cim-current/CIM_Schema.mof
                 --schema ${OPENLMI_QUALIFIERS_MOF}
                 --schema ${OPENLMI_JOBS_MOF}
-                --mof ${CMAKE_SOURCE_DIR}/mof/${MOF}
+                --mof ${MOF_PATH}
                 CIM_ComputerSystem
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${PROVIDER}/mof
-        DEPENDS ${PROVIDER}-doc-mof-dir
+    )
+    add_dependencies(${PROVIDER}-doc-mof
+        ${PROVIDER}-doc-mof-dir
     )
 
     if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${PROVIDER}/pic)
@@ -111,8 +131,9 @@ foreach(I RANGE ${LEN})
         add_custom_target(${PROVIDER}-doc-pic
             # copy the pictures
             COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/${PROVIDER}/pic/*.svg ${CMAKE_CURRENT_BINARY_DIR}/${PROVIDER}/pic/
-            DEPENDS ${PROVIDER}-doc-mof-dir
-            DEPENDS ${PROVIDER}-doc-pic-gen
+        )
+        add_dependencies(${PROVIDER}-doc-pic
+            ${PROVIDER}-doc-mof-dir ${PROVIDER}-doc-pic-gen
         )
 
     else (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${PROVIDER}/pic)
@@ -127,12 +148,13 @@ foreach(I RANGE ${LEN})
                     -c ${CMAKE_CURRENT_SOURCE_DIR}
                     -D "version=${OPENLMI_VERSION}" -D "release=${OPENLMI_VERSION}" -D "project=OpenLMI ${CAPTION} provider" -D "epub_title=OpenLMI ${CAPTION} provider"
                     ${CMAKE_CURRENT_BINARY_DIR}/${PROVIDER} ${CMAKE_CURRENT_BINARY_DIR}/${PROVIDER}/html
-        DEPENDS ${PROVIDER}-doc-mof ${PROVIDER}-doc-pic
+    )
+    add_dependencies(${PROVIDER}-doc
+        ${PROVIDER}-doc-mof ${PROVIDER}-doc-pic
     )
     set(DOC_DEPS ${DOC_DEPS} ${PROVIDER}-doc)
 endforeach(I RANGE ${LEN})
 
 # Finally, create 'doc' target to run all the previous *doc targets
-add_custom_target(doc
-    DEPENDS ${DOC_DEPS}
-)
+add_custom_target(doc)
+add_dependencies(doc ${DOC_DEPS})

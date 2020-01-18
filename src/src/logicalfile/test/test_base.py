@@ -1,4 +1,4 @@
-# Copyright (C) 2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2013-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -17,6 +17,7 @@
 # Authors: Jan Synacek <jsynacek@redhat.com>
 
 import os
+import shutil
 import subprocess
 import pyudev
 
@@ -51,3 +52,72 @@ class LogicalFileTestBase(cimbase.CIMTestCase):
 
     def tearDown(self):
         pass
+
+
+class Configuration():
+    """
+    Ini-like configuration.
+
+    {group : [(key1, value1), (key2, value2), ...]}
+
+    """
+    def __init__(self, path=None):
+        self.configuration = dict()
+        self.path = path
+        if path:
+            self.backupfile = path + '.backup_openlmi_logicalfile'
+        self.backup = None
+        self.original_path = None
+
+    def add(self, group, options):
+        if self.configuration.has_key(group):
+            self.configuration[group].extend(options)
+        else:
+            self.configuration[group] = options
+
+    def save(self):
+        def get_original_path(path):
+            """
+            Compute already existing path when creating a directory. Returns
+            path to original directory or the whole path.
+
+            Example:
+            Suppose there already exists '/tmp/stuff/' directory.
+            get_original_path('/tmp/stuff/new/directory/file.txt') will return '/tmp/stuff/'.
+            get_original_path('/tmp/stuff/file.txt') will return '/tmp/stuff/file.txt'.
+            """
+            (head, tail) = os.path.split(path)
+            while (head != ''):
+                if os.path.exists(head):
+                    return os.path.join(head, tail)
+                (head, tail) = os.path.split(head)
+            return None
+
+        if os.path.exists(self.path):
+            # backup
+            self.backup = self.backupfile
+            shutil.move(self.path, self.backupfile)
+        else:
+            # create new
+            self.original_path = get_original_path(self.path)
+            d = os.path.dirname(self.path)
+            if (self.path != self.original_path):
+                os.makedirs(os.path.dirname(self.path))
+
+        f = open(self.path, 'w')
+        for group in self.configuration.keys():
+            f.write('[' + group + ']' + '\n')
+            for (key, val) in self.configuration[group]:
+                f.write(key + '=' + val + '\n')
+        f.close()
+
+    def dispose(self):
+        if self.backup:
+            shutil.move(self.backupfile, self.path)
+        elif self.original_path:
+            if self.path != self.original_path:
+                shutil.rmtree(self.original_path)
+            else:
+                os.unlink(self.path)
+        self.backup = None
+        self.original_path = None

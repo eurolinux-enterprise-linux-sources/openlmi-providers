@@ -1,6 +1,6 @@
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -53,5 +53,11 @@ def is_this_system(system_name):
 
     :rtype: boolean
     """
-    return (  socket.gethostbyaddr(system_name)[0]
-           == socket.gethostbyaddr(socket.gethostname())[0])
+    try:
+        return (  socket.gethostbyaddr(system_name)[0]
+               == socket.gethostbyaddr(socket.gethostname())[0])
+    except socket.gaierror:     # name resolution failed
+        if system_name == socket.gethostname():
+            # hostname can not be translated to IP
+            return True
+        return False

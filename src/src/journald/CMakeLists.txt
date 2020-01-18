@@ -30,7 +30,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}
                     ${CMPI_INCLUDE_DIR}
                     ${GLIB2_INCLUDE_DIRS}
                     ${SYSTEMD-JOURNAL_INCLUDE_DIRS}
-                    ${CMAKE_SOURCE_DIR}/src/indmanager
+                    ${CMAKE_SOURCE_DIR}/src/libs/indmanager
                     )
 
 target_link_libraries(${LIBRARY_NAME}
@@ -52,7 +52,7 @@ set(TARGET_MOF "${CMAKE_BINARY_DIR}/mof/90_LMI_Journald_Profile.mof")
 profile_mof_generate("90_LMI_Journald_Profile.mof.skel" "${TARGET_MOF}" "${CIM_PROVIDERS_CLASSES}")
 
 # Create registration file
-cim_registration(${PROVIDER_NAME} ${LIBRARY_NAME} ${MOF} share/openlmi-providers)
+cim_registration(${PROVIDER_NAME} ${LIBRARY_NAME} ${MOF} share/openlmi-providers "${TARGET_MOF}")
 
 install(TARGETS ${LIBRARY_NAME} DESTINATION lib${LIB_SUFFIX}/cmpi/)
 install(PROGRAMS ${CIMPROVAGT_SCRIPT} DESTINATION libexec/pegasus)

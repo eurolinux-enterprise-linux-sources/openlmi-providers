@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -27,7 +27,7 @@ import cgi
 import sys
 
 class DotExporter(object):
-    
+
     def __init__(self, cliconn):
         self.classcache = {}
         self.cliconn = cliconn
@@ -182,13 +182,13 @@ edge [arrowhead="empty" fontsize=10 fontname="sans-serif"]
 """
         while self.classes:
             c = self.classes.pop()
-            
+
             cl = self.load_class(c)
             if noassoc and cl.qualifiers.get("Association", False):
                 continue
-         
+
             if shrink and shrink.match(c):
-            
+
                 self.print_class(cl, box_only = True)
             else:
                 self.print_class(cl)

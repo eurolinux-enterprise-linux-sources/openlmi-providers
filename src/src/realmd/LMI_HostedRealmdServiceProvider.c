@@ -2,7 +2,6 @@
 #include "LMI_HostedRealmdService.h"
 #include "CIM_ComputerSystem.h"
 #include "rdcp_util.h"
-#include "globals.h"
 
 static const CMPIBroker* _cb;
 
@@ -41,15 +40,16 @@ static CMPIStatus LMI_HostedRealmdServiceEnumInstances(
     LMI_HostedRealmdService hosted_realmd_service;
 
     const char *name_space = KNameSpace(cop);
-    const char *host_name = get_system_name();
+    const char *host_name = lmi_get_system_name_safe(cc);
 
     CMSetStatus(&status, CMPI_RC_OK);
 
     LMI_InitRealmdServiceKeys(LMI_RealmdServiceRef, &realmd_service_ref, name_space, host_name);
 
     LMI_HostedRealmdService_Init(&hosted_realmd_service, _cb, name_space);
-    LMI_HostedRealmdService_SetObjectPath_Antecedent(&hosted_realmd_service,
-                                                     lmi_get_computer_system());
+    LMI_HostedRealmdService_SetObjectPath_Antecedent(
+            &hosted_realmd_service,
+            lmi_get_computer_system_safe(cc));
     LMI_HostedRealmdService_Set_Dependent(&hosted_realmd_service,
                                           &realmd_service_ref);
 

@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -23,18 +23,22 @@ Common utilities and base class for all software tests.
 
 import itertools
 import functools
+import collections
 import os
 import re
 import shutil
-import subprocess
 import tempfile
 
 from lmi.test.lmibase import LmiTestCase
+from lmi.test import unittest
 import package
 import repository
 import reposetup
+import util
 
 RE_REPOPKG = re.compile(r'^(?P<repo>[a-z-]+)#(?P<pkg_name>\w+.*|\*)', re.I)
+RE_OBJECT_PATH = re.compile(r'^((?P<host>//[^/]+)/)?(?P<ns>[^:]+):'
+        '(?P<clsname>[^.]+)(?P<keybindings>.*)')
 
 def test_with_repos(*enable_repos, **repos_dict):
     """
@@ -66,11 +70,14 @@ def test_with_repos(*enable_repos, **repos_dict):
                 for r, v in repos_dict.items() if v))
             to_enable_final = []
             to_disable = []
+            repolist = None
+            if util.USE_PKCON:
+                repolist = repository.get_pk_repo_list()
             for repoid in self.repodb:
                 enable = (  repoid in to_enable
                          or bool(repos_dict.get(repoid, False)))
                 repo = self.repodb[repoid]
-                repo.refresh()
+                repo.refresh(repolist)
                 if enable != repo.status:
                     if enable:
                         to_enable_final.append(repoid)
@@ -78,8 +85,10 @@ def test_with_repos(*enable_repos, **repos_dict):
                         to_disable.append(repoid)
             repository.set_repos_enabled(to_enable_final, True)
             repository.set_repos_enabled(to_disable, False)
+            if util.USE_PKCON:
+                repolist = repository.get_pk_repo_list()
             for repoid in itertools.chain(to_enable_final, to_disable):
-                self.repodb[repoid].refresh()
+                self.repodb[repoid].refresh(repolist)
             return func(self, *args, **kwargs)
 
         return _wrapper
@@ -164,6 +173,40 @@ def test_with_packages(*install_pkgs, **enable_dict):
 
     return _decorator
 
+def run_for_backends(backends):
+    """
+    Decorator factory for test case methods. It executes test case method
+    only for specified backend(s).
+
+    It accepts string with single backend or iterable with multiple backends.
+
+    Usage: ::
+
+        @run_for_backends('yum')
+        def test_method(self):
+            pass
+
+        @run_for_backends(['yum', 'package-kit'])
+        def test_method(self):
+            pass
+    """
+
+    def _decorator(func):
+        """ Returns wrapped function. """
+        @functools.wraps(func)
+        def _wrapper(self, *args, **kwargs):
+            """ This is a wrapper deciding whether to skip the test. """
+            backend = util.get_env('backend')
+            if isinstance(backends, basestring) and backend != backends:
+                raise unittest.SkipTest('test only for "%s" backend' % backends)
+            elif isinstance(backends, collections.Iterable) and backend not in backends:
+                raise unittest.SkipTest('test only for %s backends' % backends)
+            return func(self, *args, **kwargs)
+
+        return _wrapper
+
+    return _decorator
+
 class SwTestCase(LmiTestCase):
     """
     Base class for all LMI Software test classes.
@@ -195,6 +238,8 @@ class SwTestCase(LmiTestCase):
             Boolean flag indicating whether, the cache shall be deleted. This
             includes temporary directory with testing repositories and their
             configuration files and serialized database file.
+        ``LMI_SOFTWARE_BACKEND`` : "yum"
+            Can be set either to "yum" or "package-kit".
     """
     #: Define in subclass.
     KEYS = tuple()
@@ -206,6 +251,21 @@ class SwTestCase(LmiTestCase):
     def __init__(self, *args, **kwargs):
         LmiTestCase.__init__(self, *args, **kwargs)
         self.longMessage = True
+
+    def assertObjectPathStringEqual(self, path1, path2):
+        """
+        Compare two object paths while ignoring host if any path is missing it.
+        """
+        m1 = RE_OBJECT_PATH.match(path1)
+        m2 = RE_OBJECT_PATH.match(path2)
+        if not m1 or not m2:
+            return self.assertEqual(path1, path2)
+        if (m1.group('host') and m2.group('host')) \
+                or (not m1.group('host') and not m2.group('host')):
+            return self.assertEqual(path1, path2)
+        return self.assertEqual(
+                '%s:%s.%s' % m1.group('ns', 'clsname', 'keybindings'),
+                '%s:%s.%s' % m2.group('ns', 'clsname', 'keybindings'))
 
     def get_repo(self, repoid):
         """
@@ -229,16 +289,17 @@ class SwTestCase(LmiTestCase):
     def setUpClass(cls):
         LmiTestCase.setUpClass.im_func(cls)
         # This applies to all the commands whose output needs to be parsed.
-        # Make sure we don't need to deal with localisations.
+        # Make sure we don't need to deal with localizations.
         os.environ['LANG'] = 'C'
-        SwTestCase.yum_repos_dir = os.environ.get(
-                'LMI_SOFTWARE_YUM_REPOS_DIR', '/etc/yum.repos.d')
-        SwTestCase._cleanup_db = (
-                    os.environ.get('LMI_SOFTWARE_CLEANUP_CACHE', '1')
-                in  ('1', 'yes', 'on', 'true'))
+        SwTestCase.yum_repos_dir = util.get_env('yum_repos_dir')
+        SwTestCase._cleanup_db = util.get_env('cleanup_cache')
+        SwTestCase.backend = util.get_env('backend')
+        if not SwTestCase.backend in ("yum", "package-kit"):
+            raise ValueError('Invalid provider backend \"%s\"!'
+                    % SwTestCase.backend)
         if SwTestCase.TEST_CASES_INSTANTIATED == 0:
-            if os.environ.get('LMI_SOFTWARE_DB_CACHE', None):
-                db_cache = os.environ['LMI_SOFTWARE_DB_CACHE']
+            if util.get_env('db_cache'):
+                db_cache = util.get_env('db_cache')
                 SwTestCase.repos_dir, SwTestCase.repodb, \
                         SwTestCase.other_repos = \
                             reposetup.load_test_database(db_cache)
@@ -255,8 +316,12 @@ class SwTestCase(LmiTestCase):
                         and repository.is_repo_enabled(repoid):
                     SwTestCase._restore_repos.append(repoid)
             repository.set_repos_enabled(SwTestCase._restore_repos, False)
+            if util.USE_PKCON:
+                repolist = repository.get_pk_repo_list()
+            else:
+                repolist = None
             for repoid in SwTestCase._restore_repos:
-                SwTestCase.other_repos[repoid].refresh()
+                SwTestCase.other_repos[repoid].refresh(repolist)
         SwTestCase.TEST_CASES_INSTANTIATED += 1
 
     @classmethod
@@ -276,8 +341,9 @@ class SwTestCase(LmiTestCase):
             repository.set_repos_enabled(cls._restore_repos, True)
             if SwTestCase._cleanup_db:
                 shutil.rmtree(cls.repos_dir)
-                if os.environ.get('LMI_SOFTWARE_DB_CACHE', None):
-                    os.remove(os.environ['LMI_SOFTWARE_DB_CACHE'])
+                if util.get_env('db_cache'):
+                    os.remove(util.get_env('db_cache'))
             cls.repodb.clear()
         SwTestCase.TEST_CASES_INSTANTIATED -= 1
+        LmiTestCase.tearDownClass.im_func(cls)
 

@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -63,9 +63,9 @@ def get_prop_from_yum_repo(repo, prop_name):
             val = None
         elif prop_name == "ready":
             val = val()
-    elif prop_name in {"arch", "basearch", "releasever"}:
+    elif prop_name in ("arch", "basearch", "releasever"):
         val = repo.yumvar[prop_name]
-    elif prop_name in {"revision", "last_update"}:
+    elif prop_name in ("revision", "last_update"):
         if repo.enabled and repo.repoXML:
             md = repo.repoXML
             if prop_name == "last_update":
@@ -137,6 +137,8 @@ class Repository(object):
                 raise TypeError("%s must be an instance of datetime" % arg)
         if not isinstance(timeout, float):
             raise TypeError("timeout must be a float")
+        if not isinstance(ready, bool) and ready is not None:
+            raise TypeError("ready must be a boolean or None")
         for arg in ('cost', 'revision'):
             if (   locals()[arg] is not None
                and not isinstance(locals()[arg], (int, long))):
@@ -158,7 +160,7 @@ class Repository(object):
         self.name = name
         #self.pkg_count = pkg_count
         self.pkg_dir = pkg_dir
-        self.ready = bool(ready)
+        self.ready = ready
         self.releasever = releasever
         self.repo_gpg_check = bool(repo_gpg_check)
         self.revision = revision
@@ -192,6 +194,9 @@ def make_repository_from_db(repo):
         raise TypeError("repo must be in instance of yum.yumRepo.YumRepository")
     metadata = {}
     for prop_name in Repository.__slots__[1:]:
+        if prop_name == "ready" and not repo.enabled:
+            metadata[prop_name] = None
+            continue
         try:
             metadata[prop_name] = get_prop_from_yum_repo(repo, prop_name)
         except yum.Errors.RepoError as exc:

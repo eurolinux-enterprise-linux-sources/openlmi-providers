@@ -1,8 +1,8 @@
 #!/bin/sh
-# 
+#
 # serviceutil.sh
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -57,11 +57,12 @@ then
 elif [ -f $SYSV_SDIR/$2 ];
 then
   case "$1" in
-    start|stop|reload|restart|condrestart)
+    start|stop|reload|restart|try-restart|condrestart|reload-or-restart|reload-or-try-restart)
       $SYSV_SDIR/$2 $1
+      exit $?
       ;;
     status)
-     output=`$SYSV_SDIR/$2 status`
+     output=`LANG=C $SYSV_SDIR/$2 status`
       if echo "$output" | grep "stopped" > /dev/null 2>&1; then
         echo "stopped"
       elif echo "$output" | grep "not running" > /dev/null 2>&1; then
@@ -71,16 +72,16 @@ then
       fi
       ;;
     is-enabled)
-     CUR_RLVL=`runlevel | cut -d " " -f 2`
-     output=`chkconfig --list tog-pegasus | cut -f $((CUR_RLVL + 2))`
-     if echo "$output" | grep "on" > /dev/null 2>&1; then
+      CUR_RLVL=`runlevel | cut -d " " -f 2`
+      output=`chkconfig --list $2 | cut -f $((CUR_RLVL + 2))`
+      if echo "$output" | grep "on" > /dev/null 2>&1; then
         echo "enabled"
-     elif echo "$output" | grep "off" > /dev/null 2>&1; then
+      elif echo "$output" | grep "off" > /dev/null 2>&1; then
         echo "disabled"
-     fi
-     ;;
+      fi
+      ;;
     enable)
-     chkconfig $2 on
+      chkconfig $2 on
       ;;
     disable)
      chkconfig $2 off

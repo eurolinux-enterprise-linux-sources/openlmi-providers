@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_ProcessorCapabilities.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 #include "lscpu.h"
 
@@ -61,8 +60,8 @@ static CMPIStatus LMI_ProcessorCapabilitiesEnumInstances(
     CMPIUint16 cores = 1, threads = 1;
     const char *ns = KNameSpace(cop),
             *element_name_string = "Capabilities of processor ";
-    char *error_msg = NULL, instance_id[INSTANCE_ID_LEN],
-            element_name[ELEMENT_NAME_LEN];
+    char *error_msg = NULL, instance_id[BUFLEN],
+            element_name[BUFLEN];
     unsigned i, cpus_nb = 0;
     DmiProcessor *dmi_cpus = NULL;
     unsigned dmi_cpus_nb = 0;
@@ -70,11 +69,10 @@ static CMPIStatus LMI_ProcessorCapabilitiesEnumInstances(
 
     if (dmi_get_processors(&dmi_cpus, &dmi_cpus_nb) != 0 || dmi_cpus_nb < 1) {
         dmi_free_processors(&dmi_cpus, &dmi_cpus_nb);
-
-        if (lscpu_get_processor(&lscpu) != 0) {
-            error_msg = "Unable to get processor information.";
-            goto done;
-        }
+    }
+    if (lscpu_get_processor(&lscpu) != 0) {
+        error_msg = "Unable to get processor information.";
+        goto done;
     }
 
     if (dmi_cpus_nb > 0) {
@@ -91,19 +89,23 @@ static CMPIStatus LMI_ProcessorCapabilitiesEnumInstances(
 
         /* do we have output from dmidecode program? */
         if (dmi_cpus_nb > 0) {
-            snprintf(instance_id, INSTANCE_ID_LEN,
-                    ORGID ":" ORGID "_" CPU_CAP_CLASS_NAME ":%s",
+            snprintf(instance_id, BUFLEN,
+                    LMI_ORGID ":" LMI_ProcessorCapabilities_ClassName ":%s",
                     dmi_cpus[i].id);
-            snprintf(element_name, ELEMENT_NAME_LEN, "%s%s",
+            snprintf(element_name, BUFLEN, "%s%s",
                     element_name_string, dmi_cpus[i].id);
             cores = dmi_cpus[i].cores;
             threads = dmi_cpus[i].threads;
         } else {
-            snprintf(instance_id, INSTANCE_ID_LEN,
-                    ORGID ":" ORGID "_" CPU_CAP_CLASS_NAME ":%u", i);
-            snprintf(element_name, ELEMENT_NAME_LEN, "%s%u",
+            snprintf(instance_id, BUFLEN,
+                    LMI_ORGID ":" LMI_ProcessorCapabilities_ClassName ":%u", i);
+            snprintf(element_name, BUFLEN, "%s%u",
                     element_name_string, i);
+        }
+        if (cores < lscpu.cores) {
             cores = lscpu.cores;
+        }
+        if (threads < lscpu.threads_per_core * lscpu.cores) {
             threads = lscpu.threads_per_core * lscpu.cores;
         }
 
@@ -124,11 +126,8 @@ static CMPIStatus LMI_ProcessorCapabilitiesEnumInstances(
     }
 
 done:
-    /* free lscpu only if it was used */
-    if (dmi_cpus_nb < 1) {
-        lscpu_free_processor(&lscpu);
-    }
     dmi_free_processors(&dmi_cpus, &dmi_cpus_nb);
+    lscpu_free_processor(&lscpu);
 
     if (error_msg) {
         KReturn2(_cb, ERR_FAILED, "%s", error_msg);

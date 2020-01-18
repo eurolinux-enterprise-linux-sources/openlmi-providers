@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -21,7 +21,6 @@
 #include <konkret/konkret.h>
 #include "LMI_FanAssociatedSensor.h"
 #include "fan.h"
-#include "globals.h"
 
 static const CMPIBroker* _cb;
 
@@ -33,7 +32,7 @@ static void LMI_FanAssociatedSensorInitialize(const CMPIContext *ctx)
 
 static CMPIStatus LMI_FanAssociatedSensorCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
@@ -51,10 +50,10 @@ static CMPIStatus LMI_FanAssociatedSensorEnumInstanceNames(
 
 static CMPIStatus LMI_FanAssociatedSensorEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     const char *ns = KNameSpace(cop);
     CMPIStatus status;
@@ -76,15 +75,15 @@ static CMPIStatus LMI_FanAssociatedSensorEnumInstances(
         LMI_FanRef_Init(&fan, _cb, ns);
         LMI_FanRef_Set_CreationClassName(&fan, "LMI_Fan");
         LMI_FanRef_Set_DeviceID(&fan, sptr->device_id);
-        LMI_FanRef_Set_SystemCreationClassName(&fan, get_system_creation_class_name());
-        LMI_FanRef_Set_SystemName(&fan, get_system_name());
+        LMI_FanRef_Set_SystemCreationClassName(&fan, lmi_get_system_creation_class_name());
+        LMI_FanRef_Set_SystemName(&fan, lmi_get_system_name_safe(cc));
 
         LMI_FanSensorRef fanSensor;
         LMI_FanSensorRef_Init(&fanSensor, _cb, ns);
         LMI_FanSensorRef_Set_CreationClassName(&fanSensor, "LMI_FanSensor");
         LMI_FanSensorRef_Set_DeviceID(&fanSensor, sptr->device_id);
-        LMI_FanSensorRef_Set_SystemCreationClassName(&fanSensor, get_system_creation_class_name());
-        LMI_FanSensorRef_Set_SystemName(&fanSensor, get_system_name());
+        LMI_FanSensorRef_Set_SystemCreationClassName(&fanSensor, lmi_get_system_creation_class_name());
+        LMI_FanSensorRef_Set_SystemName(&fanSensor, lmi_get_system_name_safe(cc));
 
         LMI_FanAssociatedSensor_Set_Antecedent(&w, &fanSensor);
         LMI_FanAssociatedSensor_Set_Dependent(&w, &fan);
@@ -102,61 +101,61 @@ static CMPIStatus LMI_FanAssociatedSensorEnumInstances(
 }
 
 static CMPIStatus LMI_FanAssociatedSensorGetInstance(
-    CMPIInstanceMI* mi, 
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
 static CMPIStatus LMI_FanAssociatedSensorCreateInstance(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_FanAssociatedSensorModifyInstance(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci,
+    const char**properties)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_FanAssociatedSensorDeleteInstance(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_FanAssociatedSensorExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_FanAssociatedSensorAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -249,13 +248,13 @@ static CMPIStatus LMI_FanAssociatedSensorReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_FanAssociatedSensor,
     LMI_FanAssociatedSensor,
     _cb,
     LMI_FanAssociatedSensorInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_FanAssociatedSensor,
     LMI_FanAssociatedSensor,
     _cb,

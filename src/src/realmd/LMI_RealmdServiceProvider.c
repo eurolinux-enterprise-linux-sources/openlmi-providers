@@ -1,7 +1,6 @@
 #include <konkret/konkret.h>
 #include "LMI_RealmdService.h"
 #include "rdcp_util.h"
-#include "globals.h"
 #include "rdcp_error.h"
 #include "rdcp_dbus.h"
 
@@ -95,7 +94,7 @@ static CMPIStatus LMI_RealmdServiceEnumInstances(
     GError *g_error = NULL;
     LMI_RealmdService lmi_realmd_service;
     const char *name_space = KNameSpace(cop);
-    const char *host_name = get_system_name();
+    const char *host_name = lmi_get_system_name_safe(cc);
     GVariant *provider_props = NULL;
     gchar *joined_domain = NULL;
 

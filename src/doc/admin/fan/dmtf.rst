@@ -136,7 +136,7 @@ It inherts many methods that are not supported because underlying library does
 not offer such functionality. Controlling of fans is very hardware dependent.
 Different drivers may provide different ways and possibilities to manage
 connected fans.
-    
+
 ..
     ***************************************************************************
 

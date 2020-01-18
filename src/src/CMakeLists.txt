@@ -1,24 +1,10 @@
-include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMPI_INCLUDE_DIR} ${GLIB_INCLUDE_DIRS})
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    libs/libopenlmi
+    ${CMPI_INCLUDE_DIR}
+    ${GLIB_INCLUDE_DIRS})
 
-add_library(openlmicommon SHARED
-            openlmi.c
-)
-
-target_link_libraries(openlmicommon ${GLIB_LIBRARIES} dl)
-
-set(OPENLMICOMMON_VERSION_MAJOR 0)
-set(OPENLMICOMMON_VERSION_MINOR 0)
-set(OPENLMICOMMON_VERSION_PATCH 1)
-set(OPENLMICOMMON_VERSION "${OPENLMICOMMON_VERSION_MAJOR}.${OPENLMICOMMON_VERSION_MINOR}.${OPENLMICOMMON_VERSION_PATCH}")
-
-set_target_properties(openlmicommon PROPERTIES VERSION ${OPENLMICOMMON_VERSION})
-set_target_properties(openlmicommon PROPERTIES SOVERSION ${OPENLMICOMMON_VERSION_MAJOR})
-
-install(TARGETS openlmicommon DESTINATION lib${LIB_SUFFIX})
-install(FILES openlmi.h DESTINATION include/openlmi)
-configure_file(openlmi.pc.in openlmi.pc @ONLY)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/openlmi.pc DESTINATION lib${LIB_SUFFIX}/pkgconfig)
-install(FILES openlmi.conf DESTINATION ${SYSCONF_INSTALL_DIR}/openlmi)
+add_subdirectory(libs/libopenlmi)
 
 if (WITH-FAN)
     add_subdirectory(fan)
@@ -31,6 +17,14 @@ endif (WITH-POWER)
 if (WITH-SERVICE)
     add_subdirectory(service-dbus)
 endif (WITH-SERVICE)
+
+if (WITH-SERVICE-LEGACY)
+    add_subdirectory(service)
+endif (WITH-SERVICE-LEGACY)
+
+if (WITH-SERVICE AND WITH-SERVICE-LEGACY)
+    message(FATAL_ERROR "Service and Service-legacy can't be enabled together")
+endif (WITH-SERVICE AND WITH-SERVICE-LEGACY)
 
 if (WITH-ACCOUNT)
     add_subdirectory(account)
@@ -49,11 +43,23 @@ if (WITH-REALMD)
 endif (WITH-REALMD)
 
 if (WITH-INDMANAGER)
-    add_subdirectory(indmanager)
+    add_subdirectory(libs/indmanager)
 endif (WITH-INDMANAGER)
 
+if (WITH-INDSENDER)
+    add_subdirectory(libs/indsender)
+endif (WITH-INDSENDER)
+
+if (WITH-JOBMANAGER)
+    add_subdirectory(libs/jobmanager)
+endif (WITH-JOBMANAGER)
+
 if (WITH-SOFTWARE)
-    add_subdirectory(software)
+    if (WITH-SOFTWARE-DBUS)
+        add_subdirectory(software-dbus)
+    else (WITH-SOFTWARE-DBUS)
+        add_subdirectory(software)
+    endif (WITH-SOFTWARE-DBUS)
 endif (WITH-SOFTWARE)
 
 if (WITH-JOURNALD)
@@ -63,6 +69,14 @@ endif (WITH-JOURNALD)
 if (WITH-PCP)
     add_subdirectory(pcp)
 endif (WITH-PCP)
+
+if (WITH-LOCALE)
+    add_subdirectory(locale)
+endif (WITH-LOCALE)
+
+if (WITH-SSSD)
+    add_subdirectory(sssd)
+endif (WITH-SSSD)
 
 file(GLOB INIT_SKELS "*/lmi/*/__init__.skel")
 foreach(SKEL ${INIT_SKELS})

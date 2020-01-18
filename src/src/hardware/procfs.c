@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,7 +19,6 @@
  */
 
 #include "procfs.h"
-
 
 /*
  * Initialize CpuinfoProcessor attributes.
@@ -52,7 +51,7 @@ short check_cpuinfoprocessor_attributes(CpuinfoProcessor *cpu)
 
 done:
     if (ret != 0) {
-        warn("Failed to allocate memory.");
+        lmi_warn("Failed to allocate memory.");
     }
 
     return ret;

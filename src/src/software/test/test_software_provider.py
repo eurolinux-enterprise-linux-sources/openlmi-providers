@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -23,13 +23,13 @@
 Miscellaneous unit tests for OpenLMI Software provider.
 """
 
-import os
 import subprocess
-import unittest
+from lmi.test import unittest
 
 import swbase
+import util
 
-BROKER = os.environ.get("LMI_CIMOM_BROKER", "tog-pegasus")
+BROKER = util.get_env("broker")
 OPENLMI_SOFTWARE_PKG_NAME = 'openlmi-software'
 
 class TestSoftwareProvider(swbase.SwTestCase):
@@ -39,7 +39,7 @@ class TestSoftwareProvider(swbase.SwTestCase):
 
     def _is_provider_ready(self):
         """
-        Test whether software provider anwers requests.
+        Test whether software provider answers requests.
         """
         service = self.ns.LMI_SoftwareInstallationService.first_instance()
         self.assertNotEqual(service, None,

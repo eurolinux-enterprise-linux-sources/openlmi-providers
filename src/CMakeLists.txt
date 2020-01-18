@@ -2,15 +2,24 @@
 project(openlmi-providers C)
 
 set(OPENLMI_VERSION_MAJOR 0)
-set(OPENLMI_VERSION_MINOR 4)
-set(OPENLMI_VERSION_REVISION 2)
+set(OPENLMI_VERSION_MINOR 5)
+set(OPENLMI_VERSION_REVISION 0)
 set(OPENLMI_VERSION "${OPENLMI_VERSION_MAJOR}.${OPENLMI_VERSION_MINOR}.${OPENLMI_VERSION_REVISION}")
 
 cmake_minimum_required(VERSION 2.6)
 
 # Set flags and definitions
 add_definitions(-D_XOPEN_SOURCE=500 -D_GNU_SOURCE)
-set(CMAKE_C_FLAGS "-std=c99 -fstack-protector-strong -Wall -pedantic -g -Wextra -Wno-unused-parameter -Wformat -Wparentheses -Wl,--no-undefined ${CMAKE_C_FLAGS}")
+set(CMAKE_C_FLAGS "-std=c99 -Wall -W -Wformat-security -pedantic -g -Wextra -Wno-unused-parameter -Wformat -Wparentheses -Wl,--no-undefined ${CMAKE_C_FLAGS}")
+
+# Some compilers don't have -fstack-protector-strong yet
+include(CheckCCompilerFlag)
+check_c_compiler_flag(-fstack-protector-strong HAS_STACK_PROTECTOR_STRONG)
+if(HAS_STACK_PROTECTOR_STRONG)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector-strong")
+else(HAS_STACK_PROTECTOR_STRONG)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector")
+endif()
 
 # Set LIB_SUFFIX to 64 on 64bit architectures
 if(CMAKE_SIZEOF_VOID_P EQUAL 4)
@@ -23,17 +32,40 @@ if(NOT SYSCONF_INSTALL_DIR)
     set(SYSCONF_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/etc)
 endif(NOT SYSCONF_INSTALL_DIR)
 
+set(OPTDESC-JOBMANAGER "Build job manager")
+set(OPTDESC-SOFTWARE-DBUS
+    "Use experimental dbus implementation of software provider")
+
 option(WITH-FAN "Build fan provider" ON)
 option(WITH-POWER "Build power provider" ON)
 option(WITH-SERVICE "Build service provider" ON)
+option(WITH-SERVICE-LEGACY "Build service-legacy provider" OFF)
 option(WITH-ACCOUNT "Build account provider" ON)
 option(WITH-HARDWARE "Build hardware provider" ON)
 option(WITH-LOGICALFILE "Build logical file provider" ON)
 option(WITH-REALMD "Build RealmD provider" ON)
 option(WITH-PCP "Build PCP provider" ON)
 option(WITH-INDMANAGER "Build indication manager" ON)
+option(WITH-INDSENDER "Build indication sender" ON)
+option(WITH-JOBMANAGER ${OPTDESC-JOBMANAGER} ON)
 option(WITH-SOFTWARE "Build software provider" ON)
+option(WITH-SOFTWARE-DBUS ${OPTDESC-SOFTWARE-DBUS} OFF)
 option(WITH-JOURNALD "Build journald provider" ON)
+option(WITH-LOCALE "Build locale provider" ON)
+option(WITH-SSSD "Build SSSD provider" ON)
+
+option(WITH-DEVASSISTANT "Install Developer Assistant templates" OFF)
+
+if(NOT WITH-INDSENDER AND WITH-JOBMANAGER)
+    message(STATUS
+        "Disabled a build of job manager which depends on indication sender.")
+    set(WITH-JOBMANAGER OFF CACHE BOOL ${OPTDESC-JOBMANAGER} FORCE)
+endif(NOT WITH-INDSENDER AND WITH-JOBMANAGER)
+if(NOT WITH-JOBMANAGER AND WITH-SOFTWARE-DBUS)
+    message(STATUS "Disabled a build of software-dbus provider which depends"
+       " on job manager.")
+    set(WITH-SOFTWARE-DBUS OFF CACHE BOOL ${OPTDESC-SOFTWARE-DBUS} FORCE)
+endif(NOT WITH-JOBMANAGER AND WITH-SOFTWARE-DBUS)
 
 # Set path to custom cmake modules
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules ${CMAKE_MODULE_PATH})
@@ -53,8 +85,8 @@ find_package(KonkretCMPI REQUIRED)
 
 pkg_check_modules(GLIB REQUIRED glib-2.0)
 
-add_subdirectory(src)
 add_subdirectory(mof)
+add_subdirectory(src)
 add_subdirectory(tools)
 add_subdirectory(doc)
 

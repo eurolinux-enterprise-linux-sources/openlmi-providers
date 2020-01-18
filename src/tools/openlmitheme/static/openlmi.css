@@ -61,7 +61,7 @@ div.sphinxsidebarwrapper {
     margin: 15px;
     background-color: #f6f6f2;
     word-wrap: break-word; /* don't overflow with large items like LMI_SoftwareInstallationServiceAffectsElement*/
-} 
+}
 
 div.sphinxsidebar {
     width: 280px; /* make the sidebar a bit wider */

@@ -1,0 +1,32 @@
+commit e5ace6896a16a10cb07b1a64d8e9de351e3a6d59
+Author: Radek Novacek <rnovacek@redhat.com>
+Date:   Mon Jan 19 12:09:15 2015 +0100
+
+    openlmi-mof-register: don't raise traceback on db error
+
+diff --git a/openlmi-mof-register b/openlmi-mof-register
+index 89de6eb..d29960e 100755
+--- a/openlmi-mof-register
++++ b/openlmi-mof-register
+@@ -629,11 +629,19 @@ def main():
+     if cmd == "register":
+         log_msg("Registering mofs: " + " ".join(mofs) + ", reg: " + str(reg))
+         cimom_register(mofs, reg, version, namespace, cimom_sel, run_as_user)
+-        db_register(mofs, reg, version, namespace, db_sel, run_as_user)
++        try:
++            db_register(mofs, reg, version, namespace, db_sel, run_as_user)
++        except sqlite3.IntegrityError, e:
++            log_msg("Unable to insert registration information to database: %s" % (str(e)))
++            sys.exit(1)
+     elif cmd == "unregister":
+         log_msg("Unregistering mofs: " + " ".join(mofs) + ", reg: " + str(reg))
+         cimom_unregister(mofs, reg, version, namespace, cimom_sel)
+-        db_unregister(mofs, reg, version, namespace, db_sel)
++        try:
++            db_unregister(mofs, reg, version, namespace, db_sel)
++        except sqlite3.IntegrityError, e:
++            log_msg("Unable to remove registration information from database: %s" % (str(e)))
++            sys.exit(1)
+     elif cmd == "reregister":
+         log_msg("Re-registering mofs: " + " ".join(mofs) + ", reg: " + str(reg))
+         reregister(cimom_sel)

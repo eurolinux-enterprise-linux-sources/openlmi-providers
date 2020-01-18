@@ -1,0 +1,1 @@
+../../../c/openlmi/mof/60_LMI_{{PROJECT_NAME}}.mof.tpl

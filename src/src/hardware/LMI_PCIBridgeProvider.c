@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,9 +20,8 @@
 
 #include <konkret/konkret.h>
 #include "LMI_PCIBridge.h"
-#include "LMI_Hardware.h"
+#include "utils.h"
 #include "PCIDev.h"
-#include "globals.h"
 
 CMPIUint16 get_bridge_type(const char *bridge_type);
 
@@ -40,7 +39,7 @@ static void LMI_PCIBridgeInitialize(const CMPIContext *ctx)
                                     | PCI_FILL_ROM_BASE
                                     | PCI_FILL_CLASS
                                     | PCI_FILL_CAPS) != 0) {
-        error("Failed to access the PCI bus.");
+        lmi_error("Failed to access the PCI bus.");
         abort();
     }
 }
@@ -83,13 +82,13 @@ static CMPIStatus LMI_PCIBridgeEnumInstances(
         pref_limit, pref_type, pref_base_upper = 0, pref_limit_upper = 0;
     struct pci_dev *dev;
     struct pci_cap *cap;
-    char vendor_buf[NAME_BUF_SIZE], *vendor_name;
-    char device_buf[NAME_BUF_SIZE], *device_name;
-    char subsys_buf[NAME_BUF_SIZE], *subsys_name;
-    char svendor_buf[NAME_BUF_SIZE], *svendor_name;
-    char class_buf[NAME_BUF_SIZE], *class;
-    char device_id_str[PCI_DEVID_STR_SIZE];
-    char instance_id[INSTANCE_ID_LEN];
+    char vendor_buf[BUFLEN], *vendor_name;
+    char device_buf[BUFLEN], *device_name;
+    char subsys_buf[BUFLEN], *subsys_name;
+    char svendor_buf[BUFLEN], *svendor_name;
+    char class_buf[BUFLEN], *class;
+    char device_id_str[BUFLEN];
+    char instance_id[BUFLEN];
 
     for (dev = acc_bridge->devices; dev; dev = dev->next) {
         /* Use only PCI Bridges */
@@ -98,17 +97,17 @@ static CMPIStatus LMI_PCIBridgeEnumInstances(
             continue;
         }
 
-        vendor_name = pci_lookup_name(acc_bridge, vendor_buf, NAME_BUF_SIZE,
+        vendor_name = pci_lookup_name(acc_bridge, vendor_buf, BUFLEN,
                 PCI_LOOKUP_VENDOR, dev->vendor_id);
-        device_name = pci_lookup_name(acc_bridge, device_buf, NAME_BUF_SIZE,
+        device_name = pci_lookup_name(acc_bridge, device_buf, BUFLEN,
                 PCI_LOOKUP_DEVICE, dev->vendor_id, dev->device_id);
         get_subid(dev, &svid, &subid);
-        subsys_name = pci_lookup_name(acc_bridge, subsys_buf, NAME_BUF_SIZE,
+        subsys_name = pci_lookup_name(acc_bridge, subsys_buf, BUFLEN,
                 PCI_LOOKUP_DEVICE | PCI_LOOKUP_SUBSYSTEM,
                 dev->vendor_id, dev->device_id, svid, subid);
-        svendor_name = pci_lookup_name(acc_bridge, svendor_buf, NAME_BUF_SIZE,
+        svendor_name = pci_lookup_name(acc_bridge, svendor_buf, BUFLEN,
                 PCI_LOOKUP_VENDOR | PCI_LOOKUP_SUBSYSTEM, svid);
-        class = pci_lookup_name(acc_bridge, class_buf, NAME_BUF_SIZE,
+        class = pci_lookup_name(acc_bridge, class_buf, BUFLEN,
                 PCI_LOOKUP_CLASS, dev->device_class);
         status = pci_read_word(dev, PCI_STATUS);
         rev = pci_read_byte(dev, PCI_REVISION_ID);
@@ -128,18 +127,18 @@ static CMPIStatus LMI_PCIBridgeEnumInstances(
         pref_type = pref_base & PCI_PREF_RANGE_TYPE_MASK;
         sec_status = pci_read_word(dev, PCI_SEC_STATUS);
 
-        snprintf(device_id_str, PCI_DEVID_STR_SIZE, "%02x:%02x.%u",
+        snprintf(device_id_str, BUFLEN, "%02x:%02x.%u",
                 dev->bus, dev->dev, dev->func);
-        snprintf(instance_id, INSTANCE_ID_LEN,
-                ORGID ":" ORGID "_" PCI_BRIDGE_CLASS_NAME ":%s", device_id_str);
+        snprintf(instance_id, BUFLEN,
+                LMI_ORGID ":" LMI_PCIBridge_ClassName ":%s", device_id_str);
 
         LMI_PCIBridge_Init(&lmi_dev, _cb, ns);
 
         LMI_PCIBridge_Set_SystemCreationClassName(&lmi_dev,
-                get_system_creation_class_name());
-        LMI_PCIBridge_Set_SystemName(&lmi_dev, get_system_name());
+                lmi_get_system_creation_class_name());
+        LMI_PCIBridge_Set_SystemName(&lmi_dev, lmi_get_system_name_safe(cc));
         LMI_PCIBridge_Set_CreationClassName(&lmi_dev,
-                ORGID "_" PCI_BRIDGE_CLASS_NAME);
+                LMI_PCIBridge_ClassName);
         LMI_PCIBridge_Set_Caption(&lmi_dev,
                 "This object represents one PCI bridge contained in system.");
 

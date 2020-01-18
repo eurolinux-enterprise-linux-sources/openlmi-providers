@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -79,9 +79,10 @@ def job2model(env, job, keys_only=True, model=None):
                 " of %s's %s method." % (job.jobid,
                 "LMI_SoftwareInstallationService", method_name))
         model['ElementName'] = 'MethodResult-%d' % job.jobid
-        model['PostCallIndication'] = pywbem.CIMProperty("PostCallIndication",
-                type="instance",
-                value=InstMethodCall.job2model(env, job, pre=False))
+        if job.state not in (job.NEW, job.RUNNING):
+            model['PostCallIndication'] = pywbem.CIMProperty(
+                    "PostCallIndication", type="instance",
+                    value=InstMethodCall.job2model(env, job, pre=False))
         model['PreCallIndication'] = pywbem.CIMProperty("PreCallIndication",
                 type="instance",
                 value=InstMethodCall.job2model(env, job))

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,9 +20,9 @@
 
 #include <konkret/konkret.h>
 #include "LMI_ProcessorChip.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
+#include "procfs.h"
 
 static const CMPIBroker* _cb = NULL;
 
@@ -58,12 +58,16 @@ static CMPIStatus LMI_ProcessorChipEnumInstances(
 {
     LMI_ProcessorChip lmi_cpu_chip;
     const char *ns = KNameSpace(cop);
-    char instance_id[INSTANCE_ID_LEN];
+    char instance_id[BUFLEN], *cpu_name = NULL;
+    short ret1, ret2;
     unsigned i;
     DmiProcessor *dmi_cpus = NULL;
     unsigned dmi_cpus_nb = 0;
+    CpuinfoProcessor proc_cpu;
 
-    if (dmi_get_processors(&dmi_cpus, &dmi_cpus_nb) != 0 || dmi_cpus_nb < 1) {
+    ret1 = dmi_get_processors(&dmi_cpus, &dmi_cpus_nb);
+    ret2 = cpuinfo_get_processor(&proc_cpu);
+    if (ret1 != 0 || dmi_cpus_nb < 1 || ret2 != 0) {
         goto done;
     }
 
@@ -71,16 +75,20 @@ static CMPIStatus LMI_ProcessorChipEnumInstances(
         LMI_ProcessorChip_Init(&lmi_cpu_chip, _cb, ns);
 
         LMI_ProcessorChip_Set_CreationClassName(&lmi_cpu_chip,
-                ORGID "_" CPU_CHIP_CLASS_NAME);
+                LMI_ProcessorChip_ClassName);
 
-        snprintf(instance_id, INSTANCE_ID_LEN,
-                ORGID ":" ORGID "_" CPU_CHIP_CLASS_NAME ":%s", dmi_cpus[i].id);
+        snprintf(instance_id, BUFLEN,
+                LMI_ORGID ":" LMI_ProcessorChip_ClassName ":%s", dmi_cpus[i].id);
+
+        cpu_name = dmi_cpus[i].name;
+        if (!cpu_name || !strlen(cpu_name)
+                || !strcmp(cpu_name, "Not Specified")) {
+            cpu_name = proc_cpu.model_name;
+        }
 
         LMI_ProcessorChip_Set_Tag(&lmi_cpu_chip, dmi_cpus[i].id);
-        LMI_ProcessorChip_Set_ElementName(&lmi_cpu_chip, dmi_cpus[i].name);
         LMI_ProcessorChip_Set_Manufacturer(&lmi_cpu_chip,
                 dmi_cpus[i].manufacturer);
-        LMI_ProcessorChip_Set_Model(&lmi_cpu_chip, dmi_cpus[i].name);
         LMI_ProcessorChip_Set_SerialNumber(&lmi_cpu_chip,
                 dmi_cpus[i].serial_number);
         LMI_ProcessorChip_Set_PartNumber(&lmi_cpu_chip,
@@ -89,13 +97,16 @@ static CMPIStatus LMI_ProcessorChipEnumInstances(
         LMI_ProcessorChip_Set_Description(&lmi_cpu_chip,
                 "This object represents one chip of processor in system.");
         LMI_ProcessorChip_Set_InstanceID(&lmi_cpu_chip, instance_id);
-        LMI_ProcessorChip_Set_Name(&lmi_cpu_chip, dmi_cpus[i].name);
+        LMI_ProcessorChip_Set_Model(&lmi_cpu_chip, cpu_name);
+        LMI_ProcessorChip_Set_Name(&lmi_cpu_chip, cpu_name);
+        LMI_ProcessorChip_Set_ElementName(&lmi_cpu_chip, cpu_name);
 
         KReturnInstance(cr, lmi_cpu_chip);
     }
 
 done:
     dmi_free_processors(&dmi_cpus, &dmi_cpus_nb);
+    cpuinfo_free_processor(&proc_cpu);
 
     CMReturn(CMPI_RC_OK);
 }

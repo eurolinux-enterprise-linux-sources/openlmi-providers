@@ -269,7 +269,7 @@ instance_id_from_dbus_path(const char *dbus_path)
     GString *g_instance_id = NULL;
 
     g_instance_id = g_string_new(NULL);
-    g_string_printf(g_instance_id, "%s:%s", ORGID, dbus_path);
+    g_string_printf(g_instance_id, "%s:%s", LMI_ORGID, dbus_path);
     return g_string_free(g_instance_id, FALSE);
 }
 

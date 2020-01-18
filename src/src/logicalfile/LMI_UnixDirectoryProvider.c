@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -17,8 +17,6 @@
  *
  * Authors: Jan Synacek <jsynacek@redhat.com>
  */
-#include <errno.h>
-#include <unistd.h>
 #include <konkret/konkret.h>
 #include "LMI_UnixDirectory.h"
 #include "file.h"
@@ -67,12 +65,12 @@ static CMPIStatus LMI_UnixDirectoryGetInstance(
     CMPIStatus st = {.rc = CMPI_RC_OK};
     logicalfile_t logicalfile;
 
-    st = lmi_check_required(_cb, cc, cop);
-    check_status(st);
+    st = lmi_check_required_properties(_cb, cc, cop, "CSCreationClassName", "CSName");
+    lmi_return_if_status_not_ok(st);
 
     LMI_UnixDirectory_InitFromObjectPath(&logicalfile.lf.unixdirectory, _cb, cop);
     st = stat_logicalfile_and_fill(_cb, &logicalfile, S_IFDIR, "Not a directory: %s");
-    check_status(st);
+    lmi_return_if_status_not_ok(st);
 
     KReturnInstance(cr, logicalfile.lf.unixdirectory);
     return st;
@@ -85,16 +83,26 @@ static CMPIStatus LMI_UnixDirectoryCreateInstance(
     const CMPIObjectPath* cop,
     const CMPIInstance* ci)
 {
-    LMI_UnixDirectory lmi_ud;
-    LMI_UnixDirectory_InitFromInstance(&lmi_ud, _cb, ci);
     CMPIStatus st;
     CMPIObjectPath *iop = CMGetObjectPath(ci, &st);
-    const char *path = get_string_property_from_op(iop, "Name");
+    lmi_return_if_status_not_ok(st);
+    st = lmi_check_required_properties(_cb, cc, iop, "CSCreationClassName", "CSName");
+    lmi_return_if_status_not_ok(st);
 
-    if (mkdir(path, 0777) < 0) {
+    const char *path = lmi_get_string_property_from_objectpath(iop, "Name");
+    bool allow = lmi_read_config_boolean("LMI_UnixDirectory", "AllowMkdir");
+
+    if (allow && mkdir(path, 0777) < 0) {
         char errmsg[BUFLEN];
-        snprintf(errmsg, BUFLEN, "Can't mkdir: %s (%s)", path, strerror(errno));
+        char strerr[BUFLEN];
+        snprintf(errmsg, BUFLEN, "Can't mkdir: %s (%s)",
+                 path,
+                 strerror_r(errno, strerr, BUFLEN));
         CMReturnWithChars(_cb, CMPI_RC_ERR_FAILED, errmsg);
+    }
+    if (allow == false) {
+        CMReturnWithChars(_cb, CMPI_RC_ERR_FAILED,
+                          "Can't mkdir: disabled by provider configuration");
     }
 
     return CMReturnObjectPath(cr, iop);
@@ -117,12 +125,20 @@ static CMPIStatus LMI_UnixDirectoryDeleteInstance(
     const CMPIResult* cr,
     const CMPIObjectPath* cop)
 {
-    const char *path = get_string_property_from_op(cop, "Name");
+    const char *path = lmi_get_string_property_from_objectpath(cop, "Name");
+    bool allow = lmi_read_config_boolean("LMI_UnixDirectory", "AllowRmdir");
 
-    if (rmdir(path) < 0) {
+    if (allow && rmdir(path) < 0) {
         char errmsg[BUFLEN];
-        snprintf(errmsg, BUFLEN, "Can't rmdir: %s (%s)", path, strerror(errno));
+        char strerr[BUFLEN];
+        snprintf(errmsg, BUFLEN, "Can't rmdir: %s (%s)",
+                 path,
+                 strerror_r(errno, strerr, BUFLEN));
         CMReturnWithChars(_cb, CMPI_RC_ERR_FAILED, errmsg);
+    }
+    if (allow == false) {
+        CMReturnWithChars(_cb, CMPI_RC_ERR_FAILED,
+                          "Can't rmdir: disabled by provider configuration");
     }
 
     CMReturn(CMPI_RC_OK);
@@ -180,4 +196,5 @@ KONKRET_REGISTRATION(
 /* vi: set et: */
 /* Local Variables: */
 /* indent-tabs-mode: nil */
+/* c-basic-offset: 4 */
 /* End: */

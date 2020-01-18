@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -99,26 +99,26 @@ def job2model(env, job, pre=True):
     """
     if not isinstance(job, jobs.YumJob):
         raise TypeError("job must be a YumJob")
-    if not pre and job.state == job.NEW or job.state == job.RUNNING:
+    if not pre and (job.state == job.NEW or job.state == job.RUNNING):
         raise ValueError("job must be finished to make a post indication"
             " instance")
     path = util.new_instance_name("CIM_InstMethodCall")
     inst = pywbem.CIMInstance(classname="CIM_InstMethodCall", path=path)
     src_instance = Job.job2model(job, keys_only=False)
+    inst["ReturnValueType"] = Values.ReturnValueType.uint32
     inst['SourceInstance'] = pywbem.CIMProperty("SourceInstance",
             type="instance", value=src_instance)
     inst['SourceInstanceModelPath'] = \
             str(src_instance.path)    #pylint: disable=E1103
     method_name = Job.JOB_METHOD_NAMES[job.metadata["method"]]
     inst['MethodName'] = method_name
-    # TODO: uncomment when Pegasus can correctly handle instances
-    # of unregistered classes
-    #inst['MethodParameters'] = Job.make_method_params(
-    #        job, '__MethodParameters', True, not pre)
-    # TODO: until then, use this workaround
-    if not pre:
+    if pre or job.state != job.COMPLETED:
         inst["MethodParameters"] = Job.make_method_params(
-                job, '__MethodParameters_' + method_name, False, True)
+                job, '__MethodParameters_' + method_name, True, False)
+    else:
+        inst["MethodParameters"] = Job.make_method_params(
+                job, '__MethodParameters_' + method_name + '_Result',
+                True, True)
 
     inst['PreCall'] = pre
 
@@ -128,9 +128,8 @@ def job2model(env, job, pre=True):
         error = Job.job2error(env, job)
         if error is not None:
             inst["Error"].append(error)
-        inst["ReturnValueType"] = Values.ReturnValueType.uint32
         return_value = Job.make_return_value(job)
-        if return_value is not None:
+        if return_value is not None and job.state == job.COMPLETED:
             inst["ReturnValue"] = str(return_value)
 
     return inst

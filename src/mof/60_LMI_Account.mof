@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,7 +18,7 @@
  * Authors: Roman Rakus <rrakus@redhat.com>
  */
 
-[ Version("0.4.2"),
+[ Version("0.4.3"),
   Description("Class representing Linux Account"),
   Provider("cmpi:cmpiLMI_Account")
 ]
@@ -44,6 +44,21 @@ class LMI_Account: CIM_Account
 
   [ Description("The date of expiration of the account.") ]
   datetime AccountExpiration;
+
+  [ Description (
+      "In the case of an LDAP-derived instance, the "
+      "UserPassword property may contain an encrypted password "
+      "used to access the person\'s resources in a directory.\n"
+      "\n"
+      "When an instance of CIM_Account is retrieved and the underlying "
+      "account has a valid password, the value of the CIM_Account.UserPassword "
+      "property shall be an array of length zero to indicate that the "
+      "account has a password configured.\n"
+      "\n"
+      "When the underlying account does not have a valid password, "
+      "the CIM_Account.UserPassword property shall be NULL." ),
+       OctetString ]
+  string UserPassword[];
 
   [ Description (
       "Delete the user. Along with the user, the home directory and user's "

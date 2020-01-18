@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -24,13 +24,14 @@ Unit tests for ``LMI_SoftwareIdentityFileCheck`` provider.
 
 import shutil
 import os
-import pywbem
 import re
 import stat
 import subprocess
-import unittest
 
+from lmi.test import unittest
+from lmi.test import wbem
 from lmi.test.lmibase import enable_lmi_exceptions
+
 import package
 import swbase
 import util
@@ -89,6 +90,17 @@ HASH_DIGEST_LENGTH = {
         11 : 56     #SHA224
 }
 
+def utf8_encode(string):
+    """
+    Encodes string, utf-8 encoding is used.
+
+    :returns: Byte representation of string.
+    :rtype: str
+    """
+    if isinstance(string, unicode):
+        return string.encode('utf-8')
+    return str(string)
+
 class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
     """
     Basic cim operations test.
@@ -102,7 +114,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         :returns: Checksum of installed file.
         :rtype: string
         """
-        return RE_CHECKSUM.match(subprocess.check_output([
+        return RE_CHECKSUM.match(util.check_output([
             HASH_COMMAND[csumnum], filename])).group(1).lower()
 
     def make_op(self, pkg, file_name):
@@ -114,11 +126,26 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
             "CheckID" : 'LMI:LMI_SoftwareIdentityFileCheck',
             "Name" : file_name,
             "SoftwareElementID" : pkg.nevra,
-            "SoftwareElementState" : pywbem.Uint16(
+            "SoftwareElementState" : wbem.Uint16(
                 SOFTWARE_ELEMENT_STATE_EXECUTABLE),
             "TargetOperatingSystem" : util.get_target_operating_system(),
             "Version" : pkg.evra
         })
+
+    def assertEqual(self, fst, snd, *args):
+        if args:
+            args = args[0] % tuple(utf8_encode(a) for a in args[1:])
+        swbase.SwTestCase.assertEqual(self, fst, snd, args)
+
+    def assertNotEqual(self, fst, snd, *args):
+        if args:
+            args = args[0] % tuple(utf8_encode(a) for a in args[1:])
+        swbase.SwTestCase.assertNotEqual(self, fst, snd, args)
+
+    def assertGreater(self, fst, snd, *args):
+        if args:
+            args = args[0] % tuple(utf8_encode(a) for a in args[1:])
+        swbase.SwTestCase.assertGreater(self, fst, snd, args)
 
     def setUp(self):
         to_uninstall = set()
@@ -130,12 +157,12 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
 
     def do_check_symlink(self, pkg, filepath, inst):
         """
-        Check symbolink link.
+        Check symbolic link.
         """
         target = os.readlink(filepath)
         stats = os.lstat(filepath)
 
-        self.assertEqual(inst.FileType, pywbem.Uint16(FILE_TYPE_SYMLINK),
+        self.assertEqual(inst.FileType, FILE_TYPE_SYMLINK,
                 "Unexpected file type of symlink for %s:%s"
                 % (pkg.name, filepath))
         self.assertEqual(inst.UserID, stats.st_uid,
@@ -165,14 +192,11 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         os.lchown(filepath, stats.st_uid + 1, -1)
         inst.refresh()
         self.assertEqual(inst.UserID, inst.UserIDOriginal + 1,
-            "Unexpected uid of modified symlink for %s:%s"%(
-            pkg.name, filepath))
+            "Unexpected uid of modified symlink for %s:%s", pkg.name, filepath)
         self.assertEqual(inst.UserID, prev_user + 1,
-            "Unexpected uid of modified symlink for %s:%s"%(
-            pkg.name, filepath))
+            "Unexpected uid of modified symlink for %s:%s", pkg.name, filepath)
         self.assertEqual(inst.GroupID, stats.st_gid,
-            "Unexpected gid of modified symlink for %s:%s"%(
-            pkg.name, filepath))
+            "Unexpected gid of modified symlink for %s:%s", pkg.name, filepath)
         self.assertEqual(inst.FailedFlags, [FAILED_FLAGS_UID])
 
         # modify link_target
@@ -182,28 +206,28 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         os.lchown(filepath, inst.UserIDOriginal, inst.GroupIDOriginal)
 
         inst.refresh()
-        self.assertEqual(set(inst.FailedFlags), set([FAILED_FLAGS_TARGET]))
+        self.assertEqual(set(inst.FailedFlags), set((FAILED_FLAGS_TARGET,)))
         self.assertGreater(len(inst.LinkTarget), len(inst.LinkTargetOriginal))
 
         self.assertTrue(inst.FileExists,
             "File %s:%s should exist"%(pkg.name, filepath))
         self.assertEqual(inst.FileType, inst.FileTypeOriginal,
-            "File type should match for symlink %s:%s"%(pkg.name, filepath))
+            "File type should match for symlink %s:%s", pkg.name, filepath)
         self.assertNotEqual(inst.FileSizeOriginal, inst.FileSize,
-            "File size should not match for symlink %s:%s"%(
-                pkg.name, filepath))
+            "File size should not match for symlink %s:%s",
+                pkg.name, filepath)
         self.assertEqual(inst.FileMode, inst.FileModeOriginal,
-            "File mode should match for symlink %s:%s"%(pkg.name, filepath))
+            "File mode should match for symlink %s:%s", pkg.name, filepath)
         self.assertEqual(inst.LinkTarget, lt_modif,
-            "Link target should match modified path %s:%s"%(
-                pkg.name, filepath))
+            "Link target should match modified path %s:%s",
+                pkg.name, filepath)
         self.assertNotEqual(inst.LinkTargetOriginal, inst.LinkTarget,
-            "Link target should not match for symlink %s:%s"%(
-                pkg.name, filepath))
+            "Link target should not match for symlink %s:%s",
+                pkg.name, filepath)
         self.assertEqual(inst.UserID, inst.UserIDOriginal,
-            "File uid should match for symlink %s:%s"%(pkg.name, filepath))
+            "File uid should match for symlink %s:%s", pkg.name, filepath)
         self.assertEqual(inst.GroupID, inst.GroupIDOriginal,
-            "File gid should match for symlink %s:%s"%(pkg.name, filepath))
+            "File gid should match for symlink %s:%s", pkg.name, filepath)
 
     def do_check_directory(self, pkg, filepath, inst):
         """
@@ -211,7 +235,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         """
         stats = os.lstat(filepath)
 
-        self.assertEqual(inst.FileType, pywbem.Uint16(FILE_TYPE_DIRECTORY),
+        self.assertEqual(inst.FileType, FILE_TYPE_DIRECTORY,
                 "Unexpected type for directory %s:%s"%(pkg.name, filepath))
         self.assertEqual(inst.UserID, stats.st_uid,
                 "Unexpected uid for directory %s:%s"%(pkg.name, filepath))
@@ -234,45 +258,46 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         """
         stats = os.lstat(filepath)
 
-        self.assertEqual(inst.FileType, pywbem.Uint16(FILE_TYPE_FILE),
-            "Unexpected file type for %s:%s"%(pkg.name, filepath))
+        self.assertEqual(inst.FileType, FILE_TYPE_FILE,
+            "Unexpected file type for %s:%s", pkg.name, filepath)
         self.assertEqual(inst.UserID, stats.st_uid,
-            "Unexpected file uid for %s:%s"%(pkg.name, filepath))
+            "Unexpected file uid for %s:%s", pkg.name, filepath)
         self.assertEqual(inst.GroupID, stats.st_gid,
-            "Unexpected gid for regular file %s:%s"%(pkg.name, filepath))
+            "Unexpected gid for regular file %s:%s", pkg.name, filepath)
         self.assertEqual(inst.FileMode, stats.st_mode,
-            "Unexpected mode for regular file %s:%s"%(pkg.name, filepath))
+            "Unexpected mode for regular file %s:%s", pkg.name, filepath)
         self.assertEqual(inst.FileSize, stats.st_size,
-            "Unexpected size for regular file %s:%s"%(pkg.name, filepath))
+            "Unexpected size for regular file %s:%s", pkg.name, filepath)
         self.assertIs(inst.LinkTarget, None)
         csum = self.make_checksum_str(inst.ChecksumType, filepath)
         self.assertEqual(inst.FileChecksum.lower(), csum,
-            "Unexpected checksum for regular file %s:%s"%(pkg.name, filepath))
+            "Unexpected checksum for regular file %s:%s", pkg.name, filepath)
         self.assertEqual(inst.LastModificationTime,
                 inst.LastModificationTimeOriginal,
-                "Unexpected mtime for regular file %s:%s"%(pkg.name, filepath))
+                "Unexpected mtime for regular file %s:%s", pkg.name, filepath)
         self.assertEqual(inst.LastModificationTime, int(stats.st_mtime),
-                "Unexpected mtime for regular file %s:%s"%(pkg.name, filepath))
+                "Unexpected mtime for regular file %s:%s", pkg.name, filepath)
 
         # make it longer
         with open(filepath, "a+") as fobj:
             fobj.write("data\n")
         inst.refresh()
-        self.assertEqual(set(inst.FailedFlags), set([
+        self.assertEqual(set(inst.FailedFlags), set((
                 FAILED_FLAGS_SIZE,
                 FAILED_FLAGS_CHECKSUM,
                 FAILED_FLAGS_MTIME,
-            ]))
+            )))
 
         self.assertGreater(inst.FileSize, inst.FileSizeOriginal,
                 "File size should be greater, then expected for regular file"
-                " %s:%s"%(pkg.name, filepath))
+                " %s:%s", pkg.name, filepath)
         self.assertGreater(inst.LastModificationTime,
                 inst.LastModificationTimeOriginal,
-                "Unexpected mtime for regular file %s:%s"%(pkg.name, filepath))
+                "Unexpected mtime for regular file %s:%s", pkg.name, filepath)
 
         self.assertTrue(inst.FileExists,
-            "Regular file should exist %s:%s"%(pkg.name, filepath))
+            "Regular file should exist %s:%s"%(
+                utf8_encode(pkg.name), utf8_encode(filepath)))
 
         # change file type
         os.remove(filepath)
@@ -281,28 +306,28 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
                 inst.GroupIDOriginal)
         inst.refresh()
         self.assertNotEqual(inst.LinkTargetOriginal, inst.LinkTarget,
-                "Link target should not match for %s:%s"%(pkg.name, filepath))
+                "Link target should not match for %s:%s", pkg.name, filepath)
         self.assertNotEqual(inst.FileSizeOriginal, inst.FileSize,
-                "File size should not match for %s:%s"%(pkg.name, filepath))
+                "File size should not match for %s:%s", pkg.name, filepath)
         self.assertGreater(inst.LastModificationTime,
                 inst.LastModificationTimeOriginal,
-                "File mtime should be greater than expected for %s:%s"%(
-                    pkg.name, filepath))
+                "File mtime should be greater than expected for %s:%s",
+                    pkg.name, filepath)
         self.assertNotEqual(inst.FileTypeOriginal, inst.FileType,
-                "File type should not match for %s:%s"%(pkg.name, filepath))
-        self.assertEqual(inst.FileType, pywbem.Uint16(FILE_TYPE_SYMLINK),
-                "File type should match for %s:%s"%(pkg.name, filepath))
-        self.assertIn(pywbem.Uint16(FAILED_FLAGS_MODE), inst.FailedFlags)
+                "File type should not match for %s:%s", pkg.name, filepath)
+        self.assertEqual(inst.FileType, FILE_TYPE_SYMLINK,
+                "File type should match for %s:%s", pkg.name, filepath)
+        self.assertIn(FAILED_FLAGS_MODE, inst.FailedFlags)
 
         # remove it
         os.remove(filepath)
         inst.refresh()
         self.assertEqual(inst.LinkTarget, inst.LinkTargetOriginal,
-                "Link target does not match for regular file %s:%s"%(
-                    pkg.name, filepath))
+                "Link target does not match for regular file %s:%s",
+                    pkg.name, filepath)
         self.assertNotEqual(inst.FileSizeOriginal, inst.FileSize,
-                "File size should not match for regular file %s:%s"%(
-                    pkg.name, filepath))
+                "File size should not match for regular file %s:%s",
+                    pkg.name, filepath)
         self.assertIsNone(inst.LastModificationTime)
         self.assertIsNone(inst.FileType)
         self.assertIsNone(inst.FileChecksum)
@@ -319,8 +344,9 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         stats = os.lstat(filepath)
 
         is_block = stat.S_ISBLK(stats.st_mode)
-        self.assertEqual(inst.FileType, pywbem.Uint16(
-            FILE_TYPE_BLOCKDEV if is_block else FILE_TYPE_CHARDEV),
+        self.assertEqual(
+                inst.FileType,
+                FILE_TYPE_BLOCKDEV if is_block else FILE_TYPE_CHARDEV,
                 "Unexpected file type of dev file for %s:%s"
                 % (pkg.name, filepath))
         self.assertEqual(inst.UserID, stats.st_uid,
@@ -345,11 +371,12 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
                 % (pkg.name, filepath))
 
         os.remove(filepath)
-        subprocess.call(['/usr/bin/mknod', filepath, 'b' if is_block else 'c',
+        subprocess.call(['/bin/mknod', filepath, 'b' if is_block else 'c',
             str(os.major(stats.st_rdev) + 1), str(os.minor(stats.st_rdev) + 1)])
+        os.chmod(filepath, 0644)
         self.assertTrue(os.path.exists(filepath))
         inst.refresh()
-        self.assertEqual(set(inst.FailedFlags), set([FAILED_FLAGS_DEVNUM]))
+        self.assertEqual(set(inst.FailedFlags), set((FAILED_FLAGS_DEVNUM,)))
         self.assertEqual(inst.FileMode, stats.st_mode)
 
     def check_filepath(self, pkg, filepath):
@@ -361,21 +388,28 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         inst = objpath.to_instance()
         self.assertNotEqual(inst, None)
         self.assertCIMNameEqual(inst.path, objpath,
-            msg="Object paths of instance must match for %s:%s"%(
-            pkg.name, filepath))
+            "Object paths of instance must match for %s:%s" % tuple(
+                utf8_encode(s) for s in (pkg.name, filepath)))
         for key in self.KEYS:
             if key.lower() == "targetoperatingsystem":
                 self.assertIsInstance(getattr(objpath, key), (int, long))
             else:
-                self.assertEqual(getattr(objpath, key), getattr(inst, key),
-                    "OP key %s values should match for %s:%s"%(
-                    key, pkg.name, filepath))
+                if key == "Name":
+                    fst = utf8_encode(getattr(objpath, key))
+                    snd = utf8_encode(getattr(inst, key))
+                else:
+                    fst = getattr(objpath, key)
+                    snd = getattr(inst, key)
+                self.assertEqual(fst, snd,
+                    "OP key %s values should match for %s:%s",
+                        key, pkg.name, filepath)
 
         self.assertTrue(inst.FileExists,
-            "File %s:%s must exist"%(pkg.name, filepath))
+            "File %s:%s must exist" % tuple(utf8_encode(s)
+                for s in (pkg.name, filepath)))
         self.assertEqual(len(inst.FailedFlags), 0,
-                "FailedFlags must be empty for %s:%s, not: %s" % (
-                    str(pkg), filepath, inst.FailedFlags))
+                "FailedFlags must be empty for %s:%s, not: %s",
+                    pkg, filepath, inst.FailedFlags)
 
         for prop in ( "FileType", "UserID", "GroupID"
                     , "FileMode", "FileSize", "LinkTarget"
@@ -387,7 +421,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
                 continue
             self.assertEqual(
                     getattr(inst, prop+"Original"), getattr(inst, prop),
-                "%s should match for %s:%s"%(prop, pkg.name, filepath))
+                "%s should match for %s:%s", prop, pkg.name, filepath)
         if os.path.islink(filepath):
             self.do_check_symlink(pkg, filepath, inst)
         elif os.path.isdir(filepath):
@@ -421,6 +455,30 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         self.assertEqual(inst.FileType, FILE_TYPE_FILE)
         self.check_filepath(pkg, filepath)
 
+    @swbase.test_with_packages('misc#unicode-chars')
+    def test_check_regular_file(self):
+        """
+        Test ``GetInstance()`` call on ``LMI_SoftwareIdentityFileCheck`` with
+        config file..
+        """
+        pkg = self.get_repo('misc')['unicode-chars']
+        filepath = ( u'/usr/share/openlmi-sw-test-unicode-chars/' \
+                     u'\u011b\u0161\u010d\u0159\u017e\xfd\xe1\xed\xe9')
+        objpath = self.make_op(pkg, filepath)
+        inst = objpath.to_instance()
+        self.assertEqual(inst.FileType, FILE_TYPE_FILE)
+        self.check_filepath(pkg, filepath)
+
+        # try also with encoded string
+        package.remove_pkgs(pkg.name)
+        package.install_pkgs(pkg)
+        filepath = filepath.encode('utf-8')
+        self.assertIsInstance(filepath, str)
+        objpath = self.make_op(pkg, filepath)
+        inst = objpath.to_instance()
+        self.assertEqual(inst.FileType, FILE_TYPE_FILE)
+        self.check_filepath(pkg, filepath)
+
     @enable_lmi_exceptions
     @swbase.test_with_packages('stable#pkg1', 'stable#pkg2')
     def test_get_instance_invalid(self):
@@ -434,9 +492,9 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         fp1 = '/etc/openlmi/software/test/dummy_config.cfg'
         fp2 = '/usr/share/openlmi-sw-test-pkg2'
         objpath1 = self.make_op(pkg1, fp2)
-        self.assertRaisesCIM(pywbem.CIM_ERR_NOT_FOUND, objpath1.to_instance)
+        self.assertRaisesCIM(wbem.CIM_ERR_NOT_FOUND, objpath1.to_instance)
         objpath2 = self.make_op(pkg2, fp1)
-        self.assertRaisesCIM(pywbem.CIM_ERR_NOT_FOUND, objpath2.to_instance)
+        self.assertRaisesCIM(wbem.CIM_ERR_NOT_FOUND, objpath2.to_instance)
         objpath1.wrapped_object["Name"] = fp1
         self.assertNotEqual(objpath1.to_instance(), None)
         objpath2.wrapped_object["Name"] = fp2
@@ -507,57 +565,57 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         objpath.wrapped_object["Name"] = permsdir + 'rw-rw-rw-'
         inst = objpath.to_instance()
         self.assertEqual(inst.FileMode, stat.S_IFREG | 0666)
-        self.assertEqual(set(inst.FileModeFlags), set([
+        self.assertEqual(set(inst.FileModeFlags), set((
             FILE_MODE_ROTH, FILE_MODE_RGRP, FILE_MODE_RUSR,
-            FILE_MODE_WOTH, FILE_MODE_WGRP, FILE_MODE_WUSR]))
+            FILE_MODE_WOTH, FILE_MODE_WGRP, FILE_MODE_WUSR,)))
 
         objpath.wrapped_object["Name"] = permsdir + 'r--r--r--'
         inst = objpath.to_instance()
         self.assertEqual(inst.FileMode, stat.S_IFREG | 0444)
-        self.assertEqual(set(inst.FileModeFlags), set([
-            FILE_MODE_ROTH, FILE_MODE_RGRP, FILE_MODE_RUSR]))
+        self.assertEqual(set(inst.FileModeFlags), set((
+            FILE_MODE_ROTH, FILE_MODE_RGRP, FILE_MODE_RUSR,)))
 
         objpath.wrapped_object["Name"] = permsdir + 'r-xr-xr-x'
         inst = objpath.to_instance()
         self.assertEqual(inst.FileMode, stat.S_IFREG | 0555)
-        self.assertEqual(set(inst.FileModeFlags), set([
+        self.assertEqual(set(inst.FileModeFlags), set((
             FILE_MODE_ROTH, FILE_MODE_RGRP, FILE_MODE_RUSR,
-            FILE_MODE_XOTH, FILE_MODE_XGRP, FILE_MODE_XUSR]))
+            FILE_MODE_XOTH, FILE_MODE_XGRP, FILE_MODE_XUSR,)))
 
         objpath.wrapped_object["Name"] = permsdir + 'r---w---x'
         inst = objpath.to_instance()
         self.assertEqual(inst.FileMode, stat.S_IFREG | 0421)
-        self.assertEqual(set(inst.FileModeFlags), set([
-            FILE_MODE_RUSR, FILE_MODE_WGRP, FILE_MODE_XOTH]))
+        self.assertEqual(set(inst.FileModeFlags), set((
+            FILE_MODE_RUSR, FILE_MODE_WGRP, FILE_MODE_XOTH,)))
 
         objpath.wrapped_object["Name"] = permsdir + 'rwSr--r--'
         inst = objpath.to_instance()
         self.assertEqual(inst.FileMode, stat.S_IFREG | 04644)
-        self.assertEqual(set(inst.FileModeFlags), set([
+        self.assertEqual(set(inst.FileModeFlags), set((
             FILE_MODE_RUSR, FILE_MODE_WUSR,
-            FILE_MODE_RGRP, FILE_MODE_ROTH, FILE_MODE_SUID]))
+            FILE_MODE_RGRP, FILE_MODE_ROTH, FILE_MODE_SUID,)))
 
         objpath.wrapped_object["Name"] = permsdir + 'rw-r-Sr--'
         inst = objpath.to_instance()
         self.assertEqual(inst.FileMode, stat.S_IFREG | 02644)
-        self.assertEqual(set(inst.FileModeFlags), set([
+        self.assertEqual(set(inst.FileModeFlags), set((
             FILE_MODE_RUSR, FILE_MODE_WUSR,
-            FILE_MODE_RGRP, FILE_MODE_ROTH, FILE_MODE_SGID]))
+            FILE_MODE_RGRP, FILE_MODE_ROTH, FILE_MODE_SGID,)))
 
         objpath.wrapped_object["Name"] = permsdir + 'rw-r--r-T'
         inst = objpath.to_instance()
         self.assertEqual(inst.FileMode, stat.S_IFREG | 01644)
-        self.assertEqual(set(inst.FileModeFlags), set([
+        self.assertEqual(set(inst.FileModeFlags), set((
             FILE_MODE_RUSR, FILE_MODE_WUSR,
-            FILE_MODE_RGRP, FILE_MODE_ROTH, FILE_MODE_SVTX]))
+            FILE_MODE_RGRP, FILE_MODE_ROTH, FILE_MODE_SVTX,)))
 
         objpath.wrapped_object["Name"] = permsdir + 'rwsr-sr-t'
         inst = objpath.to_instance()
         self.assertEqual(inst.FileMode, stat.S_IFREG | 07755)
-        self.assertEqual(set(inst.FileModeFlags), set([
+        self.assertEqual(set(inst.FileModeFlags), set((
             FILE_MODE_ROTH, FILE_MODE_RGRP, FILE_MODE_RUSR,
             FILE_MODE_XOTH, FILE_MODE_XGRP, FILE_MODE_XUSR,
-            FILE_MODE_WUSR, FILE_MODE_SUID, FILE_MODE_SGID, FILE_MODE_SVTX]))
+            FILE_MODE_WUSR, FILE_MODE_SUID, FILE_MODE_SGID, FILE_MODE_SVTX,)))
 
     @enable_lmi_exceptions
     def test_enum_instance_names(self):
@@ -565,7 +623,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         Test ``EnumInstanceNames`` call on ``LMI_SoftwareIdentityFileCheck``
         that should not be supported.
         """
-        self.assertRaisesCIM(pywbem.CIM_ERR_NOT_SUPPORTED,
+        self.assertRaisesCIM(wbem.CIM_ERR_NOT_SUPPORTED,
                 self.cim_class.instance_names)
 
     @swbase.test_with_packages('stable#pkg1')
@@ -597,7 +655,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         (rval, _, _) = inst.InvokeOnSystem(TargetSystem=self.system_iname)
         self.assertEqual(rval, INVOKE_NOT_SATISFIED)
         inst.refresh()
-        self.assertEqual(set(inst.FailedFlags), set([FAILED_FLAGS_MODE]))
+        self.assertEqual(set(inst.FailedFlags), set((FAILED_FLAGS_MODE,)))
 
         # restore it
         shutil.copy(backup, fp)
@@ -617,7 +675,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         self.assertEqual(rval, INVOKE_NOT_SATISFIED)
         inst.refresh()
         self.assertEqual(set(inst.FailedFlags),
-                set([FAILED_FLAGS_SIZE, FAILED_FLAGS_CHECKSUM]))
+                set((FAILED_FLAGS_SIZE, FAILED_FLAGS_CHECKSUM,)))
 
         # restore it
         shutil.copy(backup, fp)
@@ -634,7 +692,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         (rval, _, _) = inst.InvokeOnSystem(TargetSystem=self.system_iname)
         self.assertEqual(rval, INVOKE_NOT_SATISFIED)
         inst.refresh()
-        self.assertEqual(set(inst.FailedFlags), set([FAILED_FLAGS_MTIME]))
+        self.assertEqual(set(inst.FailedFlags), set((FAILED_FLAGS_MTIME,)))
 
     @enable_lmi_exceptions
     @swbase.test_with_packages('stable#pkg1')
@@ -649,7 +707,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         inst = objpath.to_instance()
         self.assertNotEqual(inst, None)
         package.remove_pkgs(pkg.name)
-        self.assertRaisesCIM(pywbem.CIM_ERR_NOT_FOUND, inst.Invoke)
+        self.assertRaisesCIM(wbem.CIM_ERR_NOT_FOUND, inst.Invoke)
 
     @swbase.test_with_packages('stable#pkg2')
     def test_method_invoke_on_symlink(self):
@@ -686,7 +744,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         (rval, _, _) = inst.InvokeOnSystem(TargetSystem=self.system_iname)
         self.assertEqual(rval, INVOKE_NOT_SATISFIED)
         inst.refresh()
-        self.assertEqual(set(inst.FailedFlags), set([FAILED_FLAGS_UID]))
+        self.assertEqual(set(inst.FailedFlags), set((FAILED_FLAGS_UID,)))
 
         # remove symlink
         os.remove(fp)
@@ -695,7 +753,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         (rval, _, _) = inst.InvokeOnSystem(TargetSystem=self.system_iname)
         self.assertEqual(rval, INVOKE_NOT_SATISFIED)
         inst.refresh()
-        self.assertEqual(set(inst.FailedFlags), set([FAILED_FLAGS_EXISTENCE]))
+        self.assertEqual(set(inst.FailedFlags), set((FAILED_FLAGS_EXISTENCE,)))
 
         # restore it (mtime)
         os.symlink("../data/target.txt", fp)
@@ -713,7 +771,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         (rval, _, _) = inst.InvokeOnSystem(TargetSystem=self.system_iname)
         self.assertEqual(rval, INVOKE_NOT_SATISFIED)
         inst.refresh()
-        self.assertEqual(set(inst.FailedFlags), set([FAILED_FLAGS_TARGET]))
+        self.assertEqual(set(inst.FailedFlags), set((FAILED_FLAGS_TARGET,)))
 
     @swbase.test_with_packages('stable#pkg3')
     def test_method_invoke_on_fifo(self):
@@ -748,7 +806,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         (rval, _, _) = inst.InvokeOnSystem(TargetSystem=self.system_iname)
         self.assertEqual(rval, INVOKE_NOT_SATISFIED)
         inst.refresh()
-        self.assertEqual(set(inst.FailedFlags), set([FAILED_FLAGS_UID]))
+        self.assertEqual(set(inst.FailedFlags), set((FAILED_FLAGS_UID,)))
 
         # remove fifo
         os.remove(fp)
@@ -757,10 +815,12 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         (rval, _, _) = inst.InvokeOnSystem(TargetSystem=self.system_iname)
         self.assertEqual(rval, INVOKE_NOT_SATISFIED)
         inst.refresh()
-        self.assertEqual(set(inst.FailedFlags), set([FAILED_FLAGS_EXISTENCE]))
+        self.assertEqual(set(inst.FailedFlags), set((FAILED_FLAGS_EXISTENCE,)))
 
         # restore it
         os.mkfifo(fp, 0644)
+        # mkfifo applies umask on mode (which may sometimes contain 0077)
+        os.chmod(fp, 0644)
         os.utime(fp, (stats.st_atime, stats.st_mtime))
         (rval, _, _) = inst.Invoke()
         self.assertEqual(rval, INVOKE_SATISFIED)
@@ -774,7 +834,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         (rval, _, _) = inst.InvokeOnSystem(TargetSystem=self.system_iname)
         self.assertEqual(rval, INVOKE_NOT_SATISFIED)
         inst.refresh()
-        self.assertEqual(set(inst.FailedFlags), set([FAILED_FLAGS_MODE]))
+        self.assertEqual(set(inst.FailedFlags), set((FAILED_FLAGS_MODE,)))
 
         # replace it with regular file
         os.remove(fp)
@@ -789,7 +849,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         self.assertEqual(rval, INVOKE_NOT_SATISFIED)
         inst.refresh()
         self.assertEqual(inst.FileType, FILE_TYPE_FILE)
-        self.assertEqual(set(inst.FailedFlags), set([FAILED_FLAGS_MODE]))
+        self.assertEqual(set(inst.FailedFlags), set((FAILED_FLAGS_MODE,)))
 
     @swbase.test_with_packages('stable#pkg4')
     def test_method_invoke_on_directory(self):
@@ -832,7 +892,7 @@ class TestSoftwareIdentityFileCheck(swbase.SwTestCase):
         (rval, _, _) = inst.InvokeOnSystem(TargetSystem=self.system_iname)
         self.assertEqual(rval, INVOKE_NOT_SATISFIED)
         inst.refresh()
-        self.assertEqual(set(inst.FailedFlags), set([FAILED_FLAGS_MODE]))
+        self.assertEqual(set(inst.FailedFlags), set((FAILED_FLAGS_MODE,)))
 
 def suite():
     """For unittest loaders."""

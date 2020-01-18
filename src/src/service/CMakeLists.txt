@@ -1,7 +1,8 @@
 
 set(PROVIDER_NAME Service)
 set(LIBRARY_NAME cmpiLMI_${PROVIDER_NAME})
-set(MOF 60_LMI_Service.mof)
+set(MOF 60_LMI_Service-legacy.mof)
+set(CIMPROVAGT_SCRIPT cmpiLMI_${PROVIDER_NAME}-cimprovagt)
 
 set(provider_SRCS
     util/serviceutil.c
@@ -10,6 +11,7 @@ set(provider_SRCS
 konkretcmpi_generate(${MOF}
                      CIM_PROVIDERS
                      CIM_HEADERS
+                     CIM_CLASSES
 )
 
 add_library(${LIBRARY_NAME} SHARED
@@ -22,8 +24,13 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMPI_INCLUDE_DIR})
 target_link_libraries(${LIBRARY_NAME} openlmicommon ${KONKRETCMPI_LIBRARIES})
 
 # Create registration file
-cim_registration(${PROVIDER_NAME} ${LIBRARY_NAME} ${MOF} share/openlmi-providers)
+set(TARGET_MOF "${CMAKE_BINARY_DIR}/mof/90_LMI_Service_Profile.mof")
+profile_mof_generate("90_LMI_Service_Profile.mof.skel" "${TARGET_MOF}" "LMI_Service")
+
+cim_registration(${PROVIDER_NAME} ${LIBRARY_NAME} "60_LMI_Service.mof" share/openlmi-providers "${TARGET_MOF}")
+
 
 install(PROGRAMS util/servicedisc.sh util/serviceutil.sh DESTINATION libexec)
-
+install(PROGRAMS ${CIMPROVAGT_SCRIPT} DESTINATION libexec/pegasus)
 install(TARGETS ${LIBRARY_NAME} DESTINATION lib${LIB_SUFFIX}/cmpi)
+install(FILES ${TARGET_MOF} DESTINATION share/openlmi-providers/)

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -37,6 +37,9 @@ global DEFAULT_NAMESPACE
 global REG_DB_PATH
 global REG_DB_NAME
 
+RUN_AS_USER = "2"
+RUN_AS_ROOT = "1"
+
 PEGASUS_REPOSITORY = "/var/lib/Pegasus"
 DEFAULT_NAMESPACE = "root/cimv2"
 REG_DB_PATH = "/var/lib/openlmi-registration"
@@ -61,7 +64,7 @@ Types = {
 def usage():
     print """
 Usage: %(progname)s [ --just-mofs ] [ -n namespace ] [ -c cimom ] [-v version]
-                    CMD <mof> [mof] [...] [reg]
+                    [-u] CMD <mof> [mof] [...] [reg]
     CMD is one of [ register, unregister ]
 
     %(progname)s reregister [ -c cimom ]
@@ -86,6 +89,8 @@ Usage: %(progname)s [ --just-mofs ] [ -n namespace ] [ -c cimom ] [-v version]
       usage without:
         %(progname)s -v <version> CMD <mof> [mof] [...] <reg>
 
+    -u option registers the provider to run under UID of the remote user.
+       If not set, the provider runs as root.
 
     Re-registration
 
@@ -101,23 +106,30 @@ def log_msg(msg):
     sys.stderr.write(" " + msg + "\n")
     sys.stderr.flush()
 
-def log_command(cmd, args):
+def log_command(cmd, args, quit_on_err = True):
     log_msg("COMMAND: " + cmd + " " + " ".join(args))
     try:
         rv = subprocess.check_call([cmd] + args)
     except subprocess.CalledProcessError as e:
         log_msg(str(e))
         rv = e.returncode
+        if (quit_on_err):
+            log_msg("ERROR: Process returned " + str(rv))
+            log_msg("Bailing out.")
+            sys.exit(rv)
     log_msg("EXIT CODE: " + str(rv))
     return rv
 
-def db_init():
-    if not os.path.isdir(REG_DB_PATH):
-        os.makedirs(REG_DB_PATH + "/mof")
-        os.makedirs(REG_DB_PATH + "/reg")
-    db = sqlite3.connect(REG_DB_PATH + "/" + REG_DB_NAME)
-    dbc = db.cursor()
+####################################
+# Database versioning:
+# user_version = 0 - uninitialized, either new db or openlmi-providers < 0.4.2
+# user_version = 1 - added 'runmode' to cimom_opts, openlmi-providers-0.4.2
+#
+
+
+def create_db(dbc):
     dbc.execute("PRAGMA foreign_keys = ON")
+
     dbc.executescript("""
         CREATE TABLE IF NOT EXISTS registration (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,15 +148,62 @@ def db_init():
             registration_id INTEGER REFERENCES registration(id) ON DELETE CASCADE,
             namespace VARCHAR NOT NULL,
             version VARCHAR,
+            runmode VARCHAR NOT NULL DEFAULT 1,
             PRIMARY KEY (cimom, registration_id)
         );""")
+
+def migrate_db(dbc, old_version):
+    if old_version == 0:
+        # migrating v0 -> 1: add cimom_opts.runmode
+        dbc.execute("ALTER TABLE cimom_opts ADD COLUMN runmode VARCHAR NOT NULL DEFAULT 1")
+
+def get_db_version(dbc):
+    """
+    Find current database version.
+    Returns: -1: the database is empty/not initialized
+             positive integer (incl. 0): database schema version.
+    """
+    res = dbc.execute("PRAGMA user_version")
+    ver = res.fetchone()[0]
+    if ver > 0:
+        return ver
+    # openlmi-providers < 0.4.2 did not store any user_version.
+    # Now we must check, if the database is already initialized
+    # (by openlmi-providers-0.4.1) or it's new database.
+    try:
+        res = dbc.execute("select * from cimom_opts")
+    except sqlite3.Error:
+        # The database does not exist
+        return -1
+    # Database exists
+    return 0
+
+def db_init():
+    if not os.path.isdir(REG_DB_PATH):
+        os.makedirs(REG_DB_PATH + "/mof")
+        os.makedirs(REG_DB_PATH + "/reg")
+    db = sqlite3.connect(REG_DB_PATH + "/" + REG_DB_NAME)
+    dbc = db.cursor()
+    res = dbc.execute("PRAGMA user_version")
+    ver = get_db_version(dbc)
+    if ver == -1:
+        create_db(dbc)
+    else:
+        # migrate the database to current version
+        migrate_db(dbc, ver)
+    # finally, mark the table with current version
+    dbc.execute("PRAGMA user_version = 1")
     db.commit()
     return db
 
 def db_close(db):
     db.close()
 
-def define_module(location, group, version):
+def define_module(location, group, version, run_as_user):
+    if run_as_user:
+        user_context = "2" # run as Requestor
+    else:
+        user_context = "5" # run as CIM server
     return """instance of PG_ProviderModule
 {
     Name = "%(group)s";
@@ -154,8 +213,9 @@ def define_module(location, group, version):
     InterfaceType = "CMPI";
     InterfaceVersion = "2.0.0";
     ModuleGroupName = "%(group)s";
+    UserContext = %(user_context)s;
 };
-""" % { 'location': location, 'group': group, 'version': version }
+""" % { 'location': location, 'group': group, 'version': version, 'user_context': user_context }
 
 def get_types(types):
     l = []
@@ -185,13 +245,11 @@ instance of PG_ProviderCapabilities
 """ % { 'location': location, 'provider': provider, 'class': cls, 'types': get_types(types), 'group': group }
 
 def start_pegasus():
-    if log_command("/usr/sbin/cimserver", ["daemon=true",
+    log_command("/usr/sbin/cimserver", ["daemon=true",
             "enableHttpConnection=false",
             "enableHttpsConnection=false",
             "enableRemotePrivilegedUserAccess=false",
-            "slp=false"]) != 0:
-        log_msg("Cannot start Pegasus")
-        sys.exit(1)
+            "slp=false"])
 
 def stop_pegasus():
     log_command("/usr/sbin/cimserver", ["-s"])
@@ -208,7 +266,7 @@ def find_pegasus_interop():
         sys.exit(1)
     return ret
 
-def register_pegasus(reg, version, cimmof, cm_args):
+def register_pegasus(reg, version, cimmof, cm_args, run_as_user):
     modules_defined = {}
     with open(reg, "r") as regfile:
         reg_data = regfile.read()
@@ -220,17 +278,20 @@ def register_pegasus(reg, version, cimmof, cm_args):
             group = location
 
         if group not in modules_defined:
-            tmpfile.write(define_module(location, group, version))
+            tmpfile.write(define_module(location, group, version, run_as_user))
             modules_defined[group] = True
 
         tmpfile.write(define_capability(location, provider, cls, types, group))
     tmpfile.flush()
     interop_ns = find_pegasus_interop()
     cm_args += ["-uc", "-n", interop_ns, tmpfile.name]
-    log_command(cimmof, cm_args)
+    # Don't allow log_command to exit: need to clean-up first
+    rv = log_command(cimmof, cm_args, False)
     tmpfile.close() # deletes the file
+    if (rv != 0):
+        sys.exit(rv)
 
-def cimom_register(mofs, reg, version, namespace, cimom):
+def cimom_register(mofs, reg, version, namespace, cimom, run_as_user):
     if cimom['sfcbd']:
         args = ["-n", namespace]
         if reg:
@@ -252,7 +313,15 @@ def cimom_register(mofs, reg, version, namespace, cimom):
         args += repo_args + ["-uc"] + mofs
         log_command(cimmof, args)
         if reg:
-            register_pegasus(reg, version, cimmof, repo_args)
+            register_pegasus(reg, version, cimmof, repo_args, run_as_user)
+
+# helper function: if something went wrong during unregistration,
+# stop Pegasus before bailing out
+def check_retval(rv, stop):
+    if (rv != 0):
+        if stop:
+            stop_pegasus()
+        sys.exit(rv)
 
 def cimom_unregister(mofs, reg, version, namespace, cimom):
     if cimom['sfcbd']:
@@ -286,9 +355,12 @@ def cimom_unregister(mofs, reg, version, namespace, cimom):
                             if p != rline:
                                 providers.add(p)
                 for p in providers:
-                    log_command("/usr/bin/cimprovider", ["-d", "-m", p])
-                    log_command("/usr/bin/cimprovider", ["-r", "-m", p])
-            log_command("/usr/bin/mofcomp", ["-n", namespace] + mofs)
+                    check_retval(log_command("/usr/bin/cimprovider", ["-d",
+                        "-m", p], False), custom_pegasus)
+                    check_retval(log_command("/usr/bin/cimprovider", ["-r",
+                        "-m", p], False), custom_pegasus)
+            check_retval(log_command("/usr/bin/mofcomp", ["-n", namespace] +
+                mofs, False), custom_pegasus)
         if custom_pegasus:
             stop_pegasus()
 
@@ -313,7 +385,7 @@ def parse_includes(mofs, namespace):
     parser = MOFParser()
     return parser.parse_includes(mofs)
 
-def db_register(mofs, reg, version, namespace, cimom):
+def db_register(mofs, reg, version, namespace, cimom, run_as_user):
     db = db_init()
     dbc = db.cursor()
     rows = db_get_registrations(dbc, mofs, reg)
@@ -345,12 +417,16 @@ def db_register(mofs, reg, version, namespace, cimom):
         dbc.execute("INSERT INTO reg (fname, registration_id) VALUES (?, ?)",
                 (os.path.basename(reg), reg_id))
         log_msg("%s added to database" % (reg,))
+    if run_as_user:
+        runmode = RUN_AS_USER;
+    else:
+        runmode = RUN_AS_ROOT;
     if cimom['sfcbd']:
-        dbc.execute("INSERT INTO cimom_opts (cimom, registration_id, namespace, version) \
-                VALUES (?, ?, ?, ?)", ('sfcbd', reg_id, namespace, version))
+        dbc.execute("INSERT INTO cimom_opts (cimom, registration_id, namespace, version, runmode) \
+                VALUES (?, ?, ?, ?, ?)", ('sfcbd', reg_id, namespace, version, runmode))
     if cimom['tog-pegasus']:
-        dbc.execute("INSERT INTO cimom_opts (cimom, registration_id, namespace, version) \
-                VALUES (?, ?, ?, ?)", ('tog-pegasus', reg_id, namespace, version))
+        dbc.execute("INSERT INTO cimom_opts (cimom, registration_id, namespace, version, runmode) \
+                VALUES (?, ?, ?, ?, ?)", ('tog-pegasus', reg_id, namespace, version, runmode))
     db.commit()
     db_close(db)
 
@@ -392,7 +468,9 @@ def db_get_cimom_opts(cursor, cimom, reg_id):
         return (None, None)
     namespace = row[0]
     version = row[1]
-    return (namespace, version)
+    runmode = row[2]
+    run_as_user = (runmode == RUN_AS_USER)
+    return (namespace, version, run_as_user)
 
 def reregister(cimom):
     db = db_init()
@@ -410,15 +488,15 @@ def reregister(cimom):
         else:
             reg = None
         if cimom['sfcbd']:
-            (namespace, version) = db_get_cimom_opts(dbc_2, 'sfcbd', reg_id)
+            (namespace, version, run_as_user) = db_get_cimom_opts(dbc_2, 'sfcbd', reg_id)
             if not namespace is None:
                 cimom_sel = {'sfcbd': True, 'tog-pegasus': False}
-                cimom_register(mofs, reg, version, namespace, cimom_sel)
+                cimom_register(mofs, reg, version, namespace, cimom_sel, run_as_user)
         if cimom['tog-pegasus']:
-            (namespace, version) = db_get_cimom_opts(dbc_2, 'tog-pegasus', reg_id)
+            (namespace, version, run_as_user) = db_get_cimom_opts(dbc_2, 'tog-pegasus', reg_id)
             if not namespace is None:
                 cimom_sel = {'sfcbd': False, 'tog-pegasus': True}
-                cimom_register(mofs, reg, version, namespace, cimom_sel)
+                cimom_register(mofs, reg, version, namespace, cimom_sel, run_as_user)
     db_close(db)
 
 def list_db():
@@ -458,7 +536,7 @@ def main():
         sys.exit(0)
 
     try:
-        opts, args = getopt.gnu_getopt(sys.argv[1:], "hn:c:v:", ["just-mofs", "help"])
+        opts, args = getopt.gnu_getopt(sys.argv[1:], "hun:c:v:", ["just-mofs", "help"])
     except getopt.GetoptError as e:
         print(e)
         usage()
@@ -470,6 +548,7 @@ def main():
     db_sel = {'sfcbd': True, 'tog-pegasus': True}
     cimom_found = {'sfcbd': False, 'tog-pegasus': False}
     just_mofs = False
+    run_as_user = False
 
     for o, a in opts:
         if o == "-v":
@@ -487,8 +566,10 @@ def main():
             sys.exit()
         elif o == "--just-mofs":
             just_mofs = True
+        elif o == "-u":
+            run_as_user = True
         else:
-            assert False, "unhandled option"
+            assert False, "unhandled option: %s" % (u,)
 
     cmd = args[0]
     if cmd == "register" or cmd == "unregister":
@@ -547,8 +628,8 @@ def main():
 
     if cmd == "register":
         log_msg("Registering mofs: " + " ".join(mofs) + ", reg: " + str(reg))
-        cimom_register(mofs, reg, version, namespace, cimom_sel)
-        db_register(mofs, reg, version, namespace, db_sel)
+        cimom_register(mofs, reg, version, namespace, cimom_sel, run_as_user)
+        db_register(mofs, reg, version, namespace, db_sel, run_as_user)
     elif cmd == "unregister":
         log_msg("Unregistering mofs: " + " ".join(mofs) + ", reg: " + str(reg))
         cimom_unregister(mofs, reg, version, namespace, cimom_sel)

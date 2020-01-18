@@ -1,0 +1,292 @@
+/*
+ * Copyright (C) 2014 Red Hat, Inc.  All rights reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Authors: Vitezslav Crhonek <vcrhonek@redhat.com>
+ */
+
+[ Description("Class representing Linux Locale. The system locale "
+    "controls the language settings of system services and of "
+    "the UI before the user logs in, such as the display manager, "
+    "as well as the default for users after login."),
+  Provider("cmpi:cmpiLMI_Locale") ]
+class LMI_Locale : CIM_SystemSetting
+{
+    [ Description("Main locale property. When defined, its value is "
+        "used as default for all other non-defined LC* categories. \n"
+        "The property should be in format "
+        "[language[_territory][.codeset][@modifier]], "
+        "for example, 'en_AU.UTF-8' (Australian English using "
+        "the UTF-8 encoding).") ]
+    string Lang;
+
+    [ Description("Defines behavior of the character handling and "
+        "classification functions. \n"
+        "The property should be in format "
+        "[language[_territory][.codeset][@modifier]], "
+        "for example, 'en_AU.UTF-8' (Australian English using "
+        "the UTF-8 encoding).") ]
+    string LCCType;
+
+    [ Description("Defines the information used by the input/output "
+        "functions, when they are advised to use the locale settings. \n"
+        "The property should be in format "
+        "[language[_territory][.codeset][@modifier]], "
+        "for example, 'en_AU.UTF-8' (Australian English using "
+        "the UTF-8 encoding).") ]
+    string LCNumeric;
+
+    [ Description("Defines how to display the current time in a locally "
+        "acceptable form; for example, most of Europe uses a 24-hour clock "
+        "versus the 12-hour clock used in the United States. \n"
+        "The property should be in format "
+        "[language[_territory][.codeset][@modifier]], "
+        "for example, 'en_AU.UTF-8' (Australian English using "
+        "the UTF-8 encoding).") ]
+    string LCTime;
+
+    [ Description("Defines the behavior of the functions, which are "
+        "used to compare and/or sort strings in the local alphabet. \n"
+        "The property should be in format "
+        "[language[_territory][.codeset][@modifier]], "
+        "for example, 'en_AU.UTF-8' (Australian English using "
+        "the UTF-8 encoding).") ]
+    string LCCollate;
+
+    [ Description("Defines the way numbers are usually printed, with "
+        "details such as decimal point versus decimal comma. \n"
+        "The property should be in format "
+        "[language[_territory][.codeset][@modifier]], "
+        "for example, 'en_AU.UTF-8' (Australian English using "
+        "the UTF-8 encoding).") ]
+    string LCMonetary;
+
+    [ Description("Defines the language messages are displayed in and "
+        "what an affirmative or negative answer looks like. \n"
+        "The property should be in format "
+        "[language[_territory][.codeset][@modifier]], "
+        "for example, 'en_AU.UTF-8' (Australian English using "
+        "the UTF-8 encoding).") ]
+    string LCMessages;
+
+    [ Description("Defines the settings relating to the dimensions of "
+        "the standard paper size (e.g., US letter versus A4). \n"
+        "The property should be in format "
+        "[language[_territory][.codeset][@modifier]], "
+        "for example, 'en_AU.UTF-8' (Australian English using "
+        "the UTF-8 encoding).") ]
+    string LCPaper;
+
+    [ Description("Defines the settings that describe the formats used "
+        "to address persons. \n"
+        "The property should be in format "
+        "[language[_territory][.codeset][@modifier]], "
+        "for example, 'en_AU.UTF-8' (Australian English using "
+        "the UTF-8 encoding).") ]
+    string LCName;
+
+    [ Description("Defines the rules for the formats (e.g., postal "
+        "addresses) used to describe locations and geography-related "
+        "items. \n"
+        "The property should be in format "
+        "[language[_territory][.codeset][@modifier]], "
+        "for example, 'en_AU.UTF-8' (Australian English using "
+        "the UTF-8 encoding).") ]
+    string LCAddress;
+
+    [ Description("Defines the settings that describe the formats to be "
+        "used with telephone services. \n"
+        "The property should be in format "
+        "[language[_territory][.codeset][@modifier]], "
+        "for example, 'en_AU.UTF-8' (Australian English using "
+        "the UTF-8 encoding).") ]
+    string LCTelephone;
+
+    [ Description("Defines the settings relating to the measurement system "
+        "in the locale (i.e., metric versus US customary units). \n"
+        "The property should be in format "
+        "[language[_territory][.codeset][@modifier]], "
+        "for example, 'en_AU.UTF-8' (Australian English using "
+        "the UTF-8 encoding).") ]
+    string LCMeasurement;
+
+    [ Description("Defines the settings that relate to the metadata for "
+        "the locale. \n"
+        "The property should be in format "
+        "[language[_territory][.codeset][@modifier]], "
+        "for example, 'en_AU.UTF-8' (Australian English using "
+        "the UTF-8 encoding).") ]
+    string LCIdentification;
+
+    [ Description("System keyboard mapping used on the text console. "
+        "The property should be a keyboard mapping name "
+        "(such as 'de' or 'us'). ") ]
+    string VConsoleKeymap;
+
+    [ Description("Toggle keyboard mapping used on the text console. "
+        "The property should be a keyboard mapping name "
+        "(such as 'de' or 'us'). ") ]
+    string VConsoleKeymapToggle;
+
+    [ Description("System default keyboard mapping for X11 - the graphical "
+        "UI before the user logs in, such as the display manager, as well "
+        "as the default for users after login. The property should be a "
+        "keyboard mapping name (such as 'de' or 'us'). Individual layouts "
+        "are comma separated (e. g. 'us,cz,de').") ]
+    string X11Layouts;
+
+    [ Description("Model of default keyboard mapping for X11. The property "
+        "should be a keyboard model name (such as 'pc105' or 'thinkpad60').") ]
+    string X11Model;
+
+    [ Description("Variant of default keyboard mapping for X11. The property "
+        "should be a keyboard variant name (such as 'dvorak' or 'qwerty').") ]
+    string X11Variant;
+
+    [ Description("Options for default keyboard mapping for X11. The property "
+        "should be a keyboard option name (such as 'altwin:menu' or "
+        "'grp:lalt_toggle'). Individual options are comma separated "
+        "(e. g. 'grp:alt_shift_toggle,shift:both_capslock').") ]
+    string X11Options;
+
+    [ Description("Method used to set the system locale. If you set "
+        "a new system locale, all old system locale settings will be "
+        "dropped, and the new settings will be saved to disk. "
+        "It will also be passed to the system manager, and subsequently "
+        "started daemons will inherit the new system locale from it. "
+        "Note that already running daemons will not learn about the new "
+        "system locale.") ]
+    uint32 SetLocale(
+        [ IN, Description("Sets the Lang property. \n"
+            "The value should be in format "
+            "[language[_territory][.codeset][@modifier]], "
+            "for example, 'en_AU.UTF-8' (Australian English using "
+            "the UTF-8 encoding).") ]
+        string Lang,
+        [ IN, Description("Sets the LCCType property. \n"
+            "The value should be in format "
+            "[language[_territory][.codeset][@modifier]], "
+            "for example, 'en_AU.UTF-8' (Australian English using "
+            "the UTF-8 encoding).") ]
+        string LCCType,
+        [ IN, Description("Sets the LCNumeric property. \n"
+            "The value should be in format "
+            "[language[_territory][.codeset][@modifier]], "
+            "for example, 'en_AU.UTF-8' (Australian English using "
+            "the UTF-8 encoding).") ]
+        string LCNumeric,
+        [ IN, Description("Sets the LCTime property. \n"
+            "The value should be in format "
+            "[language[_territory][.codeset][@modifier]], "
+            "for example, 'en_AU.UTF-8' (Australian English using "
+            "the UTF-8 encoding).") ]
+        string LCTime,
+        [ IN, Description("Sets the LCCollate property. \n"
+            "The value should be in format "
+            "[language[_territory][.codeset][@modifier]], "
+            "for example, 'en_AU.UTF-8' (Australian English using "
+            "the UTF-8 encoding).") ]
+        string LCCollate,
+        [ IN, Description("Sets the LCMonetar property. \n"
+            "The value should be in format "
+            "[language[_territory][.codeset][@modifier]], "
+            "for example, 'en_AU.UTF-8' (Australian English using "
+            "the UTF-8 encoding).") ]
+        string LCMonetary,
+        [ IN, Description("Sets the LCMessages property. \n"
+            "The value should be in format "
+            "[language[_territory][.codeset][@modifier]], "
+            "for example, 'en_AU.UTF-8' (Australian English using "
+            "the UTF-8 encoding).") ]
+        string LCMessages,
+        [ IN, Description("Sets the LCPaper property. \n"
+            "The value should be in format "
+            "[language[_territory][.codeset][@modifier]], "
+            "for example, 'en_AU.UTF-8' (Australian English using "
+            "the UTF-8 encoding).") ]
+        string LCPaper,
+        [ IN, Description("Sets the LCName property. \n"
+            "The value should be in format "
+            "[language[_territory][.codeset][@modifier]], "
+            "for example, 'en_AU.UTF-8' (Australian English using "
+            "the UTF-8 encoding).") ]
+        string LCName,
+        [ IN, Description("Sets the LCAddress property. \n"
+            "The value should be in format "
+            "[language[_territory][.codeset][@modifier]], "
+            "for example, 'en_AU.UTF-8' (Australian English using "
+            "the UTF-8 encoding).") ]
+        string LCAddress,
+        [ IN, Description("Sets the LCTelephone property. \n"
+            "The value should be in format "
+            "[language[_territory][.codeset][@modifier]], "
+            "for example, 'en_AU.UTF-8' (Australian English using "
+            "the UTF-8 encoding).") ]
+        string LCTelephone,
+        [ IN, Description("Sets the LCMeasurement property. \n"
+            "The value should be in format "
+            "[language[_territory][.codeset][@modifier]], "
+            "for example, 'en_AU.UTF-8' (Australian English using "
+            "the UTF-8 encoding).") ]
+        string LCMeasurement,
+        [ IN, Description("Sets the LCIdentification property. \n"
+            "The value should be in format "
+            "[language[_territory][.codeset][@modifier]], "
+            "for example, 'en_AU.UTF-8' (Australian English using "
+            "the UTF-8 encoding).") ]
+        string LCIdentification);
+
+    [ Description("Method used to set the key mapping on the "
+        "virtual console. ") ]
+    uint32 SetVConsoleKeyboard(
+        [ Required, IN, Description("Sets the keyboard mapping "
+            "on the virtual console (such as 'us' or 'cz-qwerty'), "
+            "new mapping is applied instantly. Required parameter.") ]
+        string Keymap,
+        [ IN, Description("Sets toggle keyboard mapping "
+            "on the virtual console (such as 'us' or 'cz-qwerty'). "
+            "Optional parameter.") ]
+        string KeymapToggle,
+        [ IN, Description("Convert may be set to optionally convert "
+            "the console keyboard configuration to X11 keyboard "
+            "mappings. Optional parameter. If set to TRUE, the nearest "
+            "X11 keyboard setting for the chosen console setting is set.") ]
+        boolean Convert);
+
+    [ Description("Method used to set the default key mapping of "
+        "the X11 server. ") ]
+    uint32 SetX11Keyboard(
+        [ Required, IN, Description("Sets X11 keyboard mapping (such as 'de' "
+            "or 'us'). Individual layouts are comma separated "
+            "(e. g. 'us,cz,de'). Required parameter.") ]
+        string Layouts,
+        [ IN, Description("Sets X11 keyboard model (such as 'pc105' "
+            "or 'thinkpad60'). Optional parameter.") ]
+        string Model,
+        [ IN, Description("Sets X11 keyboard variant (such as 'dvorak' "
+            "or 'qwerty'). Optional parameter.") ]
+        string Variant,
+        [ IN, Description("Sets X11 keyboard options (such as 'altwin:menu' "
+            "or 'grp:lalt_toggle'). Individual options are comma separated "
+            "(e. g. 'grp:alt_shift_toggle,shift:both_capslock'). "
+            "Optional parameter.") ]
+        string Options,
+        [ IN, Description("Convert may be set to optionally convert "
+            "the X11 keyboard mapping to console keyboard configuration. "
+            "Optional parameter. If set to TRUE, the nearest console keyboard "
+            "setting for the chosen X11 setting is set.") ]
+        boolean Convert);
+};

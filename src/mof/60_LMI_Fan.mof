@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,80 +21,194 @@
 [ Version("0.2.0"), Provider("cmpi:cmpiLMI_Fan") ]
 class LMI_Fan: CIM_Fan
 {
-    [ Key, Override("DeviceID"),
+    /* Key properties */
+
+    [ Implemented(True), Override("CreationClassName") ]
+    string CreationClassName;
+
+    [ Implemented(True), Override("DeviceID"),
       Description("Uniquely identifies fan. It is a composition of "
           "SysPath and Name glued with slash ('/').") ]
     string DeviceID;
 
-    [ Override("Name"),
-      Description("Name of fan provided by system.") ]
-    string Name;
+    [ Implemented(True), Override("SystemCreationClassName") ]
+    string SystemCreationClassName;
 
-    [ Description("Array of fan features, that are exposed through system "
+    [ Implemented(True), Override("SystemName") ]
+    string SystemName;
+
+    /* Regular properties */
+
+    [ Implemented(True),
+      Description("Array of fan features that are exposed through system "
           " interface. In other words: those that are readible/writable."),
       ValueMap { "1", "2", "3", "4", "5", "6", "7", "8" },
       Values { "MinSpeed", "MaxSpeed", "Divisor", "Pulses", "Beep",
-               "Alarm", "MinAlarm", "MaxAlarm" }
-    ]
+               "Alarm", "MinAlarm", "MaxAlarm" } ]
     uint16 AccessibleFeatures[];
 
-    [ Description("Minimum speed value."), Write,
-      Units("Revolutions per Minute") ]
+    [ Implemented(True), Write,
+      Units("Revolutions per Minute"),
+      Description("Minimum speed value.") ]
     uint64 MinSpeed;
 
-    [ Description("Maximum speed value."), Write,
-      Units("Revolutions per Minute") ]
+    [ Implemented(True), Write,
+      Units("Revolutions per Minute"),
+      Description("Maximum speed value.") ]
     uint64 MaxSpeed;
 
-    [ Description("Fan divisisor. It affects Minimum and Maximum speed value "
-          "and accuracy of readings. "
-          "The drivers account for the 'fan divisor' in their calculation "
-          "of RPM. So changing the fan divisor will NOT change the "
-          "nominal RPM reading, it will only affect the minimum and maximum "
-          "readings and the accuracy of the readings. "
-          "The actual formula is RPM = (60 * 22500) / (count * divisor)"),
-      Write ]
+    [ Implemented(True), Write,
+      Description("Fan divisisor. It affects Minimum and Maximum speed value "
+          "and accuracy of readings. The drivers account for the "
+          "'fan divisor' in their calculation of RPM. So changing the fan divisor "
+          "will NOT change the nominal RPM reading, it will only affect the "
+          "minimum and maximum readings and the accuracy of the readings. "
+          "The actual formula is RPM = (60 * 22500) / (count * divisor)") ]
     uint32 Divisor;
 
-    [ Description("Number of tachometer pulses per fan revolution. "
+    [ Implemented(True), Write,
+      Description("Number of tachometer pulses per fan revolution. "
           "Integer value, typically between 1 and 4. "
           "This value is a characteristic of the fan connected to the "
           "device's input, so it has to be set in accordance with the fan "
-          "model."),
-      Write ]
+          "model.") ]
     uint32 Pulses;
 
-    [ Description("This indicates, whether a PC's speaker should beep "
-          "when an alarm occurs."),
-      Write ]
+    [ Implemented(True), Write,
+      Description("This indicates, whether a PC's speaker should beep "
+          "when an alarm occurs.") ]
     boolean Beep;
 
-    [ Description("ALARM warning indicating, that current speed is out of "
+    [ Implemented(True),
+      Description("ALARM warning indicating that current speed is out of "
           "range. This information is supplied by fan's chip driver.") ]
     boolean Alarm;
 
-    [ Description("ALARM warning indicating, that current speed is below "
+    [ Implemented(True),
+      Description("ALARM warning indicating that current speed is below "
           "the critical level. This information is supplied by fan's chip "
           "driver.") ]
     boolean MinAlarm;
 
-    [ Description("ALARM warning indicating, that current speed is above "
+    [ Implemented(True),
+      Description("ALARM warning indicating that current speed is above "
           "the critical level. This information is supplied by fan's chip "
           "driver.") ]
     boolean MaxAlarm;
+
+    /* Inherited properties */
+    [ Implemented(True), Override("ElementName") ]
+    string ElementName;
+
+    [ Implemented(True), Override("HealthState") ]
+    uint16 HealthState;
+
+    [ Implemented(True), Override("IdentifyingDescriptions") ]
+    string IdentifyingDescriptions[];
+
+    [ Implemented(True), Override("Name"),
+      Description("Name of fan provided by system.") ]
+    string Name;
+
+    [ Implemented(True), Override("OperatingStatus") ]
+    uint16 OperatingStatus;
+
+    [ Implemented(True), Override("OperationalStatus") ]
+    uint16 OperationalStatus[];
+
+    [ Implemented(True), Override("OtherIdentifyingInfo") ]
+    string OtherIdentifyingInfo[];
+
+    [Implemented(True), Override("PrimaryStatus") ]
+    uint16 PrimaryStatus;
+
+    [ Implemented(True), Override("StatusDescriptions") ]
+    string StatusDescriptions[];
+
 };
 
 [ Provider("cmpi:cmpiLMI_Fan") ]
 class LMI_FanSensor: CIM_NumericSensor
 {
-    [ Key, Override("DeviceID"),
+    /* Key properties */
+
+    [ Implemented(True), Override("CreationClassName") ]
+    string CreationClassName;
+
+    [ Implemented(True), Override("DeviceID"),
       Description("Uniquely identifies fan. It is a composition of "
           "SysPath and Name glued with slash ('/').") ]
     string DeviceID;
 
-    [ Override("Name"),
+    [ Implemented(True), Override("SystemCreationClassName") ]
+    string SystemCreationClassName;
+
+    [ Implemented(True), Override("SystemName") ]
+    string SystemName;
+
+    /* Regular properties */
+
+    [ Implemented(True), Override("BaseUnits") ]
+    uint16 BaseUnits;
+
+    [ Implemented(True), Override("Caption")  ]
+    string Caption;
+
+    [ Implemented(True), Override("CurrentReading") ]
+    sint32 CurrentReading;
+
+    [ Implemented(True), Override("Description")  ]
+    string Description;
+
+    [ Implemented(True), Override("ElementName")  ]
+    string ElementName;
+
+    [ Implemented(True), Override("HealthState") ]
+    uint16 HealthState;
+
+    [ Implemented(True), Override("IdentifyingDescriptions") ]
+    string IdentifyingDescriptions[];
+
+    [ Implemented(True), Override("IsLinear") ]
+    boolean IsLinear;
+
+    [ Implemented(True), Override("MinReadable") ]
+    sint32 MinReadable;
+
+    [ Implemented(True), Override("Name"),
       Description("Name of fan provided by system.") ]
     string Name;
+
+    [ Implemented(True), Override("NormalMax") ]
+    sint32 NormalMax;
+
+    [ Implemented(True), Override("NormalMin") ]
+    sint32 NormalMin;
+
+    [ Implemented(True), Override("OperationalStatus")  ]
+    uint16 OperationalStatus[];
+
+    [ Implemented(True), Override("StatusDescriptions") ]
+    string StatusDescriptions[];
+
+    [ Implemented(True), Override("OperatingStatus") ]
+    uint16 OperatingStatus;
+
+    [ Implemented(True), Override("OtherIdentifyingInfo") ]
+    string OtherIdentifyingInfo[];
+
+    [ Implemented(True), Override("PossibleStates") ]
+    string PossibleStates[];
+
+    [Implemented(True), Override("PrimaryStatus") ]
+    uint16 PrimaryStatus;
+
+    [ Implemented(True), Override("RateUnits") ]
+    uint16 RateUnits;
+
+    [ Implemented(True), Override("UnitModifier") ]
+    sint32 UnitModifier;
+
 };
 
 [ Association,

@@ -1,0 +1,1051 @@
+/*
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Authors: Michal Minar <miminar@redhat.com>
+ */
+
+#pragma locale ("en_US")
+//#pragma namespace ("root/cimv2")
+
+/******************************************************************************
+ * Central class of Software Inventory and Update profiles
+ *****************************************************************************/
+[ Version("0.2.0") ]
+class LMI_SoftwareIdentity : CIM_SoftwareIdentity {
+
+    [Implemented(true), Override("InstanceID"), Description(
+        "Unique identifier for installed or available package."
+        " It's composed of OrgID and LocalID separated by ':',  where"
+        " <OrgID> is LMI and LocalID is PKG:<PKG_NEVRA>. <PKG_NEVRA>"
+        " is a string representing rpm package. Letters in NEVRA stand"
+        " for name, epoch, version, release and architecture.")]
+    string InstanceID;
+
+    [Implemented(true), Override("Caption"), Description("Package's summary.")]
+    string Caption;
+
+    [Implemented(true), Override("Classifications")]
+    uint16 Classifications[];
+
+    [Implemented(true), Override("Description"), Description(
+        "Package's description.")]
+    string Description;
+
+    [Implemented(true), Override("ElementName"), Description(
+        "Package's NEVRA string. That is also part of InstanceID.")]
+    string ElementName;
+
+    [Implemented(true), Override("InstallDate")]
+    datetime InstallDate;
+
+    [Implemented(true), Override("IsEntity")]
+    boolean IsEntity;
+
+    [Implemented(true), Override("Name"), Description(
+        "Name of package. This does not uniquely identify package"
+        " installed on computer system.")]
+    string Name;
+
+    [Implemented(true), Override("TargetTypes")]
+    string TargetTypes[];
+
+    [Implemented(true), Override("VersionString"), Description(
+        "Package's EVRA, in format: "
+        "<epoch>:<version>-<release>.<architecture>")]
+    string VersionString;
+
+    [Implemented(true), Description("Package's epoch.")]
+    uint32 Epoch;
+
+    [Implemented(true), Description("Package's version.")]
+    string Version;
+
+    [Implemented(true), Description("Package's release.")]
+    string Release;
+
+    [Implemented(true), Description("Package's architecture.")]
+    string Architecture;
+
+};
+
+/******************************************************************************
+ * Software inventory classes
+ */
+[ Version("0.2.0") ]
+class LMI_SystemSoftwareCollection : CIM_SystemSpecificCollection {
+
+    [Implemented(true), Override("InstanceID")]
+    string InstanceID;
+
+    [Implemented(true), Override("Caption")]
+    string Caption;
+
+};
+
+[ Version("0.2.0") ]
+class LMI_SoftwareIdentityResource : CIM_SoftwareIdentityResource {
+
+  [Implemented(true), Override("CreationClassName")]
+  string CreationClassName;
+
+  [Implemented(true), Override("Name"), Description(
+      "Repository id. A unique name representing repository of"
+      " system.")]
+  string Name;
+
+  [Implemented(true), Override("SystemCreationClassName")]
+  string SystemCreationClassName;
+
+  [Implemented(true), Override("SystemName")]
+  string SystemName;
+
+  [Implemented(true), Override("AccessContext")]
+  uint16 AccessContext;
+
+  [Implemented(true), Override("AccessInfo")]
+  string AccessInfo;
+
+  [Implemented(true), Override("AvailableRequestedStates")]
+  uint16 AvailableRequestedStates[];
+
+  [Implemented(true), Override("Caption"), Description(
+        "A human readable string describing the repository.")]
+  string Caption;
+
+  [Implemented(true), Description(
+      "Relative cost of accessing this repository."
+      " Useful for weighing one repo's packages as greater/less"
+      " than any other.")]
+  sint32 Cost;
+
+  [Implemented(true), Override("Description")]
+  string Description;
+
+  [Implemented(true), Override("ElementName")]
+  string ElementName;
+
+  [Implemented(true), Override("EnabledDefault")]
+  uint16 EnabledDefault;
+
+  [Implemented(true), Override("EnabledState")]
+  uint16 EnabledState;
+
+  [Implemented(true), Override("ExtendedResourceType")]
+  uint16 ExtendedResourceType;
+
+  [Implemented(true), Override("Generation")]
+  uint64 Generation;
+
+  [Implemented(true), Override("HealthState")]
+  uint16 HealthState;
+
+  [Implemented(true), Description(
+      "Whether or not a GPG signature check should be performed"
+      " on the packages gotten from this repository.")]
+  boolean GPGCheck;
+
+  [Implemented(true), Override("InfoFormat")]
+  uint16 InfoFormat;
+
+  [Implemented(true), Override("InstanceID")]
+  string InstanceID;
+
+  [Implemented(true), Description(
+      "URL to a file containing list of base URLS to mirrors"
+      " of this repository. http://, ftp:// and file:// schemas"
+      " are supported. This can contain special variables"
+      " prefixed with $, which are substituted for system values."
+      " These include $releasever - defaults to the version of"
+      " \"redhat-release\" package, $arch - architecture of system,"
+      " $basearch - base architecture of system ($arch == \"i686\", then"
+      " $basearch == \"i386\", $uuid - unique but persisent uuid for this"
+      " machine.")]
+  string MirrorList;
+
+  [Implemented(true), Override("OperationalStatus")]
+  uint16 OperationalStatus[];
+
+  [Implemented(true), Override("OtherAccessContext")]
+  string OtherAccessContext;
+
+  [Implemented(true), Override("PrimaryStatus")]
+  uint16 PrimaryStatus;
+
+  [Implemented(true), Description(
+      "Whether or not a GPG signature check should be performed"
+      " on the repodata from this repository.")]
+  boolean RepoGPGCheck;
+
+  [Implemented(true), Override("RequestedState")]
+  uint16 RequestedState;
+
+  [Implemented(true), Override("ResourceType")]
+  uint16 ResourceType;
+
+  [Implemented(true), Override("StatusDescriptions")]
+  string StatusDescriptions[];
+
+  [Implemented(true), Override("TimeOfLastStateChange")]
+  datetime TimeOfLastStateChange;
+
+  [Implemented(true), Description(
+      "Time of the repository's last update on server.")]
+  datetime TimeOfLastUpdate;
+
+  [Implemented(true), Override("TransitioningToState")]
+  uint16 TransitioningToState;
+
+  [Implemented(true), Override("RequestStateChange")]
+  uint32 RequestStateChange(
+      [IN, Description (
+         "The state requested for the element. This "
+         "information will be placed into the RequestedState "
+         "property of the instance if the return code of the "
+         "RequestStateChange method is 0 (\'Completed with "
+         "No Error\'), or 4096 (0x1000) (\'Job Started\'). "
+         "Refer to the description of the EnabledState and "
+         "RequestedState properties for the detailed "
+         "explanations of the RequestedState values." ),
+       ValueMap { "2", "3", "4", "6", "7", "8", "9", "10",
+         "11", "..", "32768..65535" },
+       Values { "Enabled", "Disabled", "Shut Down", "Offline",
+         "Test", "Defer", "Quiesce", "Reboot", "Reset",
+         "DMTF Reserved", "Vendor Reserved" },
+       ModelCorrespondence {
+         "CIM_EnabledLogicalElement.RequestedState" }]
+    uint16 RequestedState,
+      [IN ( false ), OUT, Description (
+         "May contain a reference to the ConcreteJob created "
+         "to track the state transition initiated by the "
+         "method invocation." )]
+    CIM_ConcreteJob REF Job,
+      [IN, Description (
+         "A timeout period that specifies the maximum amount "
+         "of time that the client expects the transition to "
+         "the new state to take. The interval format must be "
+         "used to specify the TimeoutPeriod. A value of 0 or "
+         "a null parameter indicates that the client has no "
+         "time requirements for the transition. \n"
+         "If this property does not contain 0 or null and "
+         "the implementation does not support this "
+         "parameter, a return code of \'Use Of Timeout "
+         "Parameter Not Supported\' shall be returned." )]
+    datetime TimeoutPeriod);
+
+};
+
+/******************************************************************************
+ * Software inventory associations
+ */
+[ Version("0.2.0"), Association]
+class LMI_HostedSoftwareCollection : CIM_HostedCollection {
+
+  [Override("Antecedent")]
+  CIM_ComputerSystem REF Antecedent;
+
+  [Override("Dependent")]
+  LMI_SystemSoftwareCollection REF Dependent;
+
+};
+
+[Version("0.2.0"), Association]
+class LMI_MemberOfSoftwareCollection : CIM_MemberOfCollection {
+
+  [Override("Collection")]
+  LMI_SystemSoftwareCollection REF Collection;
+
+  [Override("Member")]
+  LMI_SoftwareIdentity REF Member;
+
+};
+
+[Version("0.2.0"), Association]
+class LMI_InstalledSoftwareIdentity : CIM_InstalledSoftwareIdentity {
+
+  [Override("InstalledSoftware")]
+  LMI_SoftwareIdentity REF InstalledSoftware;
+
+  [Override("System")]
+  CIM_ComputerSystem REF System;
+
+};
+
+[Version("0.2.0"), Association]
+class LMI_ResourceForSoftwareIdentity : CIM_SAPAvailableForElement {
+
+    [Override("AvailableSAP")]
+    LMI_SoftwareIdentityResource REF AvailableSAP;
+
+    [Override("ManagedElement")]
+    LMI_SoftwareIdentity REF ManagedElement;
+
+};
+
+[Version("0.2.0"), Association]
+class LMI_HostedSoftwareIdentityResource : CIM_HostedAccessPoint {
+
+  [Override("Antecedent")]
+  CIM_ComputerSystem REF Antecedent;
+
+  [Override("Dependent")]
+  LMI_SoftwareIdentityResource REF Dependent;
+
+};
+
+/******************************************************************************
+ * Software update profile classes
+ */
+[Version("0.2.0")]
+class LMI_SoftwareJob : LMI_ConcreteJob {
+
+  [Implemented(true), Override("InstanceID")]
+  string InstanceID;
+
+  [Implemented(true), Override("Caption")]
+  string Caption;
+
+  [Implemented(true), Override("CommunicationStatus")]
+  uint16 CommunicationStatus;
+
+  [Implemented(true), Override("Description")]
+  string Description;
+
+  [Implemented(true), Override("ErrorCode")]
+  uint16 ErrorCode;
+
+  [Implemented(true), Override("JobStatus")]
+  string JobStatus;
+
+  [ImplemEnted(true), Override("MethodName")]
+  string MethodName;
+
+  [Implemented(true), Override("Priority")]
+  uint32 Priority;
+
+  [Implemented(true), Override("RecoveryAction")]
+  uint16 RecoveryAction;
+
+};
+
+[Version("0.2.0")]
+class LMI_SoftwareInstallationJob : LMI_SoftwareJob {
+};
+
+[Version("0.2.0")]
+class LMI_SoftwareInstallationService : CIM_SoftwareInstallationService {
+
+  [Implemented(true), Override("CreationClassName")]
+  string CreationClassName;
+
+  [Implemented(true), Override("Name")]
+  string Name;
+
+  [Implemented(true), Override("SystemCreationClassName")]
+  string SystemCreationClassName;
+
+  [Implemented(true), Override("SystemName")]
+  string SystemName;
+
+  [Implemented(true), Override("Caption")]
+  string Caption;
+
+  [Implemented(true), Override("CommunicationStatus")]
+  uint16 CommunicationStatus;
+
+  [Implemented(true), Override("Description")]
+  string Description;
+
+  [Implemented(true), Override("DetailedStatus")]
+  uint16 DetailedStatus;
+
+  [Implemented(true), Override("EnabledDefault")]
+  uint16 EnabledDefault;
+
+  [Implemented(true), Override("EnabledState")]
+  uint16 EnabledState;
+
+  [Implemented(true), Override("HealthState")]
+  uint16 HealthState;
+
+  [Implemented(true), Override("InstanceID")]
+  string InstanceID;
+
+  [Implemented(true), Override("OperatingStatus")]
+  uint16 OperatingStatus;
+
+  [Implemented(true), Override("OperationalStatus")]
+  uint16 OperationalStatus[];
+
+  [Implemented(true), Override("PrimaryStatus")]
+  uint16 PrimaryStatus;
+
+  [Implemented(true), Override("PrimaryStatus")]
+  uint16 RequestedState;
+
+  [Implemented(true), Override("Started")]
+  boolean Started;
+
+  [Implemented(true), Override("TransitioningToState")]
+  uint16 TransitioningToState;
+
+  [Implemented(True), Override("CheckSoftwareIdentity")]
+  uint32 CheckSoftwareIdentity(
+      [IN, Description (
+         "Reference to the SoftwareIdentity to be checked." )]
+    CIM_SoftwareIdentity REF Source,
+      [IN, Description (
+         "Reference to the ManagedElement that the Software "
+         "Identity is going to be installed in (or updated)." )]
+    CIM_ManagedElement REF Target,
+      [IN, Description (
+         "Reference to the Collection to which the Software "
+         "Identity will be added." )]
+    CIM_Collection REF Collection,
+      [IN ( false ), OUT, Description (
+         "The parameter describes the characteristics of the "
+         "installation/update that will take place if the "
+         "Source Software Identity is installed: \n"
+         "Target automatic reset: The target element will "
+         "automatically reset once the installation is "
+         "complete. \n"
+         "System automatic reset: The containing system of "
+         "the target ManagedElement (normally a logical "
+         "device or the system itself) will automatically "
+         "reset/reboot once the installation is complete. \n"
+         "Separate target reset required: "
+         "EnabledLogicalElement.RequestStateChange MUST be "
+         "used to reset the target element after the "
+         "SoftwareIdentity is installed. \n"
+         "Separate system reset required: "
+         "EnabledLogicalElement.RequestStateChange MUST be "
+         "used to reset/reboot the containing system of the "
+         "target ManagedElement after the SoftwareIdentity "
+         "is installed. \n"
+         "Manual Reboot Required: The system MUST be "
+         "manually rebooted by the user. \n"
+         "No reboot required : No reboot is required after "
+         "installation. \n"
+         "User Intervention Recomended : It is recommended "
+         "that a user confirm installation of this "
+         "SoftwareIdentity. Inappropriate application MAY "
+         "have serious consequences. \n"
+         "MAY be added to specified collection : The "
+         "SoftwareIndentity MAY be added to specified "
+         "Collection." ),
+       ValueMap { "2", "3", "4", "5", "6", "7", "8", "9",
+         "..", "0x7FFF..0xFFFF" },
+       Values { "Target automatic reset",
+         "System automatic reset",
+         "Separate target reset Required",
+         "Separate system reset Required",
+         "Manual Reboot Required", "No Reboot Required",
+         "User Intervention recommended",
+         "MAY be added to specified Collection",
+         "DMTF Reserved", "Vendor Specific" }]
+    uint16 InstallCharacteristics[]);
+
+  [Implemented(True), Override("InstallFromSoftwareIdentity")]
+  uint32 InstallFromSoftwareIdentity(
+      [IN ( false ), OUT, Description (
+         "Reference to the job (may be null if job completed)."
+          )]
+    CIM_ConcreteJob REF Job,
+      [IN, Description (
+         "Options to control the install process.\n"
+         "Defer target/system reset : do not automatically "
+         "reset the target/system.\n"
+         "Force installation : Force the installation of the "
+         "same or an older SoftwareIdentity. Install: "
+         "Perform an installation of this software on the "
+         "managed element.\n"
+         "Update: Perform an update of this software on the "
+         "managed element.\n"
+         "Repair: Perform a repair of the installation of "
+         "this software on the managed element by forcing "
+         "all the files required for installing the software "
+         "to be reinstalled.\n"
+         "Reboot: Reboot or reset the system immediately "
+         "after the install or update of this software, if "
+         "the install or the update requires a reboot or reset.\n"
+         "Password: Password will be specified as clear text "
+         "without any encryption for performing the install "
+         "or update.\n"
+         "Uninstall: Uninstall the software on the managed element.\n"
+         "Log: Create a log for the install or update of the software.\n"
+         "SilentMode: Perform the install or update without "
+         "displaying any user interface.\n"
+         "AdministrativeMode: Perform the install or update "
+         "of the software in the administrative mode. "
+         "ScheduleInstallAt: Indicates the time at which "
+         "theinstall or update of the software will occur." ),
+       ValueMap { "2", "3", "4", "5", "6", "7", "8", "9",
+         "10", "11", "12", "13", "..", "32768..65535" },
+       Values { "Defer target/system reset",
+         "Force installation", "Install", "Update", "Repair",
+         "Reboot", "Password", "Uninstall", "Log",
+         "SilentMode", "AdministrativeMode",
+         "ScheduleInstallAt", "DMTF Reserved",
+         "Vendor Specific" },
+       ArrayType ( "Indexed" ),
+       ModelCorrespondence {
+         "CIM_SoftwareInstallationService.InstallOptionsValues[]",
+         "CIM_SoftwareInstallationServiceCapabilities.SupportedInstallOptions[]" }]
+    uint16 InstallOptions[],
+      [IN, Description (
+         "InstallOptionsValues is an array of strings "
+         "providing additional information to InstallOptions "
+         "for the method to install the software. Each entry "
+         "of this array is related to the entry in "
+         "InstallOptions that is located at the same index "
+         "providing additional information for "
+         "InstallOptions. \n"
+         "If the index in InstallOptions has the value "
+         "\"Password \" then a value at the corresponding "
+         "index of InstallOptionValues shall not be NULL. \n"
+         "If the index in InstallOptions has the value "
+         "\"ScheduleInstallAt\" then the value at the "
+         "corresponding index of InstallOptionValues shall "
+         "not be NULL and shall be in the datetime type "
+         "format. \n"
+         "If the index in InstallOptions has the value \"Log "
+         "\" then a value at the corresponding index of "
+         "InstallOptionValues may be NULL. \n"
+         "If the index in InstallOptions has the value "
+         "\"Defer target/system reset\", \"Force "
+         "installation\",\"Install\", \"Update\", \"Repair\" "
+         "or \"Reboot\" then a value at the corresponding "
+         "index of InstallOptionValues shall be NULL." ),
+       ArrayType ( "Indexed" ),
+       ModelCorrespondence {
+         "CIM_SoftwareInstallationService.InstallOptions[]" }]
+    string InstallOptionsValues[],
+      [IN, Description (
+         "Reference to the source of the install." )]
+    CIM_SoftwareIdentity REF Source,
+      [IN, Description (
+         "The installation target. If NULL then the "
+         "SOftwareIdentity will be added to Collection only. "
+         "The underlying implementation is expected to be "
+         "able to obtain any necessary metadata from the "
+         "Software Identity." )]
+    CIM_ManagedElement REF Target,
+      [IN, Description (
+         "Reference to the Collection to which the Software "
+         "Identity SHALL be added. If NULL then the Software "
+         "Identity will not be added to a Collection." )]
+    CIM_Collection REF Collection);
+
+  [Implemented(True), Override("InstallFromURI")]
+  uint32 InstallFromURI(
+      [IN ( false ), OUT, Description (
+         "Reference to the job (may be null if job completed)."
+          )]
+    CIM_ConcreteJob REF Job,
+      [IN, Description (
+         "A URI for the software based on RFC 2079." )]
+    string URI,
+      [IN, Description ( "The installation target." )]
+    CIM_ManagedElement REF Target,
+      [IN, Description (
+         "Options to control the install process. \n"
+         "See the InstallOptions parameter of the "
+         "SoftwareInstallationService.InstallFromSoftwareIdentity "
+         "method for the description of these values." ),
+       ValueMap { "2", "3", "4", "5", "6", "7", "8", "9",
+         "10", "11", "12", "13", "..", "32768..65535" },
+       Values { "Defer target/system reset",
+         "Force installation", "Install", "Update", "Repair",
+         "Reboot", "Password", "Uninstall", "Log",
+         "SilentMode", "AdministrativeMode",
+         "ScheduleInstallAt", "DMTF Reserved",
+         "Vendor Specific" },
+       ArrayType ( "Indexed" ),
+       ModelCorrespondence {
+         "CIM_SoftwareInstallationService.InstallFromURI.InstallOptionsValues[]",
+         "CIM_SoftwareInstallationServiceCapabilities.SupportedInstallOptions[]" }]
+    uint16 InstallOptions[],
+      [IN, Description (
+         "InstallOptionsValues is an array of strings "
+         "providing additionalinformation to InstallOptions "
+         "for the method to install the software. Each entry "
+         "of this array is related to the entry in "
+         "InstallOptions that is located at the same index "
+         "providing additional information for "
+         "InstallOptions. \n"
+         "For further information on the use of "
+         "InstallOptionsValues parameter, see the "
+         "description of the InstallOptionsValues parameter "
+         "of the "
+         "SoftwareInstallationService.InstallFromSoftwareIdentity "
+         "method." ),
+       ArrayType ( "Indexed" ),
+       ModelCorrespondence {
+         "CIM_SoftwareInstallationService.InstallFromByteStream.InstallOptions[]" }]
+    string InstallOptionsValues[]);
+
+    [Implemented(True), Description(
+        "Start a job to verify installed package represented by "
+        "SoftwareIdentity (Source) on a ManagedElement (Target).\n"
+        "If 0 is returned, the function completed successfully "
+        "and no ConcreteJob instance was required. If 4096/0x1000 "
+        "is returned, a ConcreteJob will be started to perform "
+        "the verification. The Job\'s reference will be returned in "
+        "the output parameter Job.\nIn former case, the Failed parameter"
+        "will contain all associated file checks, that did not pass. "
+        "In the latter case this property will be NULL."),
+    ValueMap  { "0", "1", "2", "3", "4", "5", "6", "..", "4096"
+              , "4097", "4098..32767"
+              , "32768", "32769..65535" },
+    Values    { "Job Completed with No Error", "Not Supported"
+              , "Unspecified Error", "Timeout", "Failed"
+              , "Invalid Parameter", "Target In Use", "DMTF Reserved"
+              // 4096
+              , "Method Parameters Checked - Job Started"
+              , "Unsupported TargetType"
+              , "Method Reserved"
+              , "Software Identity Not Installed"
+              , "Vendor Specific" }]
+  uint32 VerifyInstalledIdentity(
+      [IN, Description(
+          "Reference to the installed SoftwareIdentity to be verified.")]
+    CIM_SoftwareIdentity REF Source,
+      [IN, Description(
+          "Reference to the ManagedElement that the Software "
+          "Identity is installed on." )]
+    CIM_ManagedElement REF Target,
+      [IN ( false ), OUT, Description(
+          "Reference to the job (may be null if job completed).")]
+    CIM_ConcreteJob REF Job,
+      [IN ( false ), OUT, Description(
+          "Array of file checks that did not pass verification."
+          " This is NULL in case that asynchronous job has been started.")]
+    LMI_SoftwareIdentityFileCheck REF Failed[]);
+
+    [Implemented(True), Description(
+        "Search for installed or available software identity matching"
+        " specified properties. In case \"Repository\" is given, only"
+        " available packages of this repository will be browsed."
+        " \"AllowDuplicates\" causes, that packages of the name <name>.<arch>"
+        " will be listed multiple times if more versions are available."
+        " Other input parameters with non-NULL values are compared to"
+        " corresponding properties of LMI_SoftwareIdentity instances."
+        " 0 is returned if any matching package is found, 1 otherwise.")]
+  uint32 FindIdentity(
+      [IN] string Name,
+      [IN] uint32 Epoch,
+      [IN] string Version,
+      [IN] string Release,
+      [IN] string Architecture,
+      [IN, Description(
+          "Allows to specify particular software repository, where the"
+          " search shall take place. If given, only available packages will"
+          " be browsed.")]
+      LMI_SoftwareIdentityResource REF Repository,
+      [IN, Description(
+          "Whether the different versions of the same package shall be"
+          " included in result. This defaults to \"False\".")]
+      boolean AllowDuplicates,
+      [IN, Description(
+          "Whether to compare \"Name\" for exact match. If \"False\", package"
+          " name and its summary string (\"Caption\") will be searched for"
+          " occurences of \"Name\" parameter's value. Defaults to \"False\".")]
+      boolean ExactMatch,
+      [IN(false), OUT, Description(
+          "All matching packages found shall be available in this parameter.")]
+      LMI_SoftwareIdentity REF Matches[]);
+
+};
+
+[Version("0.2.0")]
+class LMI_SoftwareInstallationServiceCapabilities :
+        CIM_SoftwareInstallationServiceCapabilities {
+
+  [Implemented(true), Override("InstanceID")]
+  string InstanceID;
+
+  [Implemented(true), Override("CanAddToCollection")]
+  boolean CanAddToCollection;
+
+  [Implemented(true), Override("Caption")]
+  string SupportedTargetTypes[];
+
+  [Implemented(true), Override("SupportedInstallOptions")]
+  uint16 SupportedInstallOptions[];
+
+  [Implemented(true), Override("Description")]
+  string Description;
+
+  [Implemented(true), Override("SupportedURISchemes")]
+  uint16 SupportedURISchemes[];
+
+  [Implemented(true), Override("SupportedAsynchronousActions"),
+   ValueMap { "2", "3", "4", "5", "10000" },
+   Values { "None supported", "Install From Software Identity",
+    "Install from ByteStream", "Install from URI", "Verify Software Identity" }]
+  uint16 SupportedAsynchronousActions[];
+
+  [Implemented(true), Override("SupportedSynchronousActions"),
+   ValueMap { "2", "3", "4", "5", "10000" },
+   Values { "None supported", "Install From Software Identity",
+    "Install from ByteStream", "Install from URI", "Verify Software Identity" }]
+  uint16 SupportedSynchronousActions[];
+
+};
+
+[Version("0.2.0")]
+class LMI_SoftwareMethodResult : LMI_MethodResult {
+
+  [Implemented(true), Override("Caption")]
+  string Caption;
+
+  [Implemented(true), Override("Description")]
+  string Description;
+
+  [Implemented(true), Override("ElementName")]
+  string ElementName;
+
+   /* FIXME: find out, why overriding following properties fails
+
+    [ Implemented(true), Override("PreCallIndication") ]
+   string PreCallIndication;
+    [ Implemented(true), Override("PostCallIndication") ]
+   string PostCallIndication;
+   */
+};
+
+/******************************************************************************
+ * Software update associations
+ */
+[Version("0.2.0"), Association]
+class LMI_AssociatedSoftwareJobMethodResult : LMI_AssociatedJobMethodResult {
+
+  [Override("Job")]
+  LMI_SoftwareJob REF Job;
+
+  [Override("JobParameters")]
+  LMI_SoftwareMethodResult REF JobParameters;
+
+};
+
+[Version("0.2.0"), Association]
+class LMI_OwningSoftwareJobElement : LMI_OwningJobElement {
+
+  [Override("OwningElement")]
+  LMI_SoftwareInstallationService REF OwningElement;
+
+  [Override("OwnedElement")]
+  LMI_SoftwareJob REF OwnedElement;
+
+};
+
+[Version("0.2.0"), Association]
+class LMI_AffectedSoftwareJobElement : LMI_AffectedJobElement {
+
+  [Override("AffectingElement")]
+  LMI_SoftwareJob REF AffectingElement;
+
+  [Implemented(true), Override("ElementEffects")]
+  uint16 ElementEffects[];
+
+  [Implemented(true), Override("OtherElementEffectsDescriptions")]
+  string OtherElementEffectsDescriptions[];
+
+};
+
+[Version("0.2.0"), Association]
+class LMI_AssociatedSoftwareInstallationServiceCapabilities :
+        CIM_ElementCapabilities {
+
+  [Override("Capabilities")]
+  LMI_SoftwareInstallationServiceCapabilities REF Capabilities;
+
+  [Override("ManagedElement")]
+  LMI_SoftwareInstallationService REF ManagedElement;
+
+  [Implemented(true), Override("Characteristics")]
+  uint16 Characteristics[];
+
+};
+
+[Version("0.2.0"), Association]
+class LMI_HostedSoftwareInstallationService : CIM_HostedService {
+
+  [Override("Antecedent")]
+  CIM_ComputerSystem REF Antecedent;
+
+  [Override("Dependent")]
+  LMI_SoftwareInstallationService REF Dependent;
+
+};
+
+[Version("0.2.0"), Association]
+class LMI_SoftwareInstallationServiceAffectsElement :
+        CIM_ServiceAffectsElement {
+
+  [Override("AffectingElement")]
+  LMI_SoftwareInstallationService REF AffectingElement;
+
+  [Implemented(true), Override("ElementEffects")]
+  uint16 ElementEffects[];
+
+  [Implemented(true), Override("OtherElementEffectsDescriptions")]
+  string OtherElementEffectsDescriptions[];
+
+};
+
+/******************************************************************************
+ * Software update indications
+ */
+[Version("0.2.0"), Indication]
+class LMI_SoftwareInstCreation : CIM_InstCreation {
+};
+
+[Version("0.2.0"), Indication]
+class LMI_SoftwareInstModification : CIM_InstModification {
+};
+
+[Version("0.4.3"), Indication]
+class LMI_SoftwareInstDeletion : CIM_InstDeletion {
+};
+
+/******************************************************************************
+ * OpenLMI additions
+ *****************************************************************************/
+[Version("0.2.0")]
+class LMI_SoftwareVerificationJob : LMI_SoftwareJob {
+};
+
+[Version("0.2.0"), Description(
+    "Identifies both a physical file installed from RPM package and its"
+    " original source in package. It represents a set of checks made"
+    " to a single installed file provided by RPM package.")]
+class LMI_SoftwareIdentityFileCheck : CIM_FileSpecification {
+
+  [Implemented(true), Override("Name"), Description(
+      "Absolute path of file being checked.") ]
+  string Name;
+
+  [Implemented(true), Override("CheckID"), Description(
+      "This contains InstanceID of asynchronous job"
+      " if this check is a result of job invocation. Otherwise"
+      " \"LMI:LMI_SoftwareIdentityFileCheck\" will be present."
+      " In former case, the format of value will be:"
+      " \"LMI:LMI_SoftwareVerificationJob:<id>\", where <id> is job's"
+      " identification number in decimal format.")]
+  string CheckID;
+
+  [Implemented(true), Override("SoftwareElementID")]
+  string SoftwareElementID;
+
+  [Implemented(true), Override("SoftwareElementState")]
+  uint16 SoftwareElementState;
+
+  [Implemented(true), Override("TargetOperatingSystem")]
+  uint16 TargetOperatingSystem;
+
+  [Implemented(true), Override("Version"), Description(
+      "Version of RPM package in EVRA form. It stands for"
+      " Epoch, Version, Revision and Architecture. It has a specific"
+      " format: <epoch>-<version>-<release>.<architecture>.")]
+  string Version;
+
+  [Implemented(true), Override("CheckMode")]
+  boolean CheckMode;
+
+  [Implemented(true), Description(
+      "Number of hash algorithm according to RFC4880."
+      " This algorithm is used for making checksums of RPM files and"
+      " packages. This algorithm is same for the whole RPM database."),
+    ValueMap  { "0", "1", "2", "3"
+              , "8", "9","10","11" },
+    Values    { "UNKNOWN", "MD5", "SHA-1", "RIPE-MD/160"
+              , "SHA256", "SHA384", "SHA512", "SHA224" }]
+  uint16 ChecksumType;
+
+  [Implemented(true), Description(
+      "Returns array of flags representing test that did not pass."
+      " Note that not all tests are run on every file. Tests are selected"
+      " depending on file type stored in package database. If the"
+      " file is missing, no other tests are run. Flag is present in the"
+      " output array if the test has been run and file did not pass it."
+      " Values representing tests being run are: \"Existence\" - it applies"
+      " to every file type; \"FileSize\" - applies only to regular files"
+      " and symbolic links; \"FileMode\" - includes check for permissions"
+      " and file type. Permissions are not checked for symbolic links."
+      " \"Checksum\" - applies only to regular files; \"Device Number\" - "
+      " tests major/minor device number; \"LinkTarget\" - tested only on"
+      " symbolic links; \"UserID\" and \"GroupID\" - apply to every"
+      " file type; \"Last Modification Time\" is tested"
+      " only on regular files."),
+    ValueMap  { "0", "1", "2", "3"
+              , "4", "5", "6", "7"
+              , "8" },
+    Values    { "Existence", "FileSize", "FileMode", "Checksum"
+              , "Device Number", "LinkTarget", "UserID", "GroupID"
+              , "Last Modification Time" }]
+  uint16 FailedFlags[];
+
+  [Implemented(true), Description(
+      "Checksum of installed file."
+      " Hash algorithm used can be obtained with ChecksumType property."
+      " This property contains valid value only for regular files."
+      " NULL is present if check could not be done.")]
+  string FileChecksum;
+  [Implemented(true), Description(
+      "Checksum of file from RPM database."
+      " Hash algorithm used can be obtained with ChecksumType property."
+      " It contains NULL for all file types but regular file.")]
+  string FileChecksumOriginal;
+
+  [Implemented(true), Description("True, if file is present on file system.")]
+  boolean FileExists;
+
+  [Implemented(true), Description(
+      "File mode of installed file as a number."
+      " NULL if file does not exist.")]
+  uint32 FileMode;
+  [Implemented(true), Description(
+      "File mode as a number given by RPM database.")]
+  uint32 FileModeOriginal;
+
+  [Implemented(true), Description (
+      "File mode of installed file as an array of permissions."
+      " Each value represents a bit position in file mode."),
+    ValueMap  { "0", "1", "2" //XWR Other
+              , "3", "4", "5" //XWR Group
+              , "6", "7", "8" //XWR User
+              , "9","10","11" //Sticky, SGID, SUID
+              },
+    Values    { "Execute Other", "Write Other", "Read Other"
+              , "Execute Group", "Write Group", "Read Group"
+              , "Execute User" , "Write User" , "Read User"
+              , "Sticky", "SGID", "SUID"
+              }]
+  uint8 FileModeFlags[];
+  [Implemented(true), Description (
+      "File mode as an array of permissions of file from RPM database."
+      " Each value represents a bit position in file mode."),
+    ValueMap  { "0", "1", "2" //XWR Other
+              , "3", "4", "5" //XWR Group
+              , "6", "7", "8" //XWR User
+              , "9","10","11" //Sticky, SGID, SUID
+              },
+    Values    { "Execute Other", "Write Other", "Read Other"
+              , "Execute Group", "Write Group", "Read Group"
+              , "Execute User" , "Write User" , "Read User"
+              , "Sticky", "SGID", "SUID"
+              }]
+  uint8 FileModeFlagsOriginal[];
+
+  [Implemented(true), Override("FileName"), Description(
+      "File name of verified file without any directory prefix.")]
+  string FileName;
+
+  [Implemented(true), Units("Bytes"), PUnit("Byte"), Override("FileSize"),
+    Description(
+      "Size of installed file in Bytes. It's NULL if file does not exist"
+      " or it's not a regular file or symbolic link.")]
+  uint64 FileSize;
+  [Implemented(true), Units("Bytes"), PUnit("Byte"),
+      Description("File size in Bytes from RPM database.")]
+  uint64 FileSizeOriginal;
+
+  [Implemented(true), Description(
+      "File type of installed file. NULL if file does not exist."),
+    ValueMap  { "0", "1", "2", "3"
+              , "4", "5", "6" },
+    Values    { "Unknown", "File", "Directory", "Symlink"
+              , "FIFO", "Character Device", "Block Device" }]
+  uint16 FileType;
+  [Implemented(true), Description(
+      "File type of file in RPM database."),
+    ValueMap  { "0", "1", "2", "3"
+              , "4", "5", "6" },
+    Values    { "Unknown", "File", "Directory", "Symlink"
+              , "FIFO", "Character Device", "Block Device" }]
+  uint16 FileTypeOriginal;
+
+  [Implemented(true), Description("Group ID of installed file.")]
+  uint32 GroupID;
+  [Implemented(true), Description("Group ID of file from RPM database.")]
+  uint32 GroupIDOriginal;
+
+  [Implemented(true), Override("MD5Checksum"), Description(
+      "MD5 checksum of installed file."
+      " It's computed only for regular files.")]
+  string MD5Checksum;
+
+  [Implemented(true), Description(
+      "Time of last modification of installed file as number a"
+      " of seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC)."
+      " NULL if file does not exist.")]
+  uint64 LastModificationTime;
+  [Implemented(true), Description(
+      "Time of last modification of file from RPM database as"
+      " a number of secodns since the Epoch,"
+      " 1970-01-01 00:00:00 +0000 (UTC).")]
+  uint64 LastModificationTimeOriginal;
+
+  [Implemented(true), Description(
+      "Target destination of symbolic link as returned by"
+      " readlink. If file is not a symbolic link or it's missing,"
+      " NULL is returned.")]
+  string LinkTarget;
+  [Implemented(true), Description(
+      "Target destination of symbolic link from RPM database"
+      " as returned by readlink. If file is not a symbolic link,"
+      " NULL is returned.")]
+  string LinkTargetOriginal;
+
+  [Implemented(true), Description("User ID of installed file.")]
+  uint32 UserID;
+  [Implemented(true), Description("User ID of file from RPM database.")]
+  uint32 UserIDOriginal;
+
+  [Implemented(true), Override("Invoke")]
+  uint32 Invoke();
+
+  [Implemented(true), Override("InvokeOnSystem")]
+  uint32 InvokeOnSystem(
+      [IN, Description(
+          "Reference to ComputerSystem in whose context the "
+          "method is to be invoked.")]
+      CIM_ComputerSystem REF TargetSystem);
+
+};
+
+
+/******************************************************************************
+ * OpenLMI additional associations
+ *****************************************************************************/
+[Version("0.2.0"), Association, Aggregation, Description(
+    "This association ties a SoftwareIdentity to a specific Check to validate"
+    " its state. Each file installed by corresponding RPM package to local"
+    " file system yields one instance of this class.")]
+class LMI_SoftwareIdentityChecks {
+
+  [Key, Aggregate, Min(1), Max(1), Description(
+      "The SoftwareIdentity being checked.")]
+  LMI_SoftwareIdentity REF Element;
+
+  [Key, Weak, Description("The Check for the file.")]
+  LMI_SoftwareIdentityFileCheck REF Check;
+
+};
+
+@SW_DBUS_MOF@
+

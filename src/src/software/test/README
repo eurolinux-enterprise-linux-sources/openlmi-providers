@@ -2,12 +2,14 @@ Testing
 =======
 Tests must be run as root on machine with cimom broker.
 There are number of environment variables, that affect test running:
+
   ``LMI_CIMOM_USERNAME``
   ``LMI_CIMOM_PASSWORD``
   ``LMI_CIMOM_BROKER``
   ``LMI_CIMOM_URL``
   ``LMI_RUN_DANGEROUS``      - valid values: 0, 1
   ``LMI_RUN_TEDIOUS``        - valid values: 0, 1
+  ``LMI_SOFTWARE_BACKEND     - valid choices: yum, package-kit
   ``LMI_SOFTWARE_DB_CACHE``
         Where to store the file with information about generated testing
         database. If not set, temporary file will be created and whole cache
@@ -21,9 +23,12 @@ There are number of environment variables, that affect test running:
         next runs to speed them up. Defaults to False.
         ``LMI_SOFTWARE_DB_CACHE`` must be set for this to have any effect.
 
+Both python and c provider implementations are supported.
+
 Dependencies
 ------------
  * @development-tools (rpmbuild, createrepo, yum-utils, etc.)
+ * unittest2 module must be installed on systems with Python < 2.7
 
 Preparation
 -----------

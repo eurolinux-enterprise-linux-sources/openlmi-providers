@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,7 +20,6 @@
 
 #include <konkret/konkret.h>
 #include "LMI_ElementCapabilities.h"
-#include "globals.h"
 #include "power.h"
 
 static const CMPIBroker* _cb;
@@ -39,7 +38,7 @@ static void LMI_ElementCapabilitiesAssociationInitialize(CMPIAssociationMI *mi,
 
 static CMPIStatus LMI_ElementCapabilitiesCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     power_unref(mi->hdl);
@@ -59,10 +58,10 @@ static CMPIStatus LMI_ElementCapabilitiesEnumInstanceNames(
 
 static CMPIStatus LMI_ElementCapabilitiesEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     const char *ns = KNameSpace(cop);
 
@@ -71,16 +70,16 @@ static CMPIStatus LMI_ElementCapabilitiesEnumInstances(
 
     LMI_PowerManagementServiceRef powerManagementServiceRef;
     LMI_PowerManagementServiceRef_Init(&powerManagementServiceRef, _cb, ns);
-    LMI_PowerManagementServiceRef_Set_Name(&powerManagementServiceRef, get_system_name());
-    LMI_PowerManagementServiceRef_Set_SystemName(&powerManagementServiceRef, get_system_name());
+    LMI_PowerManagementServiceRef_Set_Name(&powerManagementServiceRef, lmi_get_system_name_safe(cc));
+    LMI_PowerManagementServiceRef_Set_SystemName(&powerManagementServiceRef, lmi_get_system_name_safe(cc));
     LMI_PowerManagementServiceRef_Set_CreationClassName(&powerManagementServiceRef, "LMI_PowerManagementService");
-    LMI_PowerManagementServiceRef_Set_SystemCreationClassName(&powerManagementServiceRef, get_system_creation_class_name());
+    LMI_PowerManagementServiceRef_Set_SystemCreationClassName(&powerManagementServiceRef, lmi_get_system_creation_class_name());
 
     LMI_ElementCapabilities_Set_ManagedElement(&w, &powerManagementServiceRef);
 
     LMI_PowerManagementCapabilitiesRef powerManagementCapabilitiesRef;
     LMI_PowerManagementCapabilitiesRef_Init(&powerManagementCapabilitiesRef, _cb, ns);
-    LMI_PowerManagementCapabilitiesRef_Set_InstanceID(&powerManagementCapabilitiesRef, ORGID ":LMI_PowerManagementCapabilities");
+    LMI_PowerManagementCapabilitiesRef_Set_InstanceID(&powerManagementCapabilitiesRef, LMI_ORGID ":LMI_PowerManagementCapabilities");
 
     LMI_ElementCapabilities_Set_Capabilities(&w, &powerManagementCapabilitiesRef);
 
@@ -89,61 +88,61 @@ static CMPIStatus LMI_ElementCapabilitiesEnumInstances(
 }
 
 static CMPIStatus LMI_ElementCapabilitiesGetInstance(
-    CMPIInstanceMI* mi, 
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
 static CMPIStatus LMI_ElementCapabilitiesCreateInstance(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_ElementCapabilitiesModifyInstance(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci,
+    const char**properties)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_ElementCapabilitiesDeleteInstance(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_ElementCapabilitiesExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_ElementCapabilitiesAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     power_unref(mi->hdl);
     mi->hdl = NULL;
@@ -238,13 +237,13 @@ static CMPIStatus LMI_ElementCapabilitiesReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_ElementCapabilities,
     LMI_ElementCapabilities,
     _cb,
     LMI_ElementCapabilitiesInitialize(&mi, ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_ElementCapabilities,
     LMI_ElementCapabilities,
     _cb,

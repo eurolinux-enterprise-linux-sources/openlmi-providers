@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,8 +22,7 @@
 #include "LMI_ProcessorElementCapabilities.h"
 #include "LMI_ProcessorCapabilities.h"
 #include "LMI_Processor.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 #include "lscpu.h"
 
@@ -34,15 +33,15 @@ static void LMI_ProcessorElementCapabilitiesInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_ProcessorElementCapabilitiesCleanup( 
+static CMPIStatus LMI_ProcessorElementCapabilitiesCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_ProcessorElementCapabilitiesEnumInstanceNames( 
+static CMPIStatus LMI_ProcessorElementCapabilitiesEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -52,18 +51,18 @@ static CMPIStatus LMI_ProcessorElementCapabilitiesEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_ProcessorElementCapabilitiesEnumInstances( 
+static CMPIStatus LMI_ProcessorElementCapabilitiesEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_ProcessorElementCapabilities lmi_cpu_el_cap;
     LMI_ProcessorCapabilitiesRef lmi_cpu_cap;
     LMI_ProcessorRef lmi_cpu;
     const char *ns = KNameSpace(cop);
-    char *error_msg = NULL, instance_id[INSTANCE_ID_LEN];
+    char *error_msg = NULL, instance_id[BUFLEN];
     unsigned i, cpus_nb = 0;
     DmiProcessor *dmi_cpus = NULL;
     unsigned dmi_cpus_nb = 0;
@@ -92,10 +91,10 @@ static CMPIStatus LMI_ProcessorElementCapabilitiesEnumInstances(
 
         LMI_ProcessorRef_Init(&lmi_cpu, _cb, ns);
         LMI_ProcessorRef_Set_SystemCreationClassName(&lmi_cpu,
-                get_system_creation_class_name());
-        LMI_ProcessorRef_Set_SystemName(&lmi_cpu, get_system_name());
+                lmi_get_system_creation_class_name());
+        LMI_ProcessorRef_Set_SystemName(&lmi_cpu, lmi_get_system_name_safe(cc));
         LMI_ProcessorRef_Set_CreationClassName(&lmi_cpu,
-                ORGID "_" CPU_CLASS_NAME);
+                LMI_Processor_ClassName);
 
         LMI_ProcessorCapabilitiesRef_Init(&lmi_cpu_cap, _cb, ns);
 
@@ -103,16 +102,16 @@ static CMPIStatus LMI_ProcessorElementCapabilitiesEnumInstances(
         if (dmi_cpus_nb > 0) {
             LMI_ProcessorRef_Set_DeviceID(&lmi_cpu, dmi_cpus[i].id);
 
-            snprintf(instance_id, INSTANCE_ID_LEN,
-                    ORGID ":" ORGID "_" CPU_CAP_CLASS_NAME ":%s",
+            snprintf(instance_id, BUFLEN,
+                    LMI_ORGID ":" LMI_ProcessorCapabilities_ClassName ":%s",
                     dmi_cpus[i].id);
         } else {
             char cpu_id[LONG_INT_LEN];
             snprintf(cpu_id, LONG_INT_LEN, "%u", i);
             LMI_ProcessorRef_Set_DeviceID(&lmi_cpu, cpu_id);
 
-            snprintf(instance_id, INSTANCE_ID_LEN,
-                    ORGID ":" ORGID "_" CPU_CAP_CLASS_NAME ":%u", i);
+            snprintf(instance_id, BUFLEN,
+                    LMI_ORGID ":" LMI_ProcessorCapabilities_ClassName ":%u", i);
         }
 
         LMI_ProcessorCapabilitiesRef_Set_InstanceID(&lmi_cpu_cap, instance_id);
@@ -143,62 +142,62 @@ done:
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_ProcessorElementCapabilitiesGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_ProcessorElementCapabilitiesGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_ProcessorElementCapabilitiesCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_ProcessorElementCapabilitiesModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_ProcessorElementCapabilitiesCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_ProcessorElementCapabilitiesDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_ProcessorElementCapabilitiesModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_ProcessorElementCapabilitiesDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_ProcessorElementCapabilitiesExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_ProcessorElementCapabilitiesAssociationCleanup( 
+static CMPIStatus LMI_ProcessorElementCapabilitiesAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -291,13 +290,13 @@ static CMPIStatus LMI_ProcessorElementCapabilitiesReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_ProcessorElementCapabilities,
     LMI_ProcessorElementCapabilities,
     _cb,
     LMI_ProcessorElementCapabilitiesInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_ProcessorElementCapabilities,
     LMI_ProcessorElementCapabilities,
     _cb,

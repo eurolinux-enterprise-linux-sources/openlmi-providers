@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,7 @@
 
 #include <konkret/konkret.h>
 #include "LMI_MemorySlotContainer.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
 
 static const CMPIBroker* _cb;
@@ -31,15 +30,15 @@ static void LMI_MemorySlotContainerInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_MemorySlotContainerCleanup( 
+static CMPIStatus LMI_MemorySlotContainerCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_MemorySlotContainerEnumInstanceNames( 
+static CMPIStatus LMI_MemorySlotContainerEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -49,12 +48,12 @@ static CMPIStatus LMI_MemorySlotContainerEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_MemorySlotContainerEnumInstances( 
+static CMPIStatus LMI_MemorySlotContainerEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_MemorySlotContainer lmi_mem_slot_container;
     LMI_MemorySlotRef lmi_mem_slot;
@@ -74,7 +73,7 @@ static CMPIStatus LMI_MemorySlotContainerEnumInstances(
 
     LMI_ChassisRef_Init(&lmi_chassis, _cb, ns);
     LMI_ChassisRef_Set_CreationClassName(&lmi_chassis,
-            ORGID "_" CHASSIS_CLASS_NAME);
+            LMI_Chassis_ClassName);
     if (strcmp(dmi_chassis.serial_number, "Not Specified") == 0) {
         LMI_ChassisRef_Set_Tag(&lmi_chassis, "0");
     } else {
@@ -88,7 +87,7 @@ static CMPIStatus LMI_MemorySlotContainerEnumInstances(
 
         LMI_MemorySlotRef_Init(&lmi_mem_slot, _cb, ns);
         LMI_MemorySlotRef_Set_CreationClassName(&lmi_mem_slot,
-                ORGID "_" MEMORY_SLOT_CLASS_NAME);
+                LMI_MemorySlot_ClassName);
         LMI_MemorySlotRef_Set_Tag(&lmi_mem_slot, tag);
 
         LMI_MemorySlotContainer_Set_GroupComponent(&lmi_mem_slot_container,
@@ -106,62 +105,62 @@ done:
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_MemorySlotContainerGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_MemorySlotContainerGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_MemorySlotContainerCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_MemorySlotContainerModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_MemorySlotContainerCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_MemorySlotContainerDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_MemorySlotContainerModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_MemorySlotContainerDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_MemorySlotContainerExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_MemorySlotContainerAssociationCleanup( 
+static CMPIStatus LMI_MemorySlotContainerAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -254,13 +253,13 @@ static CMPIStatus LMI_MemorySlotContainerReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_MemorySlotContainer,
     LMI_MemorySlotContainer,
     _cb,
     LMI_MemorySlotContainerInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_MemorySlotContainer,
     LMI_MemorySlotContainer,
     _cb,

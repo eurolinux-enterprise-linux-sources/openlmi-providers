@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -24,13 +24,14 @@ Unit tests for ``LMI_SoftwareIdentityResource`` provider.
 """
 
 import os
-import pywbem
 import time
 import shutil
 import subprocess
-import unittest
 
+from lmi.test import unittest
+from lmi.test import wbem
 from lmi.test.lmibase import enable_lmi_exceptions
+
 import repository
 import swbase
 import util
@@ -39,18 +40,27 @@ ENABLED_DEFAULT_NOT_APPLICABLE = 5
 ENABLED_STATE_DISABLED = 3
 ENABLED_STATE_ENABLED = 2
 EXTENDED_RESOURCE_TYPE_RPM = 3
-HEALTH_STATE_MAJOR_FAILURE = 20
+
+HEALTH_STATE_UNKNOWN = 0
 HEALTH_STATE_OK = 5
+HEALTH_STATE_MAJOR_FAILURE = 20
+
 INFO_FORMAT_URL = 200
-OPERATIONAL_STATUS_ERROR = 6
+
 OPERATIONAL_STATUS_OK = 2
+OPERATIONAL_STATUS_ERROR = 6
+OPERATIONAL_STATUS_STOPPED = 10
+
 REQUESTED_STATE_ENABLED = 2
 REQUESTED_STATE_DISABLED = 3
 REQUEST_STATE_CHANGE_SUCCESSFUL = 0
 REQUEST_STATE_CHANGE_ERROR = 2
 RESOURCE_TYPE_OTHER = 1
-PRIMARY_STATUS_ERROR = 3
+
+PRIMARY_STATUS_UNKNOWN = 0
 PRIMARY_STATUS_OK = 1
+PRIMARY_STATUS_ERROR = 3
+
 TRANSITIONING_TO_STATE_NOT_APPLICABLE = 12
 
 DUMMY_TEST_REPO = 'lmi-test'
@@ -92,33 +102,34 @@ class TestSoftwareIdentityResource(swbase.SwTestCase):
                 self.assertEqual(getattr(inst, key), getattr(inst.path, key))
         self.assertEqual(inst.Name, repo.repoid)
 
-        self.assertIsInstance(inst.AccessContext, pywbem.Uint16)
+        self.assertNotEqual(inst.AccessContext, None)
         access_info = inst.AccessInfo
         if access_info is not None:
             access_info = access_info.rstrip('/')
         if access_info is not None:
             self.assertIsInstance(access_info, basestring)
-        if repo.mirror_list:
+        if not util.USE_PKCON and repo.mirror_list:
             self.assertEqual(access_info, repo.mirror_list,
                     "AccessInfo does not match mirror_list for repo %s" %
                     repo.repoid)
-        elif repo.metalink:
+        elif not util.USE_PKCON and repo.metalink:
             self.assertEqual(access_info, repo.metalink,
                     "AccessInfo does not match metalink for repo %s" %
                     repo.repoid)
         elif access_info is not None:
-            self.assertIn(access_info, {u.rstrip('/') for u in repo.base_urls},
+            self.assertIn(access_info, (u.rstrip('/') for u in repo.base_urls),
                 "AccessInfo missing in base_urls for repo %s" % repo.repoid)
 
         self.assertIsInstance(inst.AvailableRequestedStates, list)
         # Unfortunately, yum-config-manager shortens lines on its output
-        # therefor we can not check very long names.
+        # therefore we can not check very long names.
         # 61 characters in version yum-utils-1.1.31-19.fc21
         if len(repo.name) > 60:
             self.assertTrue(inst.Caption.startswith(repo.name))
         else:
             self.assertEqual(inst.Caption, repo.name)
-        self.assertIsInstance(inst.Cost, pywbem.Sint32)
+        if not util.USE_PKCON:
+            self.assertNotEqual(inst.Cost, None)
         self.assertIsInstance(inst.Description, basestring)
         self.assertEqual(inst.ElementName, repo.repoid)
         self.assertEqual(inst.EnabledDefault, ENABLED_DEFAULT_NOT_APPLICABLE)
@@ -128,41 +139,38 @@ class TestSoftwareIdentityResource(swbase.SwTestCase):
                 inst.EnabledState,
                 "EnabledState does not match for repo %s" % repo.repoid)
         self.assertEqual(inst.ExtendedResourceType, EXTENDED_RESOURCE_TYPE_RPM)
-        if repo.revision is not None:
+        if not util.USE_PKCON and repo.revision is not None:
             self.assertTrue(isinstance(inst.Generation, (int, long)),
                     'Generation must be integer for repo %s' % repo.repoid)
-        if repo.status:
-            self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
-            self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
-            self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
-        else:
-            # repo may not be enabled, but still it can be ready
-            # (which is not documented), so let's check both posibilities
-            # TODO: health state should be OK for disabled repository
-            self.assertIn(inst.HealthState,
-                    [HEALTH_STATE_OK, HEALTH_STATE_MAJOR_FAILURE])
-            self.assertIn(inst.OperationalStatus,
-                    [[OPERATIONAL_STATUS_OK], [OPERATIONAL_STATUS_ERROR]])
-            self.assertIn(inst.PrimaryStatus, [PRIMARY_STATUS_OK, PRIMARY_STATUS_ERROR])
-        self.assertIsInstance(inst.GPGCheck, bool)
+        if not util.USE_PKCON:
+            if repo.status:
+                self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
+                self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
+                self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+            else:
+                self.assertEqual(inst.HealthState, HEALTH_STATE_UNKNOWN)
+                self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_STOPPED])
+                self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_UNKNOWN)
+            self.assertIsInstance(inst.GPGCheck, bool)
+            self.assertEqual(inst.MirrorList, repo.mirror_list,
+                     'MirrorList must match for repo %s' % repo.repoid)
+            self.assertIsInstance(inst.RepoGPGCheck, bool)
         self.assertEqual(inst.InfoFormat, INFO_FORMAT_URL)
         self.assertEqual("LMI:LMI_SoftwareIdentityResource:"+repo.repoid,
                 inst.InstanceID)
-        self.assertEqual(inst.MirrorList, repo.mirror_list,
-                'MirrorList must match for repo %s' % repo.repoid)
         self.assertIsInstance(inst.OtherAccessContext, basestring)
-        self.assertIsInstance(inst.RepoGPGCheck, bool)
         self.assertEqual(
                    ENABLED_STATE_ENABLED
                 if repo.status else ENABLED_STATE_DISABLED,
                 inst.RequestedState)
         self.assertEqual(inst.ResourceType, RESOURCE_TYPE_OTHER)
         self.assertIsInstance(inst.StatusDescriptions, list)
-        self.assertEqual(1, len(inst.StatusDescriptions))
-        if repo.last_updated is not None:
-            time_stamp = repo.last_updated.replace(
-                    microsecond=0, tzinfo=pywbem.cim_types.MinutesFromUTC(0))
-            self.assertGreaterEqual(inst.TimeOfLastUpdate.datetime, time_stamp)
+        if not util.USE_PKCON:
+            self.assertEqual(1, len(inst.StatusDescriptions))
+            if repo.last_updated is not None:
+                time_stamp = repo.last_updated.replace(
+                        microsecond=0, tzinfo=wbem.cim_types.MinutesFromUTC(0))
+                self.assertGreaterEqual(inst.TimeOfLastUpdate.datetime, time_stamp)
         self.assertEqual(TRANSITIONING_TO_STATE_NOT_APPLICABLE,
                 inst.TransitioningToState)
 
@@ -238,10 +246,12 @@ class TestSoftwareIdentityResource(swbase.SwTestCase):
                 'GetInstance() call on updates repository is successful'
                 ' with path "%s"' % str(objpath))
         self.assertEqual(inst.EnabledState, ENABLED_STATE_ENABLED)
-        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
-        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
-        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+        if not util.USE_PKCON:
+            self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
+            self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
+            self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
 
+        time.sleep(1)
         repository.set_repos_enabled(repo, False)
         repo.refresh()
         self.assertFalse(repo.status)
@@ -251,9 +261,10 @@ class TestSoftwareIdentityResource(swbase.SwTestCase):
                 'GetInstance() call on updates repository is successful'
                 ' with path "%s"' % str(objpath))
         self.assertEqual(inst.EnabledState, ENABLED_STATE_DISABLED)
-        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
-        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
-        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+        if not util.USE_PKCON:
+            self.assertEqual(inst.HealthState, HEALTH_STATE_UNKNOWN)
+            self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_STOPPED])
+            self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_UNKNOWN)
 
 
     @swbase.test_with_repos(updates=False)
@@ -270,9 +281,10 @@ class TestSoftwareIdentityResource(swbase.SwTestCase):
                 'GetInstance() call on updates repository is successful'
                 ' with path "%s"' % str(objpath))
         self.assertEqual(inst.EnabledState, ENABLED_STATE_DISABLED)
-        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
-        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
-        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+        if not util.USE_PKCON:
+            self.assertEqual(inst.HealthState, HEALTH_STATE_UNKNOWN)
+            self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_STOPPED])
+            self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_UNKNOWN)
 
         repository.set_repos_enabled(repo, True)
         repo.refresh()
@@ -282,9 +294,10 @@ class TestSoftwareIdentityResource(swbase.SwTestCase):
                 'GetInstance() call on updates repository is successful'
                 ' with path "%s"' % str(objpath))
         self.assertEqual(inst.EnabledState, ENABLED_STATE_ENABLED)
-        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
-        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
-        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+        if not util.USE_PKCON:
+            self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
+            self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
+            self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
 
     @swbase.test_with_repos('stable')
     def test_disable_enabled_repo(self):
@@ -311,9 +324,10 @@ class TestSoftwareIdentityResource(swbase.SwTestCase):
         self.assertFalse(repo.status)
         inst.refresh()
         self.assertEqual(inst.EnabledState, ENABLED_STATE_DISABLED)
-        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
-        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
-        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+        if not util.USE_PKCON:
+            self.assertEqual(inst.HealthState, HEALTH_STATE_UNKNOWN)
+            self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_STOPPED])
+            self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_UNKNOWN)
 
     @swbase.test_with_repos(stable=False)
     def test_enable_disabled_repo(self):
@@ -340,9 +354,10 @@ class TestSoftwareIdentityResource(swbase.SwTestCase):
         self.assertTrue(repo.status)
         inst.refresh()
         self.assertEqual(inst.EnabledState, ENABLED_STATE_ENABLED)
-        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
-        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
-        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+        if not util.USE_PKCON:
+            self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
+            self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
+            self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
 
     @swbase.test_with_repos('stable')
     def test_enable_enabled_repo(self):
@@ -369,9 +384,10 @@ class TestSoftwareIdentityResource(swbase.SwTestCase):
         self.assertTrue(repo.status)
         inst.refresh()
         self.assertEqual(inst.EnabledState, ENABLED_STATE_ENABLED)
-        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
-        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
-        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+        if not util.USE_PKCON:
+            self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
+            self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
+            self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
 
     @swbase.test_with_repos(stable=False)
     def test_disable_disabled_repo(self):
@@ -398,9 +414,10 @@ class TestSoftwareIdentityResource(swbase.SwTestCase):
         self.assertFalse(repo.status)
         inst.refresh()
         self.assertEqual(inst.EnabledState, ENABLED_STATE_DISABLED)
-        self.assertEqual(inst.HealthState, HEALTH_STATE_OK)
-        self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_OK])
-        self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_OK)
+        if not util.USE_PKCON:
+            self.assertEqual(inst.HealthState, HEALTH_STATE_UNKNOWN)
+            self.assertEqual(inst.OperationalStatus, [OPERATIONAL_STATUS_STOPPED])
+            self.assertEqual(inst.PrimaryStatus, PRIMARY_STATUS_UNKNOWN)
 
     @enable_lmi_exceptions
     def test_disable_unexisting_repository(self):
@@ -430,7 +447,11 @@ class TestSoftwareIdentityResource(swbase.SwTestCase):
 
             os.remove(repo_file_path)
 
-            self.assertRaisesCIM(pywbem.CIM_ERR_NOT_FOUND,
+            if util.USE_PKCON:
+                subprocess.call(['pkcon', '-p', 'refresh'], \
+                                stdout=util.DEV_NULL, stderr=util.DEV_NULL)
+
+            self.assertRaisesCIM(wbem.CIM_ERR_NOT_FOUND,
                     repo.RequestStateChange,
                     RequestedState=REQUESTED_STATE_DISABLED)
         finally:
@@ -454,6 +475,9 @@ class TestSoftwareIdentityResource(swbase.SwTestCase):
                     os.path.dirname(swbase.__file__),
                     DUMMY_TEST_REPO),
                 repo_file_path)
+        if util.USE_PKCON:
+            subprocess.call(['pkcon', '-p', 'refresh'], \
+                            stdout=util.DEV_NULL, stderr=util.DEV_NULL)
         try:
 
             repo = self.cim_class.first_instance_name(
@@ -461,7 +485,11 @@ class TestSoftwareIdentityResource(swbase.SwTestCase):
 
             os.remove(repo_file_path)
 
-            self.assertRaisesCIM(pywbem.CIM_ERR_NOT_FOUND,
+            if util.USE_PKCON:
+                subprocess.call(['pkcon', '-p', 'refresh'], \
+                                stdout=util.DEV_NULL, stderr=util.DEV_NULL)
+
+            self.assertRaisesCIM(wbem.CIM_ERR_NOT_FOUND,
                     repo.RequestStateChange,
                     RequestedState=REQUESTED_STATE_ENABLED)
         finally:

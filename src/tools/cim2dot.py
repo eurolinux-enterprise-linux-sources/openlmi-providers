@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -72,20 +72,20 @@ class CimExporter(object):
             if instance.has_key(i):
                 title +=  "\\n" + instance[i]
         return title
-        
+
     def drawInstance(self, instance):
         if self.isIgnored(instance):
             return
         path = self.loader.getInstancePath(instance)
         name = 'obj' + str(len(self.instanceLabels))
         self.instanceLabels[path] = name
-        
+
         _encodeObject = lambda x: (base64.b64encode(zlib.compress(cPickle.dumps(x, cPickle.HIGHEST_PROTOCOL))))
         params = {'url': self.loader.cliconn.url, 'ns': self.loader.namespace, 'instPath':_encodeObject(instance)}
         url = self.urltemplate + "?" + cgi.urllib.urlencode(params)
         title = self.getTitle(instance)
         print '%s [tooltip="%s",label="%s",URL="%s"];' % (name, path, title, url)
-        
+
     def drawReference(self, reference):
         # find the first and the second CIMInstanceName among keybindings
         vals = reference.keybindings.values()
@@ -97,14 +97,14 @@ class CimExporter(object):
         while not isinstance(vals[i], pywbem.CIMInstanceName):
             i = i+1
         dst = vals[i]
-        
+
         if self.isIgnored(src) or self.isIgnored(dst) or self.isIgnored(reference):
             return
         label = reference.classname
         srcName = self.instanceLabels[self.loader.getInstancePath(src)]
         dstName = self.instanceLabels[self.loader.getInstancePath(dst)]
         print '%s -- %s [label="%s"];' % (srcName, dstName, label)
-        
+
     def export(self):
         instances = self.loader.instances.values()
         instances.sort()
@@ -126,7 +126,7 @@ class CimLoader(object):
         self.queue = {} #path -> level
         self.references = {} #'classname:path-path' -> reference
         self.ignore = ignore
-        
+
     def isIgnored(self, instance):
         if self.ignore is None:
             return False
@@ -140,13 +140,13 @@ class CimLoader(object):
         instance.host='f16'
         path = str(instance)
         return path.replace('"', "'")
-    
+
     def getReferencePath(self, reference, src, dst):
         label = reference.classname
         srcName = self.getInstancePath(src)
         dstName = self.getInstancePath(dst)
         return label+':'+srcName+'-'+dstName
-    
+
     def addInstances(self, instances, level):
         for i in instances:
             path = self.getInstancePath(i)
@@ -176,7 +176,7 @@ class CimLoader(object):
         # add initial instances
         instances = self.cliconn.EnumerateInstanceNames(self.classname, namespace=self.namespace)
         self.addInstances(instances, 0)
-        
+
         while True:
             try:
                 (path, level) = self.queue.popitem()
@@ -184,12 +184,12 @@ class CimLoader(object):
                 break
             instance = self.instances[path]
             self.addReferences(instance, level)
-            
+
     def dumpTo(self, filename):
         f =  open(filename, 'w')
         cPickle.dump((self.instances, self.references), f)
         f.close()
-        
+
     def loadFrom(self, filename):
         f =  open(filename, 'r')
         (self.instances, self.references) = cPickle.load(f)
@@ -221,7 +221,7 @@ if options.infile:
     l.loadFrom(options.infile)
 else:
     l.load()
-    
+
 if options.outfile:
     l.dumpTo(options.outfile)
 

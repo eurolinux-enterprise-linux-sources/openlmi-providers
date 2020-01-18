@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- Coding:utf-8 -*-
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -26,55 +26,25 @@ from datetime import datetime
 import inspect
 import os
 import re
-from subprocess import call, check_output
+from subprocess import call
 
 import util
 
-RE_REPO_TAG = re.compile(
-    ur'^repo-(?P<tag>[a-z_-]+)[\s\u00a0]*:'
-    ur'[\s\u00a0]*(?P<value>.*?)[\s\u00a0]*$', re.I | re.U | re.M)
-RE_REPO_INFOS = re.compile(
-    r'^(repo-id\s*:.*?)(?:^\s*$)',
-    re.IGNORECASE | re.MULTILINE | re.DOTALL)
-RE_REPO_CONFIG = re.compile(
-    ur'^(?P<tag>[a-z_-]+)[ \t\u00a0]*='
-    ur'[ \t\u00a0]*((?P<value>.*?)[ \t\u00a0]*)?$',
-    re.I | re.M | re.U)
-RE_REPO_ENABLED = re.compile(
-    r'^enabled\s*=\s*(true|false|0|1|yes|no)\s*$', re.I | re.M)
-
 class Repository(object):
 
-    def __init__(self, repoid, name, status, revision,
-            tags, last_updated, pkg_count, base_urls,
-            metalink, mirror_list, filename, cost, timeout,
-            gpg_check, repo_gpg_check, metadata_expire,
-            config_path=None, packages=None):
-        for attr in ('repoid', 'name', 'tags', 'metalink', 'filename'):
+    def __init__(self, repoid, name, status, config_path=None, packages=None):
+        for attr in ('repoid', 'name'):
             setattr(self, attr, locals()[attr])
-        for attr in ('gpg_check', 'repo_gpg_check', 'cost', 'status',
-                'revision', 'last_updated', 'pkg_count',
-                'base_urls', 'mirror_list', 'timeout', 'metadata_expire'):
-            setattr(self, '_'+attr, None)
-        self.base_urls = base_urls
-        self.cost = cost
-        self.gpg_check = gpg_check
-        self.last_updated = last_updated
-        self.metadata_expire = metadata_expire
-        self.mirror_list = mirror_list
-        self.pkg_count = pkg_count
-        self.repo_gpg_check = repo_gpg_check
-        self.revision = revision
+        setattr(self, '_status', None)
         self.status = status
-        self.timeout = timeout
         if config_path is None:
-            repos_dir = os.environ.get('LMI_SOFTWARE_YUM_REPOS_DIR',
-                    '/etc/yum.repos.d')
+            repos_dir = util.get_env('yum_repos_dir')
             config_path = os.path.join(repos_dir, '%s.repo' % self.repoid)
         self.config_path = config_path
         if packages is None:
             packages = set()
         self._packages = set(packages)
+        self._base_urls = list()
 
     @property
     def base_urls(self):
@@ -90,6 +60,66 @@ class Repository(object):
         if (   len(self._base_urls) == 1
            and self._base_urls[0].startswith('file://')):
             return self._base_urls[0][len('file://'):]
+
+    @property
+    def packages(self):
+        return self._packages
+
+    @property
+    def status(self):
+        return self._status
+    @status.setter
+    def status(self, value):
+        self._status = bool(value)
+
+    def __getitem__(self, pkg_name):
+        pkg_dict = dict((p.name, p) for p in self._packages)
+        try:
+            return pkg_dict[pkg_name]
+        except KeyError:
+            try:
+                return pkg_dict['openlmi-sw-test-' + pkg_name]
+            except KeyError:
+                raise KeyError(pkg_name)
+
+class YumRepository(Repository):
+
+    RE_REPO_TAG = re.compile(
+        ur'^repo-(?P<tag>[a-z_-]+)[\s\u00a0]*:'
+        ur'[\s\u00a0]*(?P<value>.*?)[\s\u00a0]*$', re.I | re.U | re.M)
+    RE_REPO_INFOS = re.compile(
+        r'^(repo-id\s*:.*?)(?:^\s*$)',
+        re.IGNORECASE | re.MULTILINE | re.DOTALL)
+    RE_REPO_CONFIG = re.compile(
+        ur'^(?P<tag>[a-z_-]+)[ \t\u00a0]*='
+        ur'[ \t\u00a0]*((?P<value>.*?)[ \t\u00a0]*)?$',
+        re.I | re.M | re.U)
+    RE_REPO_ENABLED = re.compile(
+        r'^enabled\s*=\s*(true|false|0|1|yes|no)\s*$', re.I | re.M)
+
+    def __init__(self, repoid, name, status, revision,
+            tags, last_updated, pkg_count, base_urls,
+            metalink, mirror_list, filename, cost, timeout,
+            gpg_check, repo_gpg_check, metadata_expire,
+            config_path=None, packages=None):
+        super(YumRepository, self).__init__(repoid, name, status, config_path,
+            packages)
+        for attr in ('tags', 'metalink', 'filename'):
+            setattr(self, attr, locals()[attr])
+        for attr in ('gpg_check', 'repo_gpg_check', 'cost', 'revision',
+                'last_updated', 'pkg_count', 'base_urls', 'mirror_list',
+                'timeout', 'metadata_expire'):
+            setattr(self, '_'+attr, None)
+        self.base_urls = base_urls
+        self.cost = cost
+        self.gpg_check = gpg_check
+        self.last_updated = last_updated
+        self.metadata_expire = metadata_expire
+        self.mirror_list = mirror_list
+        self.pkg_count = pkg_count
+        self.repo_gpg_check = repo_gpg_check
+        self.revision = revision
+        self.timeout = timeout
 
     @property
     def cost(self):
@@ -140,10 +170,6 @@ class Repository(object):
         self._mirror_list = mirror_list
 
     @property
-    def packages(self):
-        return self._packages
-
-    @property
     def pkg_count(self):
         return self._pkg_count
     @pkg_count.setter
@@ -165,30 +191,13 @@ class Repository(object):
         self._revision = None if value is None else int(value)
 
     @property
-    def status(self):
-        return self._status
-    @status.setter
-    def status(self, value):
-        self._status = bool(value)
-
-    @property
     def timeout(self):
         return self._timeout
     @timeout.setter
     def timeout(self, timeout):
         self._timeout = float(timeout)
 
-    def __getitem__(self, pkg_name):
-        pkg_dict = {p.name : p for p in self._packages}
-        try:
-            return pkg_dict[pkg_name]
-        except KeyError:
-            try:
-                return pkg_dict['openlmi-sw-test-' + pkg_name]
-            except KeyError:
-                raise KeyError(pkg_name)
-
-    def refresh(self):
+    def refresh(self, repolist = None):
         updated_attrs = set()
         for attr, value in _parse_repo_file(self.repoid).items():
             try:
@@ -200,6 +209,39 @@ class Repository(object):
             for attr in ('revision', 'tags', 'last_updated'):
                 if attr not in updated_attrs and getattr(self, attr) is not None:
                     setattr(self, attr, None)
+
+class PkRepository(Repository):
+
+    RE_REPO_INFOS = re.compile(
+        r'\s+(Enabled|Disabled)\s+(\S+)\s+(.*)',
+        re.IGNORECASE)
+
+    def __init__(self, repoid, name, status, config_path=None, packages=None):
+        super(PkRepository, self).__init__(repoid, name, status, config_path,
+            packages)
+        self._find_base_url()
+
+    def _find_base_url(self):
+        if os.path.isfile(self.config_path):
+            with open(self.config_path, 'r') as f:
+                for l in f:
+                    if l.strip().startswith('baseurl'):
+                        self._base_urls = [l.split('=', 2)[1].strip()]
+                        break
+
+    def refresh(self, repolist = None):
+        rl = repolist if repolist else get_pk_repo_list()
+        for m in PkRepository.RE_REPO_INFOS.finditer(rl):
+            if self.repoid == m.group(2):
+                self.name = m.group(3)
+                self.status = m.group(1).lower() == 'enabled'
+                break
+
+def get_pk_repo_list():
+    env = os.environ.copy()
+    env['LC_ALL'] = 'C'
+    cmd = ["pkcon", "-p", "repo-list"]
+    return util.check_output(cmd, env=env).decode('utf-8')
 
 def to_json(encoder, repo):
     """
@@ -221,7 +263,7 @@ def to_json(encoder, repo):
             return type(val)((transform_value(v) for v in val))
         return val
     argspec = inspect.getargspec(repo.__init__)
-    return { a: transform_value(getattr(repo, a)) for a in argspec.args[1:] }
+    return dict((a, transform_value(getattr(repo, a))) for a in argspec.args[1:] )
 
 def from_json(package_deserializer, json_object):
     """
@@ -234,7 +276,7 @@ def from_json(package_deserializer, json_object):
     :returns: Package object.
     :rtype: :py:class:`Package`
     """
-    if 'gpg_check' in json_object:
+    if 'status' in json_object:
         kwargs = {}
         for key, value in json_object.items():
             if isinstance(value, (tuple, list)):
@@ -242,10 +284,13 @@ def from_json(package_deserializer, json_object):
             else:
                 value = package_deserializer(value)
             kwargs[key] = value
-        return Repository(**kwargs)
+        if util.USE_PKCON:
+            return PkRepository(**kwargs)
+        else:
+            return YumRepository(**kwargs)
     return json_object
 
-# example of repo information
+# example of YUM repo information
 #Repo-id      : updates-testing/18/x86_64
 #Repo-name    : Fedora 18 - x86_64 - Test Updates
 #Repo-status  : enabled
@@ -268,9 +313,9 @@ def _parse_repo_file(repo_name):
     :rtype: dictionary
     """
     cmd = ["yum-config-manager", repo_name]
-    out = check_output(cmd).decode('utf-8')
+    out = util.check_output(cmd).decode('utf-8')
     result = {}
-    for match in RE_REPO_CONFIG.finditer(out):
+    for match in YumRepository.RE_REPO_CONFIG.finditer(out):
         tag = match.group('tag')
         value = match.group('value')
         if tag == "gpgcheck":
@@ -289,18 +334,18 @@ def _parse_repo_file(repo_name):
             result['status'] = value.lower() in ('true', 'yes', 1)
         elif tag == 'mirrorlist':
             result['mirror_list'] = value
-        elif tag in {p for p in Repository.__dict__ if not p.startswith('_')}:
+        elif tag in set(p for p in Repository.__dict__ if not p.startswith('_')):
             continue
     return result
 
 def make_repo(repo_info, packages=None):
     """
-    Makes a Repository instance from string dumped by yum repoinfo command.
+    Makes a Repository instance from string dumped by yum repolist command.
     """
     metadata = defaultdict(lambda : None)
     metadata["base_urls"] = []
-    argspec = inspect.getargspec(Repository.__init__)
-    for match in RE_REPO_TAG.finditer(repo_info):
+    argspec = inspect.getargspec(YumRepository.__init__)
+    for match in YumRepository.RE_REPO_TAG.finditer(repo_info):
         tag = match.group('tag')
         value = match.group('value')
         try:
@@ -338,18 +383,25 @@ def make_repo(repo_info, packages=None):
     for field in argspec.args[1:]:  # leave out self argument
         if not field in metadata:
             metadata[field] = config_items.get(field, None)
-    return Repository(**metadata)
+    return YumRepository(**metadata)
 
 def get_repo_list(kind='all'):
     if kind.lower() not in ('all', 'enabled', 'disabled'):
         raise ValueError('kind must be on of {"all", "enabled", "disabled"}')
-    cmd = ["yum", "-q", "repoinfo", "all"]
     env = os.environ.copy()
     env['LC_ALL'] = 'C'
-    return list(
-                RE_REPO_TAG.search(m.group(1)).group('value').split('/')[0]
-            for m in RE_REPO_INFOS.finditer(
-                        check_output(cmd, env=env).decode('utf-8')))
+    if util.USE_PKCON:
+        cmd = ["pkcon", "-p", "repo-list"]
+        return list(
+                    m.group(2) for m in PkRepository.RE_REPO_INFOS.finditer(
+                        util.check_output(cmd, env=env).decode('utf-8')) \
+                    if kind.lower() == 'all' or m.group(1).lower() == kind.lower())
+    else:
+        cmd = ["yum", "-q", "repolist", "-v", kind.lower()]
+        return list(
+                    YumRepository.RE_REPO_TAG.search(m.group(1)).group('value').split('/')[0]
+                for m in YumRepository.RE_REPO_INFOS.finditer(
+                            util.check_output(cmd, env=env).decode('utf-8')))
 
 def get_repo_database():
     """
@@ -357,12 +409,19 @@ def get_repo_database():
     :rtype: list
     """
     result = []
-    cmd = ["yum", "-q", "repoinfo", "all"]
     env = os.environ.copy()
     env['LC_ALL'] = 'C'
-    repo_infos = check_output(cmd, env=env).decode('utf-8')
-    for match in RE_REPO_INFOS.finditer(repo_infos):
-        result.append(make_repo(match.group(1)))
+    if util.USE_PKCON:
+        cmd = ["pkcon", "-p", "repo-list"]
+        repo_infos = util.check_output(cmd, env=env).decode('utf-8')
+        for m in PkRepository.RE_REPO_INFOS.finditer(repo_infos):
+            pkrepo = PkRepository(m.group(2), m.group(3), m.group(1).lower() == 'enabled')
+            result.append(pkrepo)
+    else:
+        cmd = ["yum", "-q", "repolist", "-v", "all"]
+        repo_infos = util.check_output(cmd, env=env).decode('utf-8')
+        for match in YumRepository.RE_REPO_INFOS.finditer(repo_infos):
+            result.append(make_repo(match.group(1)))
     return result
 
 def is_repo_enabled(repo):
@@ -373,19 +432,32 @@ def is_repo_enabled(repo):
     """
     if isinstance(repo, Repository):
         repo = repo.repoid
-    cmd = ["yum-config-manager", repo]
-    out = check_output(cmd)
-    match = RE_REPO_ENABLED.search(out)
-    return bool(match) and match.group(1).lower() in {"true", "yes", "1"}
+    if util.USE_PKCON:
+        env = os.environ.copy()
+        env['LC_ALL'] = 'C'
+        cmd = ["pkcon", "-p", "repo-list"]
+        repo_infos = util.check_output(cmd, env=env).decode('utf-8')
+        for m in PkRepository.RE_REPO_INFOS.finditer(repo_infos):
+            if m.group(2) == repo and m.group(1).lower() == 'enabled':
+                return True
+        return False
+    else:
+        cmd = ["yum-config-manager", repo]
+        out = util.check_output(cmd)
+        match = YumRepository.RE_REPO_ENABLED.search(out)
+        return bool(match) and match.group(1).lower() in ("true", "yes", "1")
 
 def set_repos_enabled(repos, enable=True):
     """
     Enables or disables repository in its configuration file.
 
-    :param repo: Eiether a repository id or instance of :py:class:`Repository`.
+    :param repo: Either a repository id or instance of :py:class:`Repository`.
     :param boolean enable: New state of repository.
     """
-    cmd = ["yum-config-manager", "--enable" if enable else "--disable"]
+    if util.USE_PKCON:
+        cmd = ["pkcon", "-p", "repo-enable" if enable else "repo-disable"]
+    else:
+        cmd = ["yum-config-manager", "--enable" if enable else "--disable"]
     repoids = []
     if isinstance(repos, (basestring, Repository)):
         repos = [repos]
@@ -394,6 +466,10 @@ def set_repos_enabled(repos, enable=True):
             repo = repo.repoid
         repoids.append(repo)
     if len(repoids) > 0:
-        cmd.extend(repoids)
-        call(cmd, stdout=util.DEV_NULL, stderr=util.DEV_NULL)
-
+        if util.USE_PKCON:
+            for repoid in repoids:
+                call(cmd + [repoid], stdout=util.DEV_NULL, stderr=util.DEV_NULL)
+            call(["pkcon", "-p", "refresh"], stdout=util.DEV_NULL, stderr=util.DEV_NULL)
+        else:
+            cmd.extend(repoids)
+            call(cmd, stdout=util.DEV_NULL, stderr=util.DEV_NULL)

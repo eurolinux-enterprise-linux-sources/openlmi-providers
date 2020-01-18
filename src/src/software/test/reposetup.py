@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -52,7 +52,7 @@ REGULAR, DOC, CONFIG, LINK, CHARDEV, BLOCKDEV, FIFO = [
 YumVars = collections.namedtuple('YumVars',
         ('releasever', 'disttag', 'basearch', 'arch'))
 
-#: Dictionary with shortned package names as keys with assigned contents.
+#: Dictionary with shortened package names as keys with assigned contents.
 #: Content represented with recursive dictionaries where dictionaries
 #: represent folders and tuples files, pipes, symlinks, etc.
 #: Directories whose names end with '/' will be owned.
@@ -122,6 +122,8 @@ PKG_FILE_ENTRIES = {
         },
     }
 }
+
+UTF8_TEST_FILE_NAME = u'\u011b\u0161\u010d\u0159\u017e\xfd\xe1\xed\xe9'
 
 #: Repositories with assigned packages.
 REPOS = {
@@ -227,6 +229,15 @@ REPOS = {
                 }
             }
         },
+        # unicode characters
+        'openlmi-sw-test-unicode-chars-0:1.2.3-1%(disttag)s.noarch' : {
+            'files' : {
+                'usr/share/openlmi-sw-test-unicode-chars/' : {
+                    UTF8_TEST_FILE_NAME:
+                        (REGULAR | DOC, 0644, 'content\n')
+                }
+            }
+        }
     },
 }
 
@@ -238,7 +249,6 @@ Release:  %(release)s
 License:  LGPLv2+
 Source0:  %(pkg_name)s-%(epoch)s:%(version)s-%(release)s.%(pkg_arch)s.tar.gz
 %(arch_string)s
-Requires: openlmi-software
 %(requires_string)s
 Summary: This is a test package %(pkg_name)s
 
@@ -408,7 +418,7 @@ def _make_source_tarball(rpmbuild_dir, pkg_nevra, pkg_dict):
         src_dir = os.path.join(archive_dir,
                 '%s-%s' % (match.group('name'), match.group('ver')))
         _write_package_directory(src_dir, pkg_dict.get('files', {}))
-        subprocess.call(['/usr/bin/tar', '-C', archive_dir,
+        subprocess.call(['/bin/tar', '-C', archive_dir,
             '-czf', tarball_path, os.path.basename(src_dir)])
         return tarball_path
     finally:
@@ -433,6 +443,8 @@ def _make_spec_files_string(path, entries):
     res = []
     for name, entry in entries.items():
         full_path = os.path.join(path, name)
+        if isinstance(full_path, unicode):
+            full_path = full_path.encode('utf-8')
         if isinstance(entry, dict):
             if name.endswith('perms/'):
                 res.append('%dir %attr(1777, -, -) ' + full_path)
@@ -457,7 +469,7 @@ def _get_rpm_name_from_spec(spec_file_path):
     :returns: Name of rpm file builded out of particular spec file.
     :rtype: string
     """
-    return subprocess.check_output(['/usr/bin/rpm', '-q', '--specfile',
+    return util.check_output(['/bin/rpm', '-q', '--specfile',
         spec_file_path]).splitlines()[0] + '.rpm'
 
 def _build_pkg(rpmbuild_dir, pkg_nevra, pkg_dict):
@@ -555,11 +567,10 @@ def get_yum_config():
     """
     if not hasattr(get_yum_config, '_yum_vars'):
         yumvar_dict = yum.YumBase().conf.yumvar
-        kwargs = {   f: yumvar_dict[f]
-                 for f in YumVars._fields if f in yumvar_dict}
-        kwargs['disttag'] = '.' + subprocess.check_output(
-                ['/usr/bin/rpm', '-q', '--qf', '%{RELEASE}\n'
-                , 'kernel']).splitlines()[0].split('.')[-1]
+        kwargs = dict((f, yumvar_dict[f]) for f in YumVars._fields if f in yumvar_dict)
+        kwargs['disttag'] = '.' + util.check_output(
+                ['/bin/rpm', '-q', '--qf', '%{RELEASE}\n'
+                , 'kernel']).splitlines()[-1].split('.')[-1]
         get_yum_config._yum_vars = YumVars(**kwargs)
     return get_yum_config._yum_vars
 

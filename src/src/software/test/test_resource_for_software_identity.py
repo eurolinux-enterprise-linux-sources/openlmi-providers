@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -21,8 +21,8 @@
 """
 Unit tests for ``LMI_ResourceForSoftwareIdentity`` provider.
 """
-
-import unittest
+from lmi.test import unittest
+from util import USE_PKCON
 
 import package
 import swbase
@@ -61,8 +61,7 @@ class TestResourceForSoftwareIdentity(swbase.SwTestCase):
                       'LMI:LMI_SoftwareIdentity:' + pkg.nevra)
         return objpath
 
-    @swbase.test_with_repos('stable', 'updates', 'misc',
-            **{'updates-testing' : True})
+    @swbase.test_with_repos('stable', 'updates', 'updates-testing', 'misc')
     def test_get_instance(self):
         """
         Test ``GetInstance()`` call on ``LMI_ResourceForSoftwareIdentity``.
@@ -81,6 +80,7 @@ class TestResourceForSoftwareIdentity(swbase.SwTestCase):
                         'Key property "%s" does not match for package "%s#%s"!'
                         % (key, repo.repoid, pkg))
 
+    @swbase.run_for_backends('yum')
     @swbase.test_with_repos(**{'updates' : False})
     def test_get_instance_disabled_repo(self):
         """
@@ -108,7 +108,8 @@ class TestResourceForSoftwareIdentity(swbase.SwTestCase):
         """
         repo = self.get_repo('stable')
         self.assertTrue(repo.status)
-        self.assertGreater(repo.pkg_count, 0)
+        if not USE_PKCON:
+            self.assertGreater(repo.pkg_count, 0)
 
         objpath = self.make_op(repo=repo)
         refs = objpath.AvailableSAP.to_instance().associator_names(
@@ -116,9 +117,14 @@ class TestResourceForSoftwareIdentity(swbase.SwTestCase):
                 Role="AvailableSAP",
                 ResultRole="ManagedElement",
                 ResultClass="LMI_SoftwareIdentity")
-        self.assertEqual(len(refs), repo.pkg_count,
-                'repository "%s" is missing software identities'
-                % repo.name)
+        if USE_PKCON:
+            self.assertGreater(len(refs), 0,
+                    'repository "%s" is missing software identities'
+                    % repo.name)
+        else:
+            self.assertEqual(len(refs), repo.pkg_count,
+                    'repository "%s" is missing software identities'
+                    % repo.name)
         for ref in refs:
             self.assertEqual(ref.namespace, 'root/cimv2')
             self.assertEqual(ref.classname, "LMI_SoftwareIdentity")
@@ -136,6 +142,7 @@ class TestResourceForSoftwareIdentity(swbase.SwTestCase):
         self.assertEqual(len(nevra_set), 0,
                 "all packages from repository have been listed")
 
+    @swbase.run_for_backends('yum')
     @swbase.test_with_repos(stable=False)
     def test_disabled_repo_identity_names(self):
         """
@@ -161,6 +168,7 @@ class TestResourceForSoftwareIdentity(swbase.SwTestCase):
             self.assertTrue(
                     ref.InstanceID.startswith("LMI:LMI_SoftwareIdentity:"))
 
+    @swbase.run_for_backends('yum')
     @swbase.test_with_repos('updates')
     @swbase.test_with_packages(**{
             'updates#pkg1' : True,
@@ -182,16 +190,15 @@ class TestResourceForSoftwareIdentity(swbase.SwTestCase):
                 Role="AvailableSAP",
                 ResultRole="ManagedElement",
                 ResultClass="LMI_SoftwareIdentity")
-        if repo.pkg_count:
-            self.assertGreater(len(refs), 0,
-                'no software identities associated to repo "%s"'
+        self.assertGreater(len(refs), 0,
+            'no software identities associated to repo "%s"'
                 % repo.repoid)
         for ref in refs:
             self.assertEqual(ref.namespace, 'root/cimv2')
             self.assertEqual(ref.classname, "LMI_SoftwareIdentity")
             self.assertEqual(ref.path.key_properties(), ["InstanceID"])
 
-        nevra_dict = {i.ElementName: i for i in refs}
+        nevra_dict = dict((i.ElementName, i) for i in refs)
         installed_count = 0
         for pkg in repo.packages:
             self.assertTrue(pkg.nevra in nevra_dict,
@@ -233,8 +240,8 @@ class TestResourceForSoftwareIdentity(swbase.SwTestCase):
             self.assertEqual(ref.namespace, 'root/cimv2')
             self.assertEqual(ref.classname, "LMI_SoftwareIdentityResource")
             self.assertEqual(set(ref.key_properties()),
-                    set(["SystemCreationClassName", "SystemName",
-                        "Name", "CreationClassName"]))
+                    set(("SystemCreationClassName", "SystemName",
+                        "Name", "CreationClassName",)))
             self.assertEqual(ref.Name, pkg.repoid,
                     'Repository name does not match for pkg "%s"'
                     % pkg.nevra)
@@ -268,8 +275,8 @@ class TestResourceForSoftwareIdentity(swbase.SwTestCase):
             self.assertEqual(ref.namespace, 'root/cimv2')
             self.assertEqual(ref.classname, "LMI_SoftwareIdentityResource")
             self.assertEqual(set(ref.path.key_properties()),
-                    set(["SystemCreationClassName", "SystemName",
-                        "Name", "CreationClassName"]))
+                    set(("SystemCreationClassName", "SystemName",
+                        "Name", "CreationClassName",)))
             self.assertEqual(ref.Name, pkg.repoid,
                     'Repository name does not match for pkg "%s"'
                     % pkg.nevra)

@@ -16,6 +16,8 @@ Contents:
 
    usage
 
+   configuration
+
 .. ifconfig:: includeClasses
 
    OpenLMI LogicalFile CIM Classes:

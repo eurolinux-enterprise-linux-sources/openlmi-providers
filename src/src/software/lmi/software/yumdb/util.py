@@ -1,6 +1,6 @@
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -20,7 +20,7 @@
 #
 
 """
-Common utilities meant to be used only be ``yumdb`` subpackage.
+Common utilities meant to be used only by ``yumdb`` subpackage.
 """
 
 import logging
@@ -29,51 +29,55 @@ import yum
 from lmi.providers import cmpi_logging
 from lmi.software.util import Configuration
 
-DEBUG_LOGGING_CONFIG = {
-    "version" : 1,
-    'disable_existing_loggers' : True,
-    "formatters": {
-        # this is a message format for logging function/method calls
-        # it's manually set up in YumWorker's init method
-        "default": {
-            "()": "lmi.providers.cmpi_logging.DispatchingFormatter",
-            "formatters" : {
-                "lmi.providers.cmpi_logging.trace_function_or_method":
+def disable_existing_loggers():
+    """
+    Disable all existing loggers and remove logging handlers.
+    """
+    for logger in logging.root.manager.loggerDict.values():
+        logger.disabled = 1
+        logger.handlers = []
+    logger = logging.getLogger()
+    logger.disabled = 1
+    logger.handlers = []
+
+def disable_logging():
+    """
+    Send everything to ``/dev/null``.
+    """
+    disable_existing_loggers()
+    handler = logging.FileHandler('/dev/null')
+    handler.setLevel(logging.CRITICAL)
+    root = logging.getLogger('root')
+    root.disabled = 0
+    root.addHandler(handler)
+    root.setLevel(logging.CRITICAL)
+
+def setup_logging_to_file(output_file, level=logging.DEBUG):
+    """
+    Log everything to file.
+
+    :param str output_file: Path to a desired log file.
+    :param int level: Lowest level of logging messages to handle.
+    """
+    disable_existing_loggers()
+    formatter = cmpi_logging.DispatchingFormatter(
+        formatters={
+            "lmi.providers.cmpi_logging.trace_function_or_method":
                     "%(asctime)s %(levelname)s:%(message)s"
                 },
-            "default" : "%(asctime)s %(levelname)s:%(module)s:"
-                        "%(funcName)s:%(lineno)d - %(message)s"
-            },
-        },
-    "handlers": {
-        "file" : {
-            "class" : "logging.FileHandler",
-            "filename" : "/var/tmp/YumWorker.log",
-            "level" : "DEBUG",
-            "formatter": "default",
-            },
-        },
-    "root": {
-        "level": "DEBUG",
-        "handlers" : ["file"]
-        },
-}
-
-DISABLED_LOGGING_CONFIG = {
-    'version' : 1,
-    'disable_existing_loggers' : True,
-    'handlers': {
-        'null' : {
-            'class': 'logging.FileHandler',
-            'level': 'CRITICAL',
-            'filename': '/dev/null'
-            }
-        },
-    'root' : {
-        'level': 'CRITICAL',
-        'handlers' : ['null'],
-        }
-}
+        default="%(asctime)s %(levelname)s:%(module)s:"
+                        "%(funcName)s:%(lineno)d - %(message)s")
+    handler = logging.FileHandler(output_file)
+    handler.setLevel(level)
+    handler.setFormatter(formatter)
+    root = logging.getLogger()
+    root.setLevel(level)
+    root.addHandler(handler)
+    # re-enable function tracing logger which has been disabled by
+    # disable_existing_loggers() call
+    logger = logging.getLogger(
+            cmpi_logging.__name__ + '.trace_function_or_method')
+    logger.disabled = 0
 
 def setup_logging():
     """
@@ -85,7 +89,7 @@ def setup_logging():
     config = Configuration.get_instance()
     cp = config.config
     logging_setup = False
-    if cp.has_option('YumWorkerLog', 'file_config'):
+    if cp.has_option('YumWorkerLog', 'FileConfig'):
         try:
             file_path = config.file_path('YumWorkerLog', 'FileConfig')
             logging.config.fileConfig(file_path)
@@ -96,23 +100,14 @@ def setup_logging():
         out = config.get_safe('YumWorkerLog', 'OutputFile')
         if out is not None:
             try:
-                defaults = DEBUG_LOGGING_CONFIG.copy()
-                defaults["handlers"]["file"]["filename"] = out
                 level = config.get_safe('YumWorkerLog', 'Level')
                 level = cmpi_logging.LOGGING_LEVELS[level.lower()]
-                defaults["handlers"]["file"]["level"] = level
-                defaults["root"]["level"] = level
-                logging.config.dictConfig(defaults)
+                setup_logging_to_file(out, level)
                 logging_setup = True
-                # re-enable function tracing logger which has been disabled by
-                # dictConfig() call
-                logging.getLogger(cmpi_logging.__name__
-                        + '.trace_function_or_method').disabled = False
             except Exception:
                 pass
     if logging_setup is False:
-        # disable logging completely
-        logging.config.dictConfig(DISABLED_LOGGING_CONFIG)
+        disable_logging()
 
 def is_pkg_installed(pkg, rpmdb):
     """

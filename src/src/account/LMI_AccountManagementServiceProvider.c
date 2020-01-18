@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,7 +27,6 @@
 #include "LMI_Group.h"
 
 #include "macros.h"
-#include "globals.h"
 
 #include "aux_lu.h"
 #include "account_globals.h"
@@ -36,6 +35,9 @@
 
 #include <sys/stat.h>
 #include <unistd.h>
+#include <shadow.h>
+
+#include "lock.h"
 
 // Return values of functions
 // common
@@ -53,6 +55,10 @@ static const CMPIBroker* _cb = NULL;
 static void LMI_AccountManagementServiceInitialize(const CMPIContext *ctx)
 {
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
+    if (init_lock_pools() == 0) {
+        lmi_error("Unable to initialize lock pool.");
+        exit (1);
+    }
 }
 
 static CMPIStatus LMI_AccountManagementServiceCleanup(
@@ -82,7 +88,7 @@ static CMPIStatus LMI_AccountManagementServiceEnumInstances(
 {
     LMI_AccountManagementService lams;
 
-    const char *hostname = get_system_name();
+    const char *hostname = lmi_get_system_name_safe(cc);
 
     LMI_AccountManagementService_Init(&lams, _cb, KNameSpace(cop));
     LMI_AccountManagementService_Set_CreationClassName(&lams,
@@ -91,7 +97,7 @@ static CMPIStatus LMI_AccountManagementServiceEnumInstances(
     LMI_AccountManagementService_Set_Name(&lams, LAMSNAME);
     LMI_AccountManagementService_Set_ElementName(&lams, LAMSNAME);
     LMI_AccountManagementService_Set_SystemCreationClassName(&lams,
-      get_system_creation_class_name());
+      lmi_get_system_creation_class_name());
     LMI_AccountManagementService_Set_RequestedState(&lams,
       LMI_AccountManagementService_RequestedState_Not_Applicable);
     LMI_AccountManagementService_Set_EnabledState(&lams,
@@ -246,6 +252,7 @@ KUint32 LMI_AccountManagementService_CreateGroup(
     struct lu_error *error = NULL;
     struct lu_ent *lue = NULL;
     GValue value;
+    int pwdlockres = -1;
     const char *nameSpace = LMI_AccountManagementServiceRef_NameSpace(
         (LMI_AccountManagementServiceRef *) self);
     CMPIEnumeration *instances = NULL;
@@ -268,6 +275,16 @@ KUint32 LMI_AccountManagementService_CreateGroup(
              RET_FAILED);
         goto clean;
       }
+
+    char userlock[USERNAME_LEN_MAX] = {0};
+    /* -1 for NULL char */
+    strncpy(userlock, Name->chars, sizeof(userlock) - 1);
+    lmi_debug("Getting giant lock for user: %s", userlock);
+    get_giant_lock();
+
+    pwdlockres = lckpwdf();
+    if (pwdlockres != 0)
+        lmi_warn("Cannot acquire passwd file lock\n");
 
     luc = lu_start(NULL, lu_user, NULL, NULL, lu_prompt_console_quiet, NULL,
       &error);
@@ -323,7 +340,7 @@ KUint32 LMI_AccountManagementService_CreateGroup(
     /* Output created group identity */
     KRefA_Init(Identities, cb, 1);
     LMI_IdentityRef_Init(&Identityref, cb, nameSpace);
-    asprintf(&instanceid, ORGID":GID:%ld", aux_lu_get_long(lue, LU_GIDNUMBER));
+    asprintf(&instanceid, LMI_ORGID":GID:%ld", aux_lu_get_long(lue, LU_GIDNUMBER));
     LMI_IdentityRef_Set_InstanceID(&Identityref, instanceid);
     free(instanceid);
     IdentityOP = LMI_IdentityRef_ToObjectPath(&Identityref, NULL);
@@ -331,6 +348,12 @@ KUint32 LMI_AccountManagementService_CreateGroup(
 
 clean:
 #undef FAIL
+    if (pwdlockres == 0)
+        ulckpwdf();
+    lmi_debug("Releasing giant lock for user: %s", userlock);
+    release_giant_lock();
+    lmi_debug("Giant lock released for user %s", userlock);
+
     if (lue) lu_ent_free(lue);
     if (luc) lu_end(luc);
     return result;
@@ -373,19 +396,19 @@ KUint32 LMI_AccountManagementService_CreateAccount(
     struct lu_ent *lue = NULL, *lue_group = NULL;
 
     GValue val;
-    int create_group = 0;
     gid_t gid = LU_VALUE_INVALID_ID, uid = LU_VALUE_INVALID_ID;
     char *group_name = NULL, *instanceid = NULL;
     const char *home = NULL;
 
     const char *nameSpace = LMI_AccountManagementServiceRef_NameSpace(
         (LMI_AccountManagementServiceRef *) self);
-    const char *hostname = get_system_name();
+    const char *hostname = lmi_get_system_name_safe(context);
     CMPIStatus st;
     CMPIEnumeration *instances = NULL;
     LMI_AccountRef Accountref;
     LMI_IdentityRef Identityref;
     CMPIObjectPath *AccountOP = NULL, *IdentityOP = NULL;
+    int pwdlockres = -1;
 
     KSetStatus(status, OK);
     KUint32_Set(&result, 0);
@@ -396,6 +419,16 @@ KUint32 LMI_AccountManagementService_CreateAccount(
              RET_FAILED);
         goto clean;
       }
+
+    char userlock[USERNAME_LEN_MAX] = {0};
+    /* -1 for NULL char */
+    strncpy(userlock, Name->chars, sizeof(userlock) - 1);
+    lmi_debug("Getting giant lock for user: %s", userlock);
+    get_giant_lock();
+
+    pwdlockres = lckpwdf();
+    if (pwdlockres != 0)
+        lmi_warn("Cannot acquire passwd file lock\n");
 
     luc = lu_start(NULL, lu_user, NULL, NULL, lu_prompt_console_quiet, NULL,
       &error);
@@ -465,15 +498,7 @@ KUint32 LMI_AccountManagementService_CreateAccount(
             /* add user to the group with same name as user name */
             group_name = strdup(Name->chars);
           }
-        if (lu_group_lookup_name(luc, group_name, lue_group, &error))
-          {
-            gid = aux_lu_get_long(lue_group, LU_GIDNUMBER);
-          }
-        else
-          {
-            create_group = 1;
-          }
-        if (create_group)
+        if (!lu_group_lookup_name(luc, group_name, lue_group, &error))
           {
             lu_group_default(luc, group_name, 0, lue_group);
             if (!lu_group_add(luc, lue_group, &error))
@@ -553,7 +578,7 @@ output:
       LMI_AccountRef_Set_Name(&Accountref, Name->chars);
       LMI_AccountRef_Set_SystemName(&Accountref, hostname);
       LMI_AccountRef_Set_SystemCreationClassName(&Accountref,
-        get_system_creation_class_name());
+        lmi_get_system_creation_class_name());
       LMI_AccountRef_Set_CreationClassName(&Accountref, LMI_Account_ClassName);
       AccountOP = LMI_AccountRef_ToObjectPath(&Accountref, &st);
       KRef_SetObjectPath(Account, AccountOP);
@@ -565,7 +590,7 @@ output:
 
       /* Identity of Account */
       LMI_IdentityRef_Init(&Identityref, cb, nameSpace);
-      asprintf(&instanceid, ORGID":UID:%ld",
+      asprintf(&instanceid, LMI_ORGID":UID:%ld",
         aux_lu_get_long(lue, LU_UIDNUMBER));
       LMI_IdentityRef_Set_InstanceID(&Identityref, instanceid);
       free(instanceid);
@@ -573,7 +598,7 @@ output:
       KRefA_Set(Identities, 0, IdentityOP);
 
       /* Identity of Group */
-      asprintf(&instanceid, ORGID":GID:%ld",
+      asprintf(&instanceid, LMI_ORGID":GID:%ld",
         aux_lu_get_long(lue, LU_GIDNUMBER));
       LMI_IdentityRef_Set_InstanceID(&Identityref, instanceid);
       free(instanceid);
@@ -582,11 +607,16 @@ output:
 
 clean:
 #undef FAIL
+    if (pwdlockres == 0)
+        ulckpwdf();
+    lmi_debug("Releasing giant lock for user: %s", userlock);
+    release_giant_lock();
+    lmi_debug("Giant lock released for user %s", userlock);
+
     free(group_name);
     if (lue) lu_ent_free(lue);
     if (lue_group) lu_ent_free(lue_group);
     if (luc) lu_end(luc);
-
     return result;
 }
 

@@ -514,7 +514,7 @@ Enable and disable repository
 Supported event filters
 -----------------------
 There are various events related to asynchronous job you may be interested
-about. All of them can be suscribed to with static filters presented below.
+about. All of them can be subscribed to with static filters presented below.
 Usage of custom query strings is not supported due to a complexity of
 its parsing. These filters should be already registered in *CIMOM* if
 *OpenLMI Software* providers are installed. You may check them by enumerating

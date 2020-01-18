@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -23,12 +23,12 @@
 Unit tests for ``LMI_InstalledSoftwareIdentity`` provider.
 """
 
-import pywbem
-import unittest
-
+from lmi.test import wbem
+from lmi.test import unittest
 from lmi.shell import LMIDeletedObjectError
 from lmi.test.lmibase import enable_lmi_exceptions
 from lmi.test.util import mark_tedious
+
 import package
 import swbase
 import util
@@ -70,20 +70,21 @@ class TestInstalledSoftwareIdentity(swbase.SwTestCase):
         self.assertCIMNameEqual(inst.path, objpath,
                 "Object paths should match for package %s" % pkg)
 
-        # try it now with CIM_ComputerSystem
-        system = objpath.System.copy()
-        objpath.System.wrapped_object.classname = "CIM_ComputerSystem"
-        objpath.System.wrapped_object.CreationClassName = \
-                "CIM_ComputerSystem"
-
-        inst = objpath.to_instance()
-        self.assertCIMNameEqual(inst.path, objpath,
-                "Object paths should match for package %s" % pkg)
-        for key in self.KEYS:
-            self.assertIn(key, inst.properties(),
-                    "OP is missing \"%s\" key for package %s" % (key, pkg))
-        self.assertCIMNameEqual(inst.System, system)
-        self.assertCIMNameEqual(inst.path, objpath)
+        if not util.USE_PKCON:
+            # try it now with CIM_ComputerSystem
+            system = objpath.System.copy()
+            objpath.System.wrapped_object.classname = "CIM_ComputerSystem"
+            objpath.System.wrapped_object.CreationClassName = \
+                    "CIM_ComputerSystem"
+    
+            inst = objpath.to_instance()
+            self.assertCIMNameEqual(inst.path, objpath,
+                    "Object paths should match for package %s" % pkg)
+            for key in self.KEYS:
+                self.assertIn(key, inst.properties(),
+                        "OP is missing \"%s\" key for package %s" % (key, pkg))
+            self.assertCIMNameEqual(inst.System, system)
+            self.assertCIMNameEqual(inst.path, objpath)
 
     @enable_lmi_exceptions
     @swbase.test_with_packages(**{'stable#pkg2' : False })
@@ -94,7 +95,7 @@ class TestInstalledSoftwareIdentity(swbase.SwTestCase):
         repo = self.get_repo('stable')
         pkg = repo['pkg2']
         objpath = self.make_op(pkg)
-        self.assertRaisesCIM(pywbem.CIM_ERR_NOT_FOUND, objpath.to_instance)
+        self.assertRaisesCIM(wbem.CIM_ERR_NOT_FOUND, objpath.to_instance)
 
     @mark_tedious
     @swbase.test_with_packages(**{
@@ -112,6 +113,7 @@ class TestInstalledSoftwareIdentity(swbase.SwTestCase):
         'misc#pkg2' : False,
         'misc#funny-version' : True,
         'misc#funny-release' : True,
+        'misc#unicode-chars' : False,
     })
     def test_enum_instance_names(self):
         """
@@ -264,7 +266,7 @@ class TestInstalledSoftwareIdentity(swbase.SwTestCase):
                 "System"            : objpath.System
             }
         # try to install second time
-        self.assertRaisesCIM(pywbem.CIM_ERR_ALREADY_EXISTS,
+        self.assertRaisesCIM(wbem.CIM_ERR_ALREADY_EXISTS,
             self.cim_class.create_instance, properties)
 
     @swbase.test_with_repos(**{'stable' : False})
@@ -297,7 +299,7 @@ class TestInstalledSoftwareIdentity(swbase.SwTestCase):
 
         # try to delete second time
         self.assertRaises(LMIDeletedObjectError, inst.delete)
-        self.assertRaisesCIM(pywbem.CIM_ERR_NOT_FOUND, objpath.to_instance)
+        self.assertRaisesCIM(wbem.CIM_ERR_NOT_FOUND, objpath.to_instance)
 
     @mark_tedious
     @swbase.test_with_packages(**{

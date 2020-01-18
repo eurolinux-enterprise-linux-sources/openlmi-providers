@@ -6,7 +6,7 @@ The OpenLMI project provides a common infrastructure for the management of Linux
 systems. Capabilities include configuration, management and monitoring of
 hardware, operating systems, and system services. OpenLMI includes a set of
 services that can be accessed both locally and remotely, multiple language
-bindings, standard APIs, and standard scripting interfaces. 
+bindings, standard APIs, and standard scripting interfaces.
 
 
 *******************************************************************************
@@ -82,7 +82,14 @@ Following providers are part of this sub-project:
 * PCP
     This is a CIM interface for the PCP (Performance Co-Pilot) daemon.  Allows
     reading of PCP metrics on the local host.
-
+    
+* Locale
+    Locale provider is a CIM interface for systemd-localed. Allows to control
+    system locale variables (LANG, LC_PAPER, ...) and keyboard mapping for
+    virtual console and X11.
+    
+* SSSD
+    This is a CIM interface for the SSSD daemon.
 
 *******************************************************************************
 * Build Dependencies                                                          *
@@ -95,6 +102,7 @@ For all providers:
 
 For documentation:
     - python-sphinx
+    - konkretcmpi-python
     - (optionally) plantuml
 
 Provider specific dependencies:
@@ -125,6 +133,12 @@ Provider specific dependencies:
     - dbus-devel
 * PCP
     - python-pcp
+* Locale
+    - glib2-devel 2.26+
+    - systemd 30+ (systemd-localed)
+* SSSD
+    - dbus-devel
+    - libsss_simpleifp-devel
 
 *******************************************************************************
 * Compilation and installation                                                *

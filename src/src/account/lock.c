@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,15 +28,6 @@
 
 static lock_pools_t pools;
 
-/* Critical sections lock */
-static inline void LOCK_CSEC_POOLS (void)   { pthread_mutex_lock (&pools.csec); }
-static inline void UNLOCK_CSEC_POOLS (void) { pthread_mutex_unlock (&pools.csec); }
-static inline void LOCK_CSEC_USER (void)    { pthread_mutex_lock (&pools.user_pool.csec); }
-static inline void UNLOCK_CSEC_USER (void)  { pthread_mutex_unlock (&pools.user_pool.csec); }
-static inline void LOCK_CSEC_GROUP (void)   { pthread_mutex_lock (&pools.group_pool.csec); }
-static inline void UNLOCK_CSEC_GROUP (void) { pthread_mutex_unlock (&pools.group_pool.csec); }
-
-
 static pthread_once_t pools_are_initialized = PTHREAD_ONCE_INIT;
 static unsigned int ref_count = 0;
 
@@ -44,12 +35,43 @@ static unsigned int ref_count = 0;
 static void new_pools (void);
 static void free_lock (gpointer lock) __attribute__((nonnull));
 
+/* Critical sections locks */
+typedef enum {
+    USER_LOCK = 1,
+    GROUP_LOCK = 2,
+} lck_type_t;
+
+static inline void LOCK_CSEC_POOLS (void)   { pthread_mutex_lock (&pools.csec); }
+static inline void UNLOCK_CSEC_POOLS (void) { pthread_mutex_unlock (&pools.csec); }
+static inline void LOCK_CSEC_USER (void)    { pthread_mutex_lock (&pools.user_pool.csec); }
+static inline void UNLOCK_CSEC_USER (void)  { pthread_mutex_unlock (&pools.user_pool.csec); }
+static inline void LOCK_CSEC_GROUP (void)   { pthread_mutex_lock (&pools.group_pool.csec); }
+static inline void UNLOCK_CSEC_GROUP (void) { pthread_mutex_unlock (&pools.group_pool.csec); }
+static inline void LOCK_GIANT (void)        { pthread_mutex_lock (&giant_lock.mutex); }
+static inline void UNLOCK_GIANT (void)      { pthread_mutex_unlock (&giant_lock.mutex); }
+
+static inline void LOCK_BY_TYPE (lck_type_t lck_type)
+{
+    if ( lck_type == GROUP_LOCK ) {
+        LOCK_CSEC_GROUP ();
+    } else if ( lck_type == USER_LOCK ) {
+        LOCK_CSEC_USER ();
+    } else { assert ("Unknown lock type"); }
+}
+static inline void UNLOCK_BY_TYPE (lck_type_t lck_type)
+{
+    if ( lck_type == GROUP_LOCK ) {
+        UNLOCK_CSEC_GROUP ();
+    } else if ( lck_type == USER_LOCK ) {
+        UNLOCK_CSEC_USER ();
+    } else { assert ("Unknown lock type"); }
+}
+
 /* Internal functions */
 static int search_key (lock_pool_t *const pool, const char *const key, lock_t **lck) __attribute__((nonnull));
 static int add_key (lock_pool_t *const pool, const char *const key) __attribute__((nonnull));
 static int release_lock (lock_pool_t *const pool, const char *const key) __attribute__((nonnull));
-static int get_lock (lock_pool_t *const pool, const char *const key) __attribute__((nonnull));
-
+static int get_lock (lock_pool_t *const pool, const char *const key, lck_type_t lck_type) __attribute__((nonnull));
 
 int init_lock_pools (void)
 {
@@ -85,6 +107,10 @@ static void new_pools (void)
     pthread_mutex_init (&pools.user_pool.csec, NULL);
     pthread_mutex_init (&pools.group_pool.csec, NULL);
     pthread_mutex_init (&pools.csec, NULL);
+
+    /* initialize giant lock */
+    memset (&giant_lock, 0, sizeof (giant_lock_t));
+    pthread_mutex_init (&giant_lock.mutex, NULL);
 
     pools.initialized = 1;
 }
@@ -156,14 +182,24 @@ static int add_key (lock_pool_t *const pool, const char *const key)
     return 1;
 }
 
+void get_giant_lock (void)
+{
+    assert (pools.initialized == 1);
+    LOCK_GIANT ();
+}
+
+void release_giant_lock (void)
+{
+    assert (pools.initialized == 1);
+    UNLOCK_GIANT ();
+}
+
 int get_user_lock (const char *const username)
 {
     assert (pools.initialized == 1);
 
-    LOCK_CSEC_USER ();
     lock_pool_t *const pool = &pools.user_pool;
-    const int ret = get_lock (pool, username);
-    UNLOCK_CSEC_USER ();
+    const int ret = get_lock (pool, username, USER_LOCK);
     return ret;
 }
 
@@ -171,16 +207,16 @@ int get_group_lock (const char *const groupname)
 {
     assert (pools.initialized == 1);
 
-    LOCK_CSEC_GROUP ();
     lock_pool_t *const pool = &pools.group_pool;
-    const int ret = get_lock (pool, groupname);
-    UNLOCK_CSEC_GROUP ();
+    const int ret = get_lock (pool, groupname, GROUP_LOCK);
     return ret;
 }
 
-static int get_lock (lock_pool_t *const pool, const char *const key)
+static int get_lock (lock_pool_t *const pool, const char *const key, lck_type_t lck_type)
 {
     assert (pool != NULL);
+
+    LOCK_BY_TYPE (lck_type);
 
     lock_t *lck = NULL;
     int ret = search_key (pool, key, &lck);
@@ -193,10 +229,12 @@ static int get_lock (lock_pool_t *const pool, const char *const key)
 
         /* This will raise warning in covscan.
            But I just want return locked mutex. */
+        UNLOCK_BY_TYPE (lck_type);
         pthread_mutex_lock (mutex);
         return 1;
     }
     /* no keys found - add new key to list */
+    UNLOCK_BY_TYPE (lck_type);
     return (add_key (pool, key));
 }
 

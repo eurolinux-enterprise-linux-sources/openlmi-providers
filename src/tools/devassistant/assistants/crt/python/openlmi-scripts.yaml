@@ -1,0 +1,107 @@
+fullname: LMI script assistant
+description: 'LMI script assistant will help you create an OpenLMI script and install necessary dependencies.'
+
+dependencies:
+- use: super.dependencies
+- rpm: ['openlmi-python-base', 'openlmi-tools', 'python-docopt']
+
+dependencies_eclipse:
+- use: eclipse.dependencies_python
+
+dependencies_vim:
+- use: vim.dependencies
+
+args:
+  name:
+    use: common_args
+
+  url:
+    flags:
+    - -u
+    - --url
+    help:
+      If used, will check out LMI scripts from given URL (useful when working with fork).
+    required: False
+    default: https://github.com/openlmi/openlmi-scripts.git
+
+  author:
+    flags:
+    - -a
+    - --author
+    help:
+      Specify author
+    required: False
+    default: "John Doe"
+
+  email:
+    flags:
+    - -m
+    - --email
+    help:
+      Specify author's e-mail
+    required: False
+    default: "john@example.com"
+
+  eclipse:
+    use: eclipse
+
+  github:
+    use: common_args
+
+  vim:
+    use: vim
+
+files:
+  gitignore: &gitignore
+    source: ../.gitignore
+  sources: &sources
+    source: .
+
+run:
+- $dirname~: $(dirname "$name")
+- $basename~: $(basename "$name")
+- $lbasename~: $(basename "$name" | tr '[A-Z]' '[a-z]')
+- log_i: 'Creating LMI script $basename in $dirname ...'
+- if $(test -e "$name"):
+  - log_e: '$name already exists, cannot proceed.'
+- else:
+  - cl: mkdir -p "$name"
+  - cl: cd "$name"
+  - log_i: Getting LMI scripts sources ...
+  - $git_output: $(git clone --depth 1 "$url" .openlmi-scripts)
+  - if $(echo "$git_output" | grep "fatal"):
+    - log_e: Could not checkout sources - $git_output
+
+  - cl: cd .openlmi-scripts/commands
+  - cl_i: ./make_new.py -p "$basename" -d "$basename" -a "$author" -e "$email" "$lbasename"
+  - cl: cd "$lbasename"
+  - cl: cp -r * ../../..
+  - cl: cd ../../..
+  - cl_i: cp .openlmi-scripts/Makefile.inc Makefile
+  - cl_i: cp .openlmi-scripts/VERSION .
+  - cl: rm -rf .openlmi-scripts
+
+  - log_i: 'Building sources ...'
+  - cl_i: make setup
+  - cl_i: python setup.py build
+  - cl: cd ..
+
+- cl: cd "$name"
+- if defined $vim:
+  - use: vim.run
+- if $eclipse:
+  - use: eclipse.run_python
+- cl: cp *gitignore .
+- use: git_init_add_commit.run
+- if defined $github:
+  - github: create_and_push
+- log_i: 'New LMI script $basename in $dirname has been created.'
+- log_i: 'Remember it''s just a skeleton that should be filled in in order to make the script'
+- log_i: 'usable.'
+- log_i: ''
+- log_i: 'Please read http://pythonhosted.org/openlmi-tools/scripts/script-tutorial.html for'
+- log_i: 'a basic tutorial on how to write LMI scripts. Especially the "Setting up environment"'
+- log_i: 'section is important for testing and debugging. Note that this assistant already did'
+- log_i: 'the work noted in "Making our command structure" section for you.'
+- log_i: ''
+- log_i: 'Related information are kept on the project website: http://www.openlmi.org/devassistant'

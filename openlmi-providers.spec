@@ -3,13 +3,16 @@
 %global required_libuser_ver 0.60
 
 Name:           openlmi-providers
-Version:        0.4.2
-Release:        8%{?dist}
+Version:        0.5.0
+Release:        3%{?dist}
 Summary:        Set of basic CIM providers
 
 License:        LGPLv2+
 URL:            http://fedorahosted.org/openlmi/
 Source0:        http://fedorahosted.org/released/openlmi-providers/%{name}-%{version}.tar.gz
+
+# Fix traceback when provider info is not found in the registration database
+Patch0:         openlmi-providers-0.5.0-fix-mof-register-traceback.patch
 
 # Upstream name has been changed from cura-providers to openlmi-providers
 Provides:       cura-providers = %{version}-%{release}
@@ -35,11 +38,11 @@ Obsoletes:      cura-providers < 0.0.10-1
 # Storage and networking providers are built out of tree
 # We will require a minimum and maximum version of them
 # to ensure that they are tested together.
-%global storage_min_version 0.7.1
-%global storage_max_version 0.8
+%global storage_min_version 0.8
+%global storage_max_version 0.9
 
-%global nw_min_version 0.2.2
-%global nw_max_version 0.3
+%global nw_min_version 0.3
+%global nw_max_version 0.4
 
 BuildRequires:  cmake
 BuildRequires:  konkretcmpi-devel >= %{required_konkret_ver}
@@ -60,6 +63,8 @@ BuildRequires:  libudev-devel
 BuildRequires:  libselinux-devel
 # For openlmi-realmd
 BuildRequires:  dbus-devel
+# for openlmi-journald
+BuildRequires:  systemd-devel
 # For openlmi-mof-register script
 Requires:       python2
 # sblim-sfcb or tog-pegasus
@@ -81,21 +86,6 @@ Requires:       openlmi-python-base = %{providers_version_release}
 # Remove in future
 BuildRequires:  python-setuptools
 
-# from upstream
-# https://bugzilla.redhat.com/show_bug.cgi?id=1050841
-Patch0:        openlmi-providers-0.4.2-thread-unsafe.patch
-# https://bugzilla.redhat.com/show_bug.cgi?id=1042843
-Patch1:        openlmi-providers-0.4.2-dont-autofill-fsname-fsclassname.patch
-# https://bugzilla.redhat.com/show_bug.cgi?id=1049819
-Patch2:        openlmi-providers-0.4.2-proper-method-result.patch
-# https://bugzilla.redhat.com/show_bug.cgi?id=1049816
-Patch3:        openlmi-providers-0.4.2-methods-description.patch
-# https://bugzilla.redhat.com/show_bug.cgi?id=1031650
-Patch4:        openlmi-providers-0.4.2-fan-make-the-sprintf_chip_name-thread-safe.patch
-# https://bugzilla.redhat.com/show_bug.cgi?id=1062264
-Patch5:        openlmi-providers-0.4.2-logicalfile-socket-getinstance.patch
-# https://bugzilla.redhat.com/show_bug.cgi?id=1074419
-Patch6:        openlmi-providers-0.4.2-system_name_verification.patch
 
 %description
 %{name} is set of (usually) small CMPI providers (agents) for basic
@@ -325,7 +315,7 @@ into strings on demand.
 
 %package -n openlmi
 Summary:        OpenLMI managed system software components
-Version:        1.0.1
+Version:        1.0.2
 Requires:       %{name} = %{providers_version_release}
 BuildArch:      noarch
 Requires:       tog-pegasus
@@ -369,20 +359,32 @@ BuildArch:      noarch
 python-sphinx-theme-openlmi contains Sphinx theme for OpenLMI provider
 documentation.
 
+%package -n openlmi-journald
+Summary:        CIM provider for Journald
+Requires:       %{name}%{?_isa} = %{providers_version_release}
+
+%description -n openlmi-journald
+The openlmi-journald package contains CMPI providers for systemd journald
+service, allowing listing, iterating through and writing new message log
+records.
+
+%package -n openlmi-journald-doc
+Summary:        CIM Journald provider documentation
+Group:          Documentation
+BuildArch:      noarch
+
+%description -n openlmi-journald-doc
+This package contains the documents for OpenLMI Journald provider.
+
+
 %prep
 %setup -q
 %patch0 -p1
-%patch1 -p1
-%patch2 -p1
-%patch3 -p1
-%patch4 -p1
-%patch5 -p1
-%patch6 -p1
 
 %build
 mkdir -p %{_target_platform}
 pushd %{_target_platform}
-%{cmake} .. -DCRYPT_ALGS='"SHA512","SHA256","DES","MD5"' -DWITH-JOURNALD=OFF
+%{cmake} .. -DCRYPT_ALGS='"SHA512","SHA256","DES","MD5"' -DWITH-SSSD=OFF -DWITH-INDSENDER=OFF -DWITH-LOCALE=OFF
 popd
 
 make -k %{?_smp_mflags} -C %{_target_platform} all doc
@@ -450,7 +452,7 @@ touch $RPM_BUILD_ROOT/%{_localstatedir}/lib/%{name}/stamp
 # documentation
 install -m 755 -d $RPM_BUILD_ROOT/%{_docdir}/%{name}
 install -m 644 README COPYING $RPM_BUILD_ROOT/%{_docdir}/%{name}
-for provider in account fan hardware logicalfile power realmd software; do
+for provider in account fan hardware logicalfile power realmd software journald; do
     install -m 755 -d $RPM_BUILD_ROOT/%{_docdir}/%{name}/${provider}/admin_guide
     cp -pr %{_target_platform}/doc/admin/${provider}/html/* $RPM_BUILD_ROOT/%{_docdir}/%{name}/${provider}/admin_guide
 done
@@ -461,8 +463,6 @@ cp -pr %{_target_platform}/doc/admin/service-dbus/html/* $RPM_BUILD_ROOT/%{_docd
 install -m 755 -d $RPM_BUILD_ROOT/%{python_sitelib}/sphinx/themes/openlmitheme
 cp -pr tools/openlmitheme/* $RPM_BUILD_ROOT/%{python_sitelib}/sphinx/themes/openlmitheme/
 
-# Remove journald
-rm $RPM_BUILD_ROOT/%{_datadir}/%{name}/60_LMI_Journald.mof
 
 %files
 %dir %{_docdir}/%{name}
@@ -489,6 +489,7 @@ rm $RPM_BUILD_ROOT/%{_datadir}/%{name}/60_LMI_Journald.mof
 %{_libdir}/pkgconfig/openlmi.pc
 %dir %{_includedir}/openlmi
 %{_includedir}/openlmi/openlmi.h
+%{_includedir}/openlmi/openlmi-utils.h
 %{_datadir}/cmake/Modules/OpenLMIMacros.cmake
 %{_datadir}/cmake/Modules/FindOpenLMI.cmake
 %{_datadir}/cmake/Modules/FindCMPI.cmake
@@ -601,9 +602,10 @@ rm $RPM_BUILD_ROOT/%{_datadir}/%{name}/60_LMI_Journald.mof
 
 %files -n openlmi-logicalfile
 %doc README COPYING
+%config(noreplace) %{_sysconfdir}/openlmi/logicalfile/logicalfile.conf
 %{_libdir}/cmpi/libcmpiLMI_LogicalFile.so
-%{_datadir}/%{name}/60_LMI_LogicalFile.mof
-%{_datadir}/%{name}/60_LMI_LogicalFile.reg
+%{_datadir}/%{name}/50_LMI_LogicalFile.mof
+%{_datadir}/%{name}/50_LMI_LogicalFile.reg
 %{_datadir}/%{name}/90_LMI_LogicalFile_Profile.mof
 %attr(755, root, root) %{_libexecdir}/pegasus/cmpiLMI_LogicalFile-cimprovagt
 
@@ -622,11 +624,11 @@ rm $RPM_BUILD_ROOT/%{_datadir}/%{name}/60_LMI_Journald.mof
 %{_docdir}/%{name}/realmd/
 
 %files -n openlmi-indicationmanager-libs
-%doc COPYING src/indmanager/README
+%doc COPYING src/libs/indmanager/README.indmanager
 %{_libdir}/libopenlmiindmanager.so.*
 
 %files -n openlmi-indicationmanager-libs-devel
-%doc COPYING src/indmanager/README
+%doc COPYING src/libs/indmanager/README.indmanager
 %{_libdir}/libopenlmiindmanager.so
 %{_libdir}/pkgconfig/openlmiindmanager.pc
 %{_includedir}/openlmi/ind_manager.h
@@ -637,6 +639,18 @@ rm $RPM_BUILD_ROOT/%{_datadir}/%{name}/60_LMI_Journald.mof
 %files -n python-sphinx-theme-openlmi
 %doc COPYING README
 %{python_sitelib}/sphinx/themes/openlmitheme/
+
+%files -n openlmi-journald
+%doc README COPYING
+%{_libdir}/cmpi/libcmpiLMI_Journald.so
+%{_datadir}/%{name}/60_LMI_Journald.mof
+%{_datadir}/%{name}/60_LMI_Journald.reg
+%{_datadir}/%{name}/70_LMI_JournaldIndicationFilters.mof
+%{_datadir}/%{name}/90_LMI_Journald_Profile.mof
+%attr(755, root, root) %{_libexecdir}/pegasus/cmpiLMI_Journald-cimprovagt
+
+%files -n openlmi-journald-doc
+%{_docdir}/%{name}/journald/
 
 %pre
 # If upgrading, deregister old version
@@ -720,9 +734,11 @@ fi >> %logfile 2>&1
 
 %pre -n openlmi-logicalfile
 if [ "$1" -gt 1 ]; then
+    # mof and reg file prefix has been changed from 60_ to 50_ recently,
+    # use * to match both of the them
     %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
-        %{_datadir}/%{name}/60_LMI_LogicalFile.mof \
-        %{_datadir}/%{name}/60_LMI_LogicalFile.reg || :;
+        %{_datadir}/%{name}/*_LMI_LogicalFile.mof \
+        %{_datadir}/%{name}/*_LMI_LogicalFile.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
         %{_datadir}/%{name}/90_LMI_LogicalFile_Profile.mof || :;
 fi >> %logfile 2>&1
@@ -755,6 +771,17 @@ if [ "$1" -gt 1 ]; then
             %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.mof \
             %{_localstatedir}/lib/%{name}/60_LMI_PCP_PMNS.reg || :;
     fi
+fi >> %logfile 2>&1
+
+%pre -n openlmi-journald
+if [ "$1" -gt 1 ]; then
+    %{_bindir}/openlmi-mof-register --just-mofs -n root/interop unregister \
+        %{_datadir}/%{name}/70_LMI_JournaldIndicationFilters.mof || :;
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
+        %{_datadir}/%{name}/60_LMI_Journald.mof \
+        %{_datadir}/%{name}/60_LMI_Journald.reg || :;
+    %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
+        %{_datadir}/%{name}/90_LMI_Journald_Profile.mof || :;
 fi >> %logfile 2>&1
 
 %post -n openlmi-fan
@@ -811,8 +838,8 @@ fi >> %logfile 2>&1
 %post -n openlmi-logicalfile
 if [ "$1" -ge 1 ]; then
     %{_bindir}/openlmi-mof-register -v %{providers_version} register \
-        %{_datadir}/%{name}/60_LMI_LogicalFile.mof \
-        %{_datadir}/%{name}/60_LMI_LogicalFile.reg || :;
+        %{_datadir}/%{name}/50_LMI_LogicalFile.mof \
+        %{_datadir}/%{name}/50_LMI_LogicalFile.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus register \
         %{_datadir}/%{name}/90_LMI_LogicalFile_Profile.mof || :;
 fi >> %logfile 2>&1
@@ -834,6 +861,17 @@ if [ "$1" -ge 1 ]; then
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus register \
         %{_datadir}/%{name}/90_LMI_Hardware_Profile.mof \
         %{_datadir}/%{name}/90_LMI_Hardware_Profile_DMTF.mof || :;
+fi >> %logfile 2>&1
+
+%post -n openlmi-journald
+if [ "$1" -ge 1 ]; then
+    %{_bindir}/openlmi-mof-register -v %{providers_version} register \
+        %{_datadir}/%{name}/60_LMI_Journald.mof \
+        %{_datadir}/%{name}/60_LMI_Journald.reg || :;
+    %{_bindir}/openlmi-mof-register --just-mofs -n root/interop register \
+        %{_datadir}/%{name}/70_LMI_JournaldIndicationFilters.mof || :;
+    %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus register \
+        %{_datadir}/%{name}/90_LMI_Journald_Profile.mof || :;
 fi >> %logfile 2>&1
 
 %preun -n openlmi-fan
@@ -889,9 +927,11 @@ fi >> %logfile 2>&1
 
 %preun -n openlmi-logicalfile
 if [ "$1" -eq 0 ]; then
+    # mof and reg file prefix has been changed from 60_ to 50_ recently,
+    # use * to match both of the them
     %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
-        %{_datadir}/%{name}/60_LMI_LogicalFile.mof \
-        %{_datadir}/%{name}/60_LMI_LogicalFile.reg || :;
+        %{_datadir}/%{name}/*_LMI_LogicalFile.mof \
+        %{_datadir}/%{name}/*_LMI_LogicalFile.reg || :;
     %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
         %{_datadir}/%{name}/90_LMI_LogicalFile_Profile.mof || :;
 fi >> %logfile 2>&1
@@ -926,7 +966,32 @@ if [ "$1" -eq 0 ]; then
     fi
 fi >> %logfile 2>&1
 
+%preun -n openlmi-journald
+if [ "$1" -eq 0 ]; then
+    # delete indication filters
+    %{_bindir}/openlmi-mof-register --just-mofs -n root/interop unregister \
+        %{_datadir}/%{name}/70_LMI_JournaldIndicationFilters.mof || :;
+    %{_bindir}/openlmi-mof-register -v %{providers_version} unregister \
+        %{_datadir}/%{name}/60_LMI_Journald.mof \
+        %{_datadir}/%{name}/60_LMI_Journald.reg || :;
+    %{_bindir}/openlmi-mof-register --just-mofs -n root/interop -c tog-pegasus unregister \
+        %{_datadir}/%{name}/90_LMI_Journald_Profile.mof || :;
+fi >> %logfile 2>&1
+
 %changelog
+* Mon Jan 19 2015 Radek Novacek <rnovacek@redhat.com> 0.5.0-3
+- Fix traceback when provider registration is not found
+- Resolves: rhbz#1182100
+
+* Fri Sep 05 2014 Radek Novacek <rnovacek@redhat.com> 0.5.0-2
+- Bump version of openlmi metapackage to 1.0.2
+- Related: rhbz#1122424
+
+* Thu Sep 04 2014 Radek Novacek <rnovacek@redhat.com> 0.5.0-1
+- Rebase to 0.5.0
+- Enable journald provider
+- Resolves: rhbz#1122424
+
 * Mon Mar 10 2014 Michal Minar <miminar@redhat.com> 0.4.2-8
 - Fixed SysteName verification.
 - Resolves: rhbz#1074419

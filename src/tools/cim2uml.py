@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -81,14 +81,14 @@ class CimExporter(object):
             s = s + "%s : %s = %s\n" % (label, name, str(instance[name]))
         return s
 
-        
+
     def drawInstance(self, instance):
         if self.isIgnored(instance):
             return
         path = self.loader.getInstancePath(instance)
         name = 'obj' + str(len(self.instanceLabels))
         self.instanceLabels[path] = name
-        
+
         _encodeObject = lambda x: (base64.b64encode(zlib.compress(cPickle.dumps(x, cPickle.HIGHEST_PROTOCOL))))
         params = {'url': self.loader.cliconn.url, 'ns': self.loader.namespace, 'instPath':_encodeObject(instance)}
         url = self.urltemplate + "?" + cgi.urllib.urlencode(params)
@@ -97,7 +97,7 @@ class CimExporter(object):
         print 'object "%s" as %s' % (title, name)
         print props
 
-        
+
     def drawReference(self, reference):
         # find the first and the second CIMInstanceName among keybindings
         vals = reference.keybindings.values()
@@ -109,14 +109,14 @@ class CimExporter(object):
         while not isinstance(vals[i], pywbem.CIMInstanceName):
             i = i+1
         dst = vals[i]
-        
+
         if self.isIgnored(src) or self.isIgnored(dst) or self.isIgnored(reference):
             return
         label = reference.classname
         srcName = self.instanceLabels[self.loader.getInstancePath(src)]
         dstName = self.instanceLabels[self.loader.getInstancePath(dst)]
         print '%s -- %s : %s' % (srcName, dstName, label)
-        
+
     def export(self):
         instances = self.loader.instances.values()
         instances.sort()
@@ -139,7 +139,7 @@ class CimLoader(object):
         self.references = {} #'classname:path-path' -> reference
         self.implemented_properties = {} # classname -> array of property names
         self.ignore = ignore
-        
+
     def isIgnored(self, instance):
         if self.ignore is None:
             return False
@@ -153,7 +153,7 @@ class CimLoader(object):
         instance.host='f16'
         path = str(instance)
         return path.replace('"', "'")
-    
+
     def getReferencePath(self, reference, src, dst):
         label = reference.classname
         srcName = self.getInstancePath(src)
@@ -174,17 +174,17 @@ class CimLoader(object):
             key = prop.qualifiers.get('Key', None)
             if key and key.value:
                 props.append(name)
- 
+
         for name in sorted(c.properties.keys()):
             prop = c.properties[name]
             implemented = prop.qualifiers.get('Implemented', None)
             key = prop.qualifiers.get('Key', None)
             if (implemented and implemented.value) and not (key and key.value):
                 props.append(name)
-    
+
         self.implemented_properties[classname] = props
         return props
-    
+
     def addInstances(self, instances, level):
         for i in instances:
             path = self.getInstancePath(i)
@@ -222,7 +222,7 @@ class CimLoader(object):
         # add initial instances
         instances = self.cliconn.EnumerateInstanceNames(self.classname, namespace=self.namespace)
         self.addInstances(instances, 0)
-        
+
         while True:
             try:
                 (path, level) = self.queue.popitem()
@@ -230,12 +230,12 @@ class CimLoader(object):
                 break
             instance = self.instances[path]
             self.addReferences(instance, level)
-            
+
     def dumpTo(self, filename):
         f =  open(filename, 'w')
         cPickle.dump((self.instances, self.references), f)
         f.close()
-        
+
     def loadFrom(self, filename):
         f =  open(filename, 'r')
         (self.instances, self.references) = cPickle.load(f)
@@ -267,7 +267,7 @@ if options.infile:
     l.loadFrom(options.infile)
 else:
     l.load()
-    
+
 if options.outfile:
     l.dumpTo(options.outfile)
 

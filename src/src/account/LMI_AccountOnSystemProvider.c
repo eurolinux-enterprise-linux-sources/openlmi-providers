@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+ * Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -31,7 +31,6 @@
 #include "aux_lu.h"
 #include "macros.h"
 #include "account_globals.h"
-#include "globals.h"
 
 static const CMPIBroker* _cb;
 
@@ -40,15 +39,15 @@ static void LMI_AccountOnSystemInitialize(const CMPIContext *ctx)
     lmi_init(provider_name, _cb, ctx, provider_config_defaults);
 }
 
-static CMPIStatus LMI_AccountOnSystemCleanup( 
+static CMPIStatus LMI_AccountOnSystemCleanup(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
+    const CMPIContext* cc,
     CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_AccountOnSystemEnumInstanceNames( 
+static CMPIStatus LMI_AccountOnSystemEnumInstanceNames(
     CMPIInstanceMI* mi,
     const CMPIContext* cc,
     const CMPIResult* cr,
@@ -58,12 +57,12 @@ static CMPIStatus LMI_AccountOnSystemEnumInstanceNames(
         _cb, mi, cc, cr, cop);
 }
 
-static CMPIStatus LMI_AccountOnSystemEnumInstances( 
+static CMPIStatus LMI_AccountOnSystemEnumInstances(
     CMPIInstanceMI* mi,
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     LMI_AccountRef laref;
     LMI_AccountOnSystem laos;
@@ -75,7 +74,7 @@ static CMPIStatus LMI_AccountOnSystemEnumInstances(
 
     size_t i;
     const char *nameSpace = KNameSpace(cop);
-    const char *hostname = get_system_name();
+    const char *hostname = lmi_get_system_name_safe(cc);
 
     luc = lu_start(NULL, lu_user, NULL, NULL, lu_prompt_console_quiet, NULL, &error);
     if (!luc)
@@ -90,16 +89,16 @@ static CMPIStatus LMI_AccountOnSystemEnumInstances(
         lue = g_ptr_array_index(accounts, i);
 
         LMI_AccountRef_Init(&laref, _cb, nameSpace);
-        LMI_AccountRef_Set_SystemCreationClassName(&laref, get_system_creation_class_name());
+        LMI_AccountRef_Set_SystemCreationClassName(&laref, lmi_get_system_creation_class_name());
         LMI_AccountRef_Set_SystemName(&laref, hostname);
         LMI_AccountRef_Set_CreationClassName(&laref,
           LMI_Account_ClassName);
         LMI_AccountRef_Set_Name(&laref, aux_lu_get_str(lue, LU_USERNAME));
 
         LMI_AccountOnSystem_Init(&laos, _cb, nameSpace);
-        KPrintObjectPath(stderr, lmi_get_computer_system(), 1);
+        KPrintObjectPath(stderr, lmi_get_computer_system_safe(cc), 1);
         LMI_AccountOnSystem_SetObjectPath_GroupComponent(&laos,
-          lmi_get_computer_system());
+          lmi_get_computer_system_safe(cc));
         LMI_AccountOnSystem_Set_PartComponent(&laos, &laref);
 
         KReturnInstance(cr, laos);
@@ -115,62 +114,62 @@ static CMPIStatus LMI_AccountOnSystemEnumInstances(
     CMReturn(CMPI_RC_OK);
 }
 
-static CMPIStatus LMI_AccountOnSystemGetInstance( 
-    CMPIInstanceMI* mi, 
+static CMPIStatus LMI_AccountOnSystemGetInstance(
+    CMPIInstanceMI* mi,
     const CMPIContext* cc,
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char** properties) 
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char** properties)
 {
     return KDefaultGetInstance(
         _cb, mi, cc, cr, cop, properties);
 }
 
-static CMPIStatus LMI_AccountOnSystemCreateInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const CMPIInstance* ci) 
-{
-    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
-}
-
-static CMPIStatus LMI_AccountOnSystemModifyInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
+static CMPIStatus LMI_AccountOnSystemCreateInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
     const CMPIObjectPath* cop,
-    const CMPIInstance* ci, 
-    const char**properties) 
+    const CMPIInstance* ci)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_AccountOnSystemDeleteInstance( 
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop) 
+static CMPIStatus LMI_AccountOnSystemModifyInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const CMPIInstance* ci,
+    const char**properties)
+{
+    CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
+}
+
+static CMPIStatus LMI_AccountOnSystemDeleteInstance(
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
 static CMPIStatus LMI_AccountOnSystemExecQuery(
-    CMPIInstanceMI* mi, 
-    const CMPIContext* cc, 
-    const CMPIResult* cr, 
-    const CMPIObjectPath* cop, 
-    const char* lang, 
-    const char* query) 
+    CMPIInstanceMI* mi,
+    const CMPIContext* cc,
+    const CMPIResult* cr,
+    const CMPIObjectPath* cop,
+    const char* lang,
+    const char* query)
 {
     CMReturn(CMPI_RC_ERR_NOT_SUPPORTED);
 }
 
-static CMPIStatus LMI_AccountOnSystemAssociationCleanup( 
+static CMPIStatus LMI_AccountOnSystemAssociationCleanup(
     CMPIAssociationMI* mi,
-    const CMPIContext* cc, 
-    CMPIBoolean term) 
+    const CMPIContext* cc,
+    CMPIBoolean term)
 {
     CMReturn(CMPI_RC_OK);
 }
@@ -263,13 +262,13 @@ static CMPIStatus LMI_AccountOnSystemReferenceNames(
         role);
 }
 
-CMInstanceMIStub( 
+CMInstanceMIStub(
     LMI_AccountOnSystem,
     LMI_AccountOnSystem,
     _cb,
     LMI_AccountOnSystemInitialize(ctx))
 
-CMAssociationMIStub( 
+CMAssociationMIStub(
     LMI_AccountOnSystem,
     LMI_AccountOnSystem,
     _cb,

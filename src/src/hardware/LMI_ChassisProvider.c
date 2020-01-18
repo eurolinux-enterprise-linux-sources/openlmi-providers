@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -20,9 +20,9 @@
 
 #include <konkret/konkret.h>
 #include "LMI_Chassis.h"
-#include "LMI_Hardware.h"
-#include "globals.h"
+#include "utils.h"
 #include "dmidecode.h"
+#include "virt_what.h"
 
 CMPIUint16 get_chassis_type(const char *dmi_chassis);
 
@@ -60,7 +60,7 @@ static CMPIStatus LMI_ChassisEnumInstances(
 {
     LMI_Chassis lmi_chassis;
     const char *ns = KNameSpace(cop);
-    char instance_id[INSTANCE_ID_LEN], *tag;
+    char instance_id[BUFLEN], *tag, *virt = NULL;
     DmiChassis dmi_chassis;
 
     if (dmi_get_chassis(&dmi_chassis) != 0) {
@@ -70,7 +70,7 @@ static CMPIStatus LMI_ChassisEnumInstances(
     LMI_Chassis_Init(&lmi_chassis, _cb, ns);
 
     LMI_Chassis_Set_CreationClassName(&lmi_chassis,
-            ORGID "_" CHASSIS_CLASS_NAME);
+            LMI_Chassis_ClassName);
     LMI_Chassis_Set_PackageType(&lmi_chassis,
             LMI_Chassis_PackageType_Chassis_Frame);
     LMI_Chassis_Set_Caption(&lmi_chassis, "System Chassis");
@@ -78,8 +78,8 @@ static CMPIStatus LMI_ChassisEnumInstances(
             "This object represents physical chassis of the system.");
 
     tag = dmi_get_chassis_tag(&dmi_chassis);
-    snprintf(instance_id, INSTANCE_ID_LEN,
-        ORGID ":" ORGID "_" CHASSIS_CLASS_NAME ":%s", tag);
+    snprintf(instance_id, BUFLEN,
+        LMI_ORGID ":" LMI_Chassis_ClassName ":%s", tag);
 
     LMI_Chassis_Set_Tag(&lmi_chassis, tag);
     LMI_Chassis_Set_InstanceID(&lmi_chassis, instance_id);
@@ -106,6 +106,12 @@ static CMPIStatus LMI_ChassisEnumInstances(
         LMI_Chassis_Set_NumberOfPowerCords(&lmi_chassis,
                 dmi_chassis.power_cords);
     }
+    if (virt_what_get_virtual_type(&virt) == 0 && virt && strlen(virt)) {
+        LMI_Chassis_Set_VirtualMachine(&lmi_chassis, virt);
+    } else {
+        LMI_Chassis_Set_VirtualMachine(&lmi_chassis, "No");
+    }
+    free(virt);
 
     KReturnInstance(cr, lmi_chassis);
 

@@ -1,6 +1,6 @@
 # Software Management Providers
 #
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -71,6 +71,9 @@ def job_request(async=False):
     Job objects are processed by this decorator for caller to obtain only the
     information he needs.
 
+    If async == True, the wrapped method must have 'async' argument in
+    its **kwargs.
+
     It wrapps them with logger wrapper and in case of asynchronous jobs,
     it returns just the jobid.
     """
@@ -94,9 +97,8 @@ def job_request(async=False):
         @wraps(method)
         def _new_func(self, *args, **kwargs):
             """Wrapper for YumDB's method."""
-            callargs = inspect.getcallargs(method, self, *args, **kwargs)
             result = logged(self, *args, **kwargs)
-            if callargs.get('async', False):
+            if kwargs.get('async', False):
                 return result
             else:
                 return result.result_data

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Red Hat, Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,9 +21,8 @@
 
 #include <konkret/konkret.h>
 #include "LMI_PCIDevice.h"
-#include "LMI_Hardware.h"
+#include "utils.h"
 #include "PCIDev.h"
-#include "globals.h"
 
 static const CMPIBroker* _cb = NULL;
 
@@ -39,7 +38,7 @@ static void LMI_PCIDeviceInitialize(const CMPIContext *ctx)
                                 | PCI_FILL_ROM_BASE
                                 | PCI_FILL_CLASS
                                 | PCI_FILL_CAPS) != 0) {
-        error("Failed to access the PCI bus.");
+        lmi_error("Failed to access the PCI bus.");
         abort();
     }
 }
@@ -79,12 +78,12 @@ static CMPIStatus LMI_PCIDeviceEnumInstances(
     u16 svid, subid, status, command_reg;
     struct pci_dev *dev;
     struct pci_cap *cap;
-    char vendor_buf[NAME_BUF_SIZE], *vendor_name;
-    char device_buf[NAME_BUF_SIZE], *device_name;
-    char subsys_buf[NAME_BUF_SIZE], *subsys_name;
-    char svendor_buf[NAME_BUF_SIZE], *svendor_name;
-    char device_id_str[PCI_DEVID_STR_SIZE];
-    char instance_id[INSTANCE_ID_LEN];
+    char vendor_buf[BUFLEN], *vendor_name;
+    char device_buf[BUFLEN], *device_name;
+    char subsys_buf[BUFLEN], *subsys_name;
+    char svendor_buf[BUFLEN], *svendor_name;
+    char device_id_str[BUFLEN];
+    char instance_id[BUFLEN];
 
     for (dev = acc_dev->devices; dev; dev = dev->next) {
         /* Ignore PCI Bridges */
@@ -93,33 +92,33 @@ static CMPIStatus LMI_PCIDeviceEnumInstances(
             continue;
         }
 
-        vendor_name = pci_lookup_name(acc_dev, vendor_buf, NAME_BUF_SIZE,
+        vendor_name = pci_lookup_name(acc_dev, vendor_buf, BUFLEN,
                 PCI_LOOKUP_VENDOR, dev->vendor_id);
-        device_name = pci_lookup_name(acc_dev, device_buf, NAME_BUF_SIZE,
+        device_name = pci_lookup_name(acc_dev, device_buf, BUFLEN,
                 PCI_LOOKUP_DEVICE, dev->vendor_id, dev->device_id);
         get_subid(dev, &svid, &subid);
-        subsys_name = pci_lookup_name(acc_dev, subsys_buf, NAME_BUF_SIZE,
+        subsys_name = pci_lookup_name(acc_dev, subsys_buf, BUFLEN,
                 PCI_LOOKUP_DEVICE | PCI_LOOKUP_SUBSYSTEM,
                 dev->vendor_id, dev->device_id, svid, subid);
-        svendor_name = pci_lookup_name(acc_dev, svendor_buf, NAME_BUF_SIZE,
+        svendor_name = pci_lookup_name(acc_dev, svendor_buf, BUFLEN,
                 PCI_LOOKUP_VENDOR | PCI_LOOKUP_SUBSYSTEM, svid);
         status = pci_read_word(dev, PCI_STATUS);
         rev = pci_read_byte(dev, PCI_REVISION_ID);
         cache_line = pci_read_byte(dev, PCI_CACHE_LINE_SIZE);
         command_reg = pci_read_word(dev, PCI_COMMAND);
 
-        snprintf(device_id_str, PCI_DEVID_STR_SIZE, "%02x:%02x.%u",
+        snprintf(device_id_str, BUFLEN, "%02x:%02x.%u",
                 dev->bus, dev->dev, dev->func);
-        snprintf(instance_id, INSTANCE_ID_LEN,
-                ORGID ":" ORGID "_" PCI_DEVICE_CLASS_NAME ":%s", device_id_str);
+        snprintf(instance_id, BUFLEN,
+                LMI_ORGID ":" LMI_PCIDevice_ClassName ":%s", device_id_str);
 
         LMI_PCIDevice_Init(&lmi_dev, _cb, ns);
 
         LMI_PCIDevice_Set_SystemCreationClassName(&lmi_dev,
-                get_system_creation_class_name());
-        LMI_PCIDevice_Set_SystemName(&lmi_dev, get_system_name());
+                lmi_get_system_creation_class_name());
+        LMI_PCIDevice_Set_SystemName(&lmi_dev, lmi_get_system_name_safe(cc));
         LMI_PCIDevice_Set_CreationClassName(&lmi_dev,
-                ORGID "_" PCI_DEVICE_CLASS_NAME);
+                LMI_PCIDevice_ClassName);
         LMI_PCIDevice_Set_Caption(&lmi_dev,
                 "This object represents one logical PCI device contained in system.");
 

@@ -1,4 +1,4 @@
-# Copyright (C) 2012-2013 Red Hat, Inc.  All rights reserved.
+# Copyright (C) 2012-2014 Red Hat, Inc.  All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -23,11 +23,12 @@ Base classes for *OpenLMI Provider* test cases.
 """
 
 import os
-import pywbem
 import socket
-import unittest
 
+from lmi.test import CIMError
+from lmi.test import unittest
 from lmi.test import util
+from lmi.test import wbem
 
 def render_iname(iname, indent=2):
     """
@@ -36,19 +37,19 @@ def render_iname(iname, indent=2):
     lines will be indented with *indent* spaces.
 
     :param iname: Object path to render.
-    :type iname: :py:class:`pywbem.CIMInstanceName`
+    :type iname: :py:class:`lmiwbem.CIMInstanceName`
     :param integer ident: Number of spaces prefixing all lines but the first.
     :returns: *iname* nicely rendered.
     :rtype: string
     """
-    if not isinstance(iname, pywbem.CIMInstanceName):
+    if not isinstance(iname, wbem.CIMInstanceName):
         return repr(iname)
     lines = [ "%s" % iname.classname
             , " "*indent + "namespace: %s" % iname.namespace
             , " "*indent + "keys:"]
     align = max([len(k) for k in iname.keybindings.iterkeys()])
     for key, value in iname.keybindings.iteritems():
-        if isinstance(value, pywbem.CIMInstanceName):
+        if isinstance(value, wbem.CIMInstanceName):
             value = render_iname(value, indent + 4)
         lines.append(" "*indent + ("  %%-%ds : %%s" % align) % (key, value))
     return "\n".join(lines)
@@ -93,15 +94,15 @@ class BaseLmiTestCase(unittest.TestCase):
     def assertRaisesCIM(self, cim_err_code, func, *args, **kwds):
         """
         This test passes if given function called with supplied arguments
-        raises :py:class:`pywbem.CIMError` with given cim error code.
+        raises `CIMError` with given cim error code.
         """
-        with self.assertRaises(pywbem.CIMError) as cm:
+        with self.assertRaises(CIMError) as cm:
             func(*args, **kwds)
         self.assertEqual(cim_err_code, cm.exception.args[0])
 
     def assertCIMNameEqual(self, fst, snd, msg=None):
         """
-        Compare two objects of :py:class:`pywbem.CIMInstanceName`. Their host
+        Compare two objects of :py:class:`lmiwbem.CIMInstanceName`. Their host
         properties are not checked.
         """
         if msg is None:
@@ -111,7 +112,7 @@ class BaseLmiTestCase(unittest.TestCase):
 
     def assertCIMNameIn(self, name, candidates):
         """
-        Checks that given :py:class:`pywbem.CIMInstanceName` is present in
+        Checks that given :py:class:`lmiwbem.CIMInstanceName` is present in
         set of candidates. It compares all properties but ``host``.
         """
         for candidate in candidates:

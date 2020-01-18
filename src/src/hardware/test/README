@@ -1,0 +1,29 @@
+Testing
+=======
+Tests must be run as root on machine with cimom broker.
+
+Dependencies
+------------
+ * python-hwdata
+
+Preparation
+-----------
+``lmi.test`` module must be on python path. The easiest way to get it there is
+to export ``PYTHONPATH`` environment variable like this: ::
+
+    export PYTHONPATH="${PATH_TO_GIT_ROOT}/src/python"
+
+There is number of environment variables, which affect test running.
+At least these four are required (with example values):
+
+    export LMI_CIMOM_URL="https://localhost"
+    export LMI_CIMOM_BROKER="tog-pegasus"
+    export LMI_CIMOM_USERNAME="pegasus"
+    export LMI_CIMOM_PASSWORD="pass"
+
+For more details take a look at https://fedorahosted.org/openlmi/wiki/TestGuidelines
+
+Running tests
+-------------
+For example: ::
+    nosetests -v ./TestHardware.py

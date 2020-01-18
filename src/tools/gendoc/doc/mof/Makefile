@@ -4,10 +4,10 @@ WORKSPACE_PREFIX ?= ../clones
 
 MOFS=$(WORKSPACE_PREFIX)/openlmi-providers/mof/05_LMI_Qualifiers.mof \
      $(WORKSPACE_PREFIX)/openlmi-providers/mof/30_LMI_Jobs.mof \
+     $(WORKSPACE_PREFIX)/openlmi-providers/mof/50_LMI_LogicalFile.mof \
      $(WORKSPACE_PREFIX)/openlmi-providers/mof/60_LMI_Account.mof \
      $(WORKSPACE_PREFIX)/openlmi-providers/mof/60_LMI_Fan.mof \
      $(WORKSPACE_PREFIX)/openlmi-providers/mof/60_LMI_Hardware.mof \
-     $(WORKSPACE_PREFIX)/openlmi-providers/mof/60_LMI_LogicalFile.mof \
      $(WORKSPACE_PREFIX)/openlmi-providers/mof/60_LMI_PCP.mof \
      $(WORKSPACE_PREFIX)/openlmi-providers/mof/60_LMI_PowerManagement.mof \
      $(WORKSPACE_PREFIX)/openlmi-providers/mof/60_LMI_Realmd.mof \
